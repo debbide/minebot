@@ -298,8 +298,15 @@ app.get('/api/bots', (req, res) => {
 // Add new server
 app.post('/api/bots/add', async (req, res) => {
   try {
-    // Save to config for persistence
-    const serverConfig = configManager.addServer(req.body);
+    // 尝试保存到配置（如果已存在会抛出错误）
+    let serverConfig;
+    try {
+      serverConfig = configManager.addServer(req.body);
+    } catch (e) {
+      // 配置已存在，使用现有配置
+      const servers = configManager.getServers();
+      serverConfig = servers.find(s => s.id === req.body.id) || req.body;
+    }
     const result = await botManager.addServer(serverConfig);
     res.json({ success: true, ...result });
   } catch (error) {

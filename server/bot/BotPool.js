@@ -13,6 +13,31 @@ export class BotPool {
     this.maxLogs = 200;
 
     this.setupProcessHandlers();
+
+    // 启动时加载已保存的服务器配置
+    this.loadSavedServers();
+  }
+
+  /**
+   * 加载已保存的服务器配置
+   */
+  loadSavedServers() {
+    const servers = this.configManager.getServers();
+    if (servers && servers.length > 0) {
+      console.log(`正在加载 ${servers.length} 个已保存的服务器配置...`);
+      for (const serverConfig of servers) {
+        // 只创建实例，不自动连接
+        const bot = new BotInstance(
+          serverConfig.id,
+          serverConfig,
+          this.aiService,
+          this.onLog.bind(this),
+          this.onStatusChange.bind(this)
+        );
+        this.bots.set(serverConfig.id, bot);
+        console.log(`已加载服务器: ${serverConfig.name || serverConfig.id}`);
+      }
+    }
   }
 
   setupProcessHandlers() {
@@ -107,8 +132,17 @@ export class BotPool {
   async addServer(serverConfig) {
     const id = serverConfig.id || `server_${Date.now()}`;
 
+    // 如果已存在，只连接不重新创建
     if (this.bots.has(id)) {
-      throw new Error(`Server ${id} already exists`);
+      const existingBot = this.bots.get(id);
+      if (!existingBot.status.connected) {
+        try {
+          await existingBot.connect();
+        } catch (error) {
+          // Bot will auto-reconnect
+        }
+      }
+      return { id, status: existingBot.getStatus() };
     }
 
     const bot = new BotInstance(
