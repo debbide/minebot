@@ -1,7 +1,6 @@
 import mineflayer from 'mineflayer';
 import pkg from 'mineflayer-pathfinder';
 const { pathfinder, Movements, goals } = pkg;
-import minecraftData from 'minecraft-data';
 
 export class BotManager {
   constructor(configManager, aiService, broadcast) {
@@ -11,10 +10,15 @@ export class BotManager {
     this.bot = null;
     this.logs = [];
     this.maxLogs = 100;
+    this.reconnecting = false;
+    this.maxReconnectAttempts = 10;
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
     this.timer = null;
     this.autoChatInterval = null;
+    this.activityMonitorInterval = null;
+    this.connectionTimeout = null;
+    this.lastActivity = Date.now();
+    this.lastConnectionOptions = null;
 
     this.modes = {
       aiView: false,
@@ -40,6 +44,38 @@ export class BotManager {
       '!pos': this.cmdPosition.bind(this),
       '!follow': this.cmdFollow.bind(this)
     };
+
+    // Handle process signals
+    this.setupProcessHandlers();
+  }
+
+  setupProcessHandlers() {
+    process.on('SIGINT', () => {
+      this.log('info', '收到中断信号，正在清理...', '🛑');
+      this.cleanup();
+      process.exit(0);
+    });
+
+    process.on('SIGTERM', () => {
+      this.log('info', '收到终止信号，正在清理...', '🛑');
+      this.cleanup();
+      process.exit(0);
+    });
+
+    process.on('uncaughtException', (err) => {
+      if (err.name === 'PartialReadError') return;
+      console.error('未捕获异常:', err);
+      this.log('error', `未捕获异常: ${err.message}`, '✗');
+    });
+
+    process.on('unhandledRejection', (reason) => {
+      if (reason && reason.name === 'PartialReadError') return;
+      console.error('未处理的 Promise 拒绝:', reason);
+    });
+  }
+
+  updateActivity() {
+    this.lastActivity = Date.now();
   }
 
   log(type, message, icon = '') {
@@ -56,6 +92,7 @@ export class BotManager {
       this.logs.shift();
     }
     this.broadcast('log', entry);
+    console.log(`[${timestamp}] ${icon} ${message}`);
   }
 
   getRecentLogs() {
@@ -73,107 +110,232 @@ export class BotManager {
     return this.modes;
   }
 
+  cleanup() {
+    // Clear all intervals
+    if (this.autoChatInterval) {
+      clearInterval(this.autoChatInterval);
+      this.autoChatInterval = null;
+    }
+    if (this.activityMonitorInterval) {
+      clearInterval(this.activityMonitorInterval);
+      this.activityMonitorInterval = null;
+    }
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+
+    // Clean up bot
+    if (this.bot) {
+      try {
+        this.bot.removeAllListeners();
+        if (this.bot._client) {
+          this.bot._client.removeAllListeners();
+        }
+        if (typeof this.bot.quit === 'function') {
+          this.bot.quit();
+        } else if (typeof this.bot.end === 'function') {
+          this.bot.end();
+        }
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      this.bot = null;
+    }
+
+    this.status.connected = false;
+  }
+
+  startActivityMonitor() {
+    if (this.activityMonitorInterval) {
+      clearInterval(this.activityMonitorInterval);
+    }
+
+    this.activityMonitorInterval = setInterval(() => {
+      // 5 minutes without activity
+      if (Date.now() - this.lastActivity > 300000) {
+        this.log('warning', 'Bot 可能卡死，尝试重连...', '⏱️');
+        this.scheduleReconnect();
+      }
+    }, 30000); // Check every 30 seconds
+  }
+
+  scheduleReconnect() {
+    if (this.reconnecting) return;
+
+    this.reconnecting = true;
+    this.cleanup();
+
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.log('error', '已达到最大重连次数，停止重连', '✗');
+      this.reconnecting = false;
+      return;
+    }
+
+    this.reconnectAttempts++;
+    // Exponential backoff: 10s, 20s, 40s, 60s max
+    const delay = Math.min(10000 * Math.pow(2, this.reconnectAttempts - 1), 60000);
+
+    this.log('info', `等待 ${delay/1000} 秒后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`, '🔄');
+
+    setTimeout(() => {
+      this.reconnecting = false;
+      if (this.lastConnectionOptions) {
+        this.connect(this.lastConnectionOptions).catch(err => {
+          this.log('error', `重连失败: ${err.message}`, '✗');
+        });
+      }
+    }, delay);
+  }
+
   async connect(options = {}) {
     const config = this.configManager.getConfig();
     const host = options.host || config.server?.host || 'localhost';
     const port = options.port || config.server?.port || 25565;
-    const username = options.username || config.server?.username || 'MinecraftBot';
+    const username = options.username || config.server?.username || this.generateUsername();
     const version = options.version || config.server?.version || false;
 
+    // Save connection options for reconnection
+    this.lastConnectionOptions = { host, port, username, version };
+
+    // Clean up existing connection
     if (this.bot) {
-      this.disconnect();
+      this.cleanup();
     }
 
     this.log('info', `正在连接服务器 ${host}:${port}...`, '⚡');
 
     return new Promise((resolve, reject) => {
       try {
-        this.bot = mineflayer.createBot({
+        const botOptions = {
           host,
           port,
           username,
-          version,
-          auth: 'offline'
-        });
+          version: version || undefined,
+          auth: 'offline',
+          connectTimeout: 30000
+        };
+
+        this.bot = mineflayer.createBot(botOptions);
+
+        // Connection timeout
+        this.connectionTimeout = setTimeout(() => {
+          if (this.bot && !this.status.connected) {
+            this.log('error', '连接超时，主动断开', '❌');
+            this.scheduleReconnect();
+            reject(new Error('Connection timeout'));
+          }
+        }, 30000);
 
         this.bot.loadPlugin(pathfinder);
 
+        // Login event
+        this.bot.on('login', () => {
+          this.log('success', 'Bot 已成功登录', '✅');
+          clearTimeout(this.connectionTimeout);
+          this.reconnecting = false;
+          this.reconnectAttempts = 0;
+          this.updateActivity();
+          this.startActivityMonitor();
+        });
+
+        // Spawn event
         this.bot.once('spawn', () => {
           this.status.connected = true;
           this.status.serverAddress = `${host}:${port}`;
           this.status.version = this.bot.version;
-          this.reconnectAttempts = 0;
 
-          const mcData = minecraftData(this.bot.version);
-          const movements = new Movements(this.bot, mcData);
-          this.bot.pathfinder.setMovements(movements);
-
-          this.log('success', `成功进入世界 (版本: ${this.bot.version})`, '✓');
-          this.log('success', '[路径规划] 版本适配成功', '✓');
+          try {
+            const movements = new Movements(this.bot, this.bot.registry);
+            this.bot.pathfinder.setMovements(movements);
+            this.log('success', `成功进入世界 (版本: ${this.bot.version})`, '✓');
+          } catch (e) {
+            this.log('warning', '路径规划初始化失败，部分功能可能不可用', '⚠');
+          }
 
           this.broadcast('status', this.getStatus());
           resolve();
         });
 
+        // Health update
         this.bot.on('health', () => {
           this.status.health = this.bot.health;
           this.status.food = this.bot.food;
+          this.updateActivity();
           this.broadcast('status', this.getStatus());
         });
 
+        // Position update
         this.bot.on('move', () => {
-          this.status.position = this.bot.entity.position;
+          if (this.bot && this.bot.entity) {
+            this.status.position = this.bot.entity.position;
+            this.updateActivity();
+          }
         });
 
+        // Player events
         this.bot.on('playerJoined', (player) => {
-          this.status.players = Object.keys(this.bot.players);
-          this.log('info', `玩家 ${player.username} 加入游戏`, '👋');
-          this.broadcast('status', this.getStatus());
+          if (this.bot) {
+            this.status.players = Object.keys(this.bot.players);
+            this.log('info', `玩家 ${player.username} 加入游戏`, '👋');
+            this.broadcast('status', this.getStatus());
+          }
         });
 
         this.bot.on('playerLeft', (player) => {
-          this.status.players = Object.keys(this.bot.players);
-          this.log('info', `玩家 ${player.username} 离开游戏`, '👋');
-          this.broadcast('status', this.getStatus());
+          if (this.bot) {
+            this.status.players = Object.keys(this.bot.players);
+            this.log('info', `玩家 ${player.username} 离开游戏`, '👋');
+            this.broadcast('status', this.getStatus());
+          }
         });
 
+        // Chat handler
         this.bot.on('chat', async (username, message) => {
-          if (username === this.bot.username) return;
-
+          if (!this.bot || username === this.bot.username) return;
+          this.updateActivity();
           this.log('chat', `${username}: ${message}`, '💬');
 
-          // Handle commands
           if (message.startsWith('!')) {
             await this.handleCommand(username, message);
           }
         });
 
+        // Error handlers
         this.bot.on('error', (err) => {
           this.log('error', `错误: ${err.message}`, '✗');
-          reject(err);
+          console.error('Bot error:', err);
         });
 
         this.bot.on('kicked', (reason) => {
-          this.log('error', `被踢出: ${reason}`, '✗');
+          this.log('error', `被踢出: ${reason}`, '👢');
           this.status.connected = false;
           this.broadcast('status', this.getStatus());
+          this.scheduleReconnect();
         });
 
         this.bot.on('end', () => {
-          this.log('warning', '连接已断开', '⚠');
+          this.log('warning', '连接已断开', '🔌');
           this.status.connected = false;
           this.bot = null;
           this.broadcast('status', this.getStatus());
-
-          // Auto reconnect with exponential backoff
-          if (this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.reconnectAttempts++;
-            // Delay increases: 10s, 20s, 40s, 60s, 60s
-            const delay = Math.min(10000 * Math.pow(2, this.reconnectAttempts - 1), 60000);
-            this.log('info', `尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})，${delay/1000}秒后...`, '🔄');
-            setTimeout(() => this.connect(options), delay);
-          }
+          this.scheduleReconnect();
         });
+
+        // Low-level client events
+        if (this.bot._client) {
+          this.bot._client.on('error', (err) => {
+            console.log('底层协议错误:', err.message);
+          });
+
+          this.bot._client.on('end', () => {
+            console.log('底层连接断开');
+          });
+        }
 
       } catch (error) {
         this.log('error', `连接失败: ${error.message}`, '✗');
@@ -183,28 +345,30 @@ export class BotManager {
   }
 
   disconnect() {
-    if (this.bot) {
-      try {
-        if (typeof this.bot.quit === 'function') {
-          this.bot.quit();
-        } else if (typeof this.bot.end === 'function') {
-          this.bot.end();
-        }
-      } catch (e) {
-        // Ignore disconnect errors
-      }
-      this.bot = null;
-      this.status.connected = false;
-      this.log('info', '已断开连接', '🔌');
-      this.broadcast('status', this.getStatus());
-    }
+    this.reconnecting = true; // Prevent auto-reconnect
+    this.cleanup();
+    this.log('info', '已断开连接', '🔌');
+    this.broadcast('status', this.getStatus());
+    this.reconnecting = false;
   }
 
   async restart() {
-    const config = this.configManager.getConfig();
+    this.log('info', '正在重启...', '🔄');
+    this.reconnectAttempts = 0;
     this.disconnect();
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    await this.connect(config.server);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    if (this.lastConnectionOptions) {
+      await this.connect(this.lastConnectionOptions);
+    }
+  }
+
+  generateUsername() {
+    const adjectives = ['Clever', 'Swift', 'Brave', 'Happy', 'Mighty', 'Wise'];
+    const animals = ['Fox', 'Wolf', 'Bear', 'Tiger', 'Eagle', 'Panda'];
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const animal = animals[Math.floor(Math.random() * animals.length)];
+    const num = Math.floor(Math.random() * 99);
+    return `${adj}${animal}${num}`;
   }
 
   setMode(mode, enabled) {
@@ -247,12 +411,10 @@ export class BotManager {
   }
 
   handlePatrolMode(enabled) {
-    // Patrol mode implementation
     if (enabled && this.bot) {
       this.log('info', '巡逻模式已启动', '🚶');
-      // Add patrol waypoints logic here
-    } else {
-      this.bot?.pathfinder?.stop();
+    } else if (this.bot?.pathfinder) {
+      this.bot.pathfinder.stop();
     }
   }
 
@@ -289,7 +451,7 @@ export class BotManager {
       } catch (error) {
         this.log('error', `指令执行失败: ${error.message}`, '✗');
       }
-    } else {
+    } else if (this.bot) {
       this.bot.chat(`未知指令: ${cmd}，输入 !help 查看帮助`);
     }
   }
@@ -305,6 +467,7 @@ export class BotManager {
 
   // Command implementations
   cmdHelp(username) {
+    if (!this.bot) return;
     const helpText = [
       '可用指令:',
       '!help - 显示帮助',
@@ -318,6 +481,7 @@ export class BotManager {
   }
 
   async cmdCome(username) {
+    if (!this.bot) return;
     const player = this.bot.players[username];
     if (!player?.entity) {
       this.bot.chat('找不到你的位置');
@@ -335,6 +499,7 @@ export class BotManager {
   }
 
   cmdFollow(username) {
+    if (!this.bot) return;
     const player = this.bot.players[username];
     if (!player?.entity) {
       this.bot.chat('找不到你的位置');
@@ -347,16 +512,19 @@ export class BotManager {
   }
 
   cmdStop() {
+    if (!this.bot) return;
     this.bot.pathfinder.stop();
     this.bot.chat('已停止');
   }
 
   cmdPosition() {
+    if (!this.bot) return;
     const pos = this.bot.entity.position;
     this.bot.chat(`位置: X=${Math.floor(pos.x)} Y=${Math.floor(pos.y)} Z=${Math.floor(pos.z)}`);
   }
 
   async cmdAsk(username, args) {
+    if (!this.bot) return;
     if (args.length === 0) {
       this.bot.chat('请输入问题，例如: !ask 今天天气怎么样');
       return;
@@ -367,7 +535,6 @@ export class BotManager {
 
     try {
       const response = await this.aiService.chat(question, username);
-      // Split long responses
       const maxLen = 100;
       for (let i = 0; i < response.length; i += maxLen) {
         this.bot.chat(response.substring(i, i + maxLen));
