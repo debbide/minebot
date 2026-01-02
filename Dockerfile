@@ -28,7 +28,7 @@ RUN cd server && npm install --omit=dev
 COPY server/ ./server/
 
 # Copy built frontend from stage 1
-COPY --from=frontend-builder /app/dist ./dist/
+COPY --from=frontend-builder /app/frontend/dist ./dist/
 
 # Create data directory for config persistence
 RUN mkdir -p /app/server/data
