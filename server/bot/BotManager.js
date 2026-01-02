@@ -162,6 +162,7 @@ export class BotManager {
         this.bot.on('end', () => {
           this.log('warning', '连接已断开', '⚠');
           this.status.connected = false;
+          this.bot = null;
           this.broadcast('status', this.getStatus());
 
           // Auto reconnect
@@ -181,7 +182,15 @@ export class BotManager {
 
   disconnect() {
     if (this.bot) {
-      this.bot.quit();
+      try {
+        if (typeof this.bot.quit === 'function') {
+          this.bot.quit();
+        } else if (typeof this.bot.end === 'function') {
+          this.bot.end();
+        }
+      } catch (e) {
+        // Ignore disconnect errors
+      }
       this.bot = null;
       this.status.connected = false;
       this.log('info', '已断开连接', '🔌');
