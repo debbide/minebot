@@ -19,24 +19,29 @@ COPY public/ ./public/
 # Build frontend
 RUN npm run build
 
-# Stage 2: Production image
-FROM node:20-alpine AS production
+# Stage 2: Install server dependencies (separate for better caching)
+FROM node:20-alpine AS server-deps
 
-# Install PM2 globally
-RUN npm install -g pm2
-
-WORKDIR /app
-
-# Copy server package.json and install dependencies
-COPY server/package.json ./server/
 WORKDIR /app/server
+
+# Copy package.json only
+COPY server/package.json ./
+
+# Install production dependencies
 RUN npm install --omit=dev
 
+# Stage 3: Production image
+FROM node:20-alpine AS production
+
+WORKDIR /app
+
+# Copy server dependencies from stage 2
+COPY --from=server-deps /app/server/node_modules ./server/node_modules
+
 # Copy server source
-COPY server/ ./
+COPY server/ ./server/
 
 # Copy built frontend from stage 1
-WORKDIR /app
 COPY --from=frontend-builder /app/dist ./dist/
 
 # Create data and logs directory
@@ -53,6 +58,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/check || exit 1
 
-# Start with PM2 for process management
+# Start the server (use docker restart policy instead of PM2 for ARM compatibility)
 WORKDIR /app/server
-CMD ["pm2-runtime", "ecosystem.config.cjs"]
+CMD ["node", "index.js"]

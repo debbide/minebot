@@ -21,7 +21,6 @@
     "minecraft-protocol": "^1.62.0",
     "dotenv": "^16.3.1",
     "openai": "^4.20.0",
-    "jsonwebtoken": "^9.0.2",
-    "pm2": "^5.3.0"
+    "jsonwebtoken": "^9.0.2"
   }
 }
