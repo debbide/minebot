@@ -16,6 +16,7 @@
     "mineflayer-pathfinder": "^2.4.5",
     "minecraft-data": "^3.61.0",
     "dotenv": "^16.3.1",
-    "openai": "^4.20.0"
+    "openai": "^4.20.0",
+    "jsonwebtoken": "^9.0.2"
   }
 }

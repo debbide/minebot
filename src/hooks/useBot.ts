@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api, BotStatus, LogEntry } from '@/lib/api';
 
-const WS_URL = import.meta.env.PROD
-  ? `ws://${window.location.host}`
-  : 'ws://localhost:3000';
+function getWsUrl(): string {
+  const token = localStorage.getItem('token');
+  const baseUrl = import.meta.env.PROD
+    ? `ws://${window.location.host}`
+    : 'ws://localhost:3000';
+  return `${baseUrl}?token=${token}`;
+}
 
 export function useWebSocket() {
   const [status, setStatus] = useState<BotStatus | null>(null);
@@ -13,9 +17,15 @@ export function useWebSocket() {
   const reconnectTimeoutRef = useRef<number | null>(null);
 
   const connect = useCallback(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setConnected(false);
+      return;
+    }
+
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
     ws.onopen = () => {
@@ -43,9 +53,16 @@ export function useWebSocket() {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       setConnected(false);
-      console.log('WebSocket disconnected, reconnecting...');
+      console.log('WebSocket disconnected', event.code);
+
+      // Don't reconnect if unauthorized
+      if (event.code === 1008) {
+        return;
+      }
+
+      // Reconnect after delay
       reconnectTimeoutRef.current = window.setTimeout(connect, 3000);
     };
 
@@ -63,6 +80,19 @@ export function useWebSocket() {
       }
       wsRef.current?.close();
     };
+  }, [connect]);
+
+  // Reconnect when token changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      connect();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [connect]);
 
   return { status, logs, connected, setLogs };

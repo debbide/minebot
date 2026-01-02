@@ -1,5 +1,17 @@
 const API_BASE = import.meta.env.PROD ? '' : 'http://localhost:3000';
 
+function getToken(): string | null {
+  return localStorage.getItem('token');
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = getToken();
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+}
+
 export interface BotStatus {
   connected: boolean;
   serverAddress: string;
@@ -37,6 +49,10 @@ export interface Config {
     apiKey: string;
     systemPrompt: string;
   };
+  auth: {
+    username: string;
+    password: string;
+  };
   autoChat: {
     enabled: boolean;
     interval: number;
@@ -62,11 +78,16 @@ class ApiService {
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
+      headers: getAuthHeaders(),
     });
+
+    if (response.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem('token');
+      localStorage.removeItem('username');
+      window.location.href = '/login';
+      throw new Error('Unauthorized');
+    }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -74,6 +95,26 @@ class ApiService {
     }
 
     return response.json();
+  }
+
+  // Auth
+  async login(username: string, password: string): Promise<{ success: boolean; token: string; username: string }> {
+    const response = await fetch(`${this.baseUrl}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Login failed');
+    }
+
+    return response.json();
+  }
+
+  async checkAuth(): Promise<{ authenticated: boolean; username?: string }> {
+    return this.request('/api/auth/check');
   }
 
   // Status
@@ -86,10 +127,21 @@ class ApiService {
     return this.request<Config>('/api/config');
   }
 
+  async getFullConfig(): Promise<Config> {
+    return this.request<Config>('/api/config/full');
+  }
+
   async updateConfig(config: Partial<Config>): Promise<{ success: boolean; config: Config }> {
     return this.request('/api/config', {
       method: 'POST',
       body: JSON.stringify(config),
+    });
+  }
+
+  async saveSettings(settings: Partial<Config>): Promise<{ success: boolean }> {
+    return this.request('/api/settings', {
+      method: 'POST',
+      body: JSON.stringify(settings),
     });
   }
 
