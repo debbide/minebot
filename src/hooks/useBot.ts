@@ -1,105 +1,12 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { api, BotStatus, LogEntry } from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { api } from '@/lib/api';
+import { useWebSocketContext } from '@/contexts/WebSocketContext';
 
-function getWsUrl(): string {
-  const token = localStorage.getItem('token');
-  const baseUrl = import.meta.env.PROD
-    ? `ws://${window.location.host}`
-    : 'ws://localhost:3000';
-  return `${baseUrl}?token=${token}`;
-}
-
-export function useWebSocket() {
-  const [status, setStatus] = useState<BotStatus | null>(null);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [connected, setConnected] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<number | null>(null);
-
-  const connect = useCallback(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setConnected(false);
-      return;
-    }
-
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-    const ws = new WebSocket(getWsUrl());
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setConnected(true);
-      console.log('WebSocket connected');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        switch (data.type) {
-          case 'status':
-            setStatus(data.data);
-            break;
-          case 'log':
-            setLogs(prev => [...prev.slice(-99), data.data]);
-            break;
-          case 'logs':
-            setLogs(data.data);
-            break;
-        }
-      } catch (error) {
-        console.error('WebSocket message error:', error);
-      }
-    };
-
-    ws.onclose = (event) => {
-      setConnected(false);
-      console.log('WebSocket disconnected', event.code);
-
-      // Don't reconnect if unauthorized
-      if (event.code === 1008) {
-        return;
-      }
-
-      // Reconnect after delay
-      reconnectTimeoutRef.current = window.setTimeout(connect, 3000);
-    };
-
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
-  }, []);
-
-  useEffect(() => {
-    connect();
-
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      wsRef.current?.close();
-    };
-  }, [connect]);
-
-  // Reconnect when token changes
-  useEffect(() => {
-    const handleStorageChange = () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-      connect();
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [connect]);
-
-  return { status, logs, connected, setLogs };
-}
+// Re-export for backwards compatibility
+export { useWebSocketContext as useWebSocket } from '@/contexts/WebSocketContext';
 
 export function useBotStatus() {
-  const { status, connected } = useWebSocket();
+  const { status, connected } = useWebSocketContext();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
