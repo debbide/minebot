@@ -165,11 +165,13 @@ export class BotManager {
           this.bot = null;
           this.broadcast('status', this.getStatus());
 
-          // Auto reconnect
+          // Auto reconnect with exponential backoff
           if (this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            this.log('info', `尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`, '🔄');
-            setTimeout(() => this.connect(options), 5000);
+            // Delay increases: 10s, 20s, 40s, 60s, 60s
+            const delay = Math.min(10000 * Math.pow(2, this.reconnectAttempts - 1), 60000);
+            this.log('info', `尝试重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})，${delay/1000}秒后...`, '🔄');
+            setTimeout(() => this.connect(options), delay);
           }
         });
 
