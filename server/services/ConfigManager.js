@@ -48,15 +48,24 @@ export class ConfigManager {
       server: {
         host: 'localhost',
         port: 25565,
-        username: 'MinecraftBot',
-        version: false
+        username: '', // Empty = auto-generate random name
+        version: false // false = auto-detect
       },
+      // Multi-server support
+      servers: [
+        // Example:
+        // { id: 'server1', name: 'Main Server', host: 'mc.example.com', port: 25565 }
+      ],
       ai: {
         enabled: true,
         model: 'gpt-3.5-turbo',
         baseURL: '',
         apiKey: '',
         systemPrompt: ''
+      },
+      auth: {
+        username: 'admin',
+        password: 'admin123'
       },
       autoChat: {
         enabled: false,
@@ -169,5 +178,56 @@ export class ConfigManager {
       ...aiConfig
     };
     this.saveConfig();
+  }
+
+  // Multi-server management
+  getServers() {
+    return this.config.servers || [];
+  }
+
+  addServer(serverConfig) {
+    if (!this.config.servers) {
+      this.config.servers = [];
+    }
+
+    // Generate ID if not provided
+    if (!serverConfig.id) {
+      serverConfig.id = `server_${Date.now()}`;
+    }
+
+    // Check for duplicate
+    const existing = this.config.servers.find(s => s.id === serverConfig.id);
+    if (existing) {
+      throw new Error(`Server ${serverConfig.id} already exists`);
+    }
+
+    this.config.servers.push(serverConfig);
+    this.saveConfig();
+    return serverConfig;
+  }
+
+  updateServer(id, updates) {
+    const index = this.config.servers?.findIndex(s => s.id === id);
+    if (index === -1) {
+      throw new Error(`Server ${id} not found`);
+    }
+
+    this.config.servers[index] = {
+      ...this.config.servers[index],
+      ...updates
+    };
+    this.saveConfig();
+    return this.config.servers[index];
+  }
+
+  removeServer(id) {
+    if (!this.config.servers) return false;
+
+    const index = this.config.servers.findIndex(s => s.id === id);
+    if (index === -1) return false;
+
+    this.config.servers.splice(index, 1);
+    this.saveConfig();
+    return true;
   }
 }

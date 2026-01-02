@@ -7,7 +7,7 @@ import { dirname, join } from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 
-import { BotManager } from './bot/BotManager.js';
+import { BotManager } from './bot/BotPool.js';
 import { AIService } from './services/AIService.js';
 import { ConfigManager } from './services/ConfigManager.js';
 import { AuthService } from './services/AuthService.js';
@@ -282,6 +282,63 @@ app.post('/api/ai/chat', async (req, res) => {
 // Get logs
 app.get('/api/logs', (req, res) => {
   res.json(botManager.getRecentLogs());
+});
+
+// ===== Multi-Server APIs =====
+
+// Get all bots status
+app.get('/api/bots', (req, res) => {
+  res.json(botManager.getAllStatus());
+});
+
+// Add new server
+app.post('/api/bots/add', async (req, res) => {
+  try {
+    const result = await botManager.addServer(req.body);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Remove server
+app.delete('/api/bots/:id', (req, res) => {
+  try {
+    const success = botManager.removeServer(req.params.id);
+    res.json({ success });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Connect all servers from config
+app.post('/api/bots/connect-all', async (req, res) => {
+  try {
+    const results = await botManager.connectAll();
+    res.json({ success: true, results });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Disconnect all servers
+app.post('/api/bots/disconnect-all', (req, res) => {
+  try {
+    botManager.disconnectAll();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Restart specific bot
+app.post('/api/bots/:id/restart', async (req, res) => {
+  try {
+    const status = await botManager.restart(req.params.id);
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
 });
 
 // Serve frontend for all other routes

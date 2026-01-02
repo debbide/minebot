@@ -1,0 +1,282 @@
+import { BotInstance } from './BotInstance.js';
+
+/**
+ * Manages multiple bot instances across different servers
+ */
+export class BotPool {
+  constructor(configManager, aiService, broadcast) {
+    this.configManager = configManager;
+    this.aiService = aiService;
+    this.broadcast = broadcast;
+    this.bots = new Map(); // id -> BotInstance
+    this.logs = [];
+    this.maxLogs = 200;
+
+    this.setupProcessHandlers();
+  }
+
+  setupProcessHandlers() {
+    process.on('SIGINT', () => {
+      console.log('收到中断信号，正在清理...');
+      this.disconnectAll();
+      process.exit(0);
+    });
+
+    process.on('SIGTERM', () => {
+      console.log('收到终止信号，正在清理...');
+      this.disconnectAll();
+      process.exit(0);
+    });
+
+    process.on('uncaughtException', (err) => {
+      if (err.name === 'PartialReadError') return;
+      console.error('未捕获异常:', err);
+    });
+
+    process.on('unhandledRejection', (reason) => {
+      if (reason && reason.name === 'PartialReadError') return;
+      console.error('未处理的 Promise 拒绝:', reason);
+    });
+  }
+
+  onLog(entry) {
+    this.logs.push(entry);
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift();
+    }
+    this.broadcast('log', entry);
+  }
+
+  onStatusChange(botId, status) {
+    this.broadcast('botStatus', { botId, status });
+    this.broadcast('status', this.getOverallStatus());
+  }
+
+  getRecentLogs() {
+    return this.logs.slice(-100);
+  }
+
+  /**
+   * Get status of all bots
+   */
+  getAllStatus() {
+    const statuses = {};
+    for (const [id, bot] of this.bots) {
+      statuses[id] = bot.getStatus();
+    }
+    return statuses;
+  }
+
+  /**
+   * Get overall summary status (for backward compatibility)
+   */
+  getOverallStatus() {
+    const connectedBots = Array.from(this.bots.values()).filter(b => b.status.connected);
+    const firstConnected = connectedBots[0];
+
+    return {
+      connected: connectedBots.length > 0,
+      serverAddress: firstConnected?.status.serverAddress || '',
+      version: firstConnected?.status.version || '',
+      health: firstConnected?.status.health || 0,
+      food: firstConnected?.status.food || 0,
+      position: firstConnected?.status.position || null,
+      players: firstConnected?.status.players || [],
+      modes: firstConnected?.modes || { aiView: false, patrol: false, autoChat: false },
+      // Multi-server info
+      totalBots: this.bots.size,
+      connectedBots: connectedBots.length,
+      botList: Array.from(this.bots.values()).map(b => ({
+        id: b.id,
+        name: b.status.serverName,
+        connected: b.status.connected,
+        serverAddress: b.status.serverAddress,
+        username: b.status.username
+      }))
+    };
+  }
+
+  getModes() {
+    const firstBot = this.bots.values().next().value;
+    return firstBot?.modes || { aiView: false, patrol: false, autoChat: false };
+  }
+
+  /**
+   * Add a new server and connect
+   */
+  async addServer(serverConfig) {
+    const id = serverConfig.id || `server_${Date.now()}`;
+
+    if (this.bots.has(id)) {
+      throw new Error(`Server ${id} already exists`);
+    }
+
+    const bot = new BotInstance(
+      id,
+      serverConfig,
+      this.aiService,
+      this.onLog.bind(this),
+      this.onStatusChange.bind(this)
+    );
+
+    this.bots.set(id, bot);
+
+    try {
+      await bot.connect();
+      return { id, status: bot.getStatus() };
+    } catch (error) {
+      // Bot will auto-reconnect
+      return { id, status: bot.getStatus(), error: error.message };
+    }
+  }
+
+  /**
+   * Remove a server
+   */
+  removeServer(id) {
+    const bot = this.bots.get(id);
+    if (bot) {
+      bot.disconnect();
+      this.bots.delete(id);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Connect single server (backward compatible)
+   */
+  async connect(options = {}) {
+    const config = this.configManager.getConfig();
+    const serverConfig = {
+      id: 'default',
+      name: options.name || 'Default Server',
+      host: options.host || config.server?.host || 'localhost',
+      port: options.port || config.server?.port || 25565,
+      username: options.username || config.server?.username || undefined,
+      version: options.version || config.server?.version || false,
+      autoChat: config.autoChat
+    };
+
+    // Remove existing default if exists
+    if (this.bots.has('default')) {
+      this.removeServer('default');
+    }
+
+    return this.addServer(serverConfig);
+  }
+
+  /**
+   * Connect to multiple servers from config
+   */
+  async connectAll() {
+    const config = this.configManager.getConfig();
+    const servers = config.servers || [];
+
+    if (servers.length === 0 && config.server?.host) {
+      // Fallback to single server config
+      servers.push({
+        id: 'default',
+        name: 'Default Server',
+        ...config.server
+      });
+    }
+
+    const results = [];
+    for (const serverConfig of servers) {
+      try {
+        const result = await this.addServer(serverConfig);
+        results.push(result);
+      } catch (error) {
+        results.push({ id: serverConfig.id, error: error.message });
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Disconnect specific server
+   */
+  disconnect(id = 'default') {
+    return this.removeServer(id);
+  }
+
+  /**
+   * Disconnect all servers
+   */
+  disconnectAll() {
+    for (const [id] of this.bots) {
+      this.removeServer(id);
+    }
+  }
+
+  /**
+   * Restart specific server
+   */
+  async restart(id = 'default') {
+    const bot = this.bots.get(id);
+    if (bot) {
+      bot.disconnect();
+      await new Promise(r => setTimeout(r, 2000));
+      await bot.connect();
+      return bot.getStatus();
+    }
+    throw new Error(`Bot ${id} not found`);
+  }
+
+  /**
+   * Set mode for specific bot or all bots
+   */
+  setMode(mode, enabled, botId = null) {
+    if (botId) {
+      const bot = this.bots.get(botId);
+      if (bot) {
+        bot.setMode(mode, enabled);
+      }
+    } else {
+      // Apply to all bots
+      for (const bot of this.bots.values()) {
+        bot.setMode(mode, enabled);
+      }
+    }
+    return this.getModes();
+  }
+
+  /**
+   * Execute command on specific bot
+   */
+  async executeCommand(command, botId = 'default') {
+    const bot = this.bots.get(botId);
+    if (bot?.bot) {
+      bot.bot.chat(command);
+      bot.log('info', `发送: ${command}`, '📤');
+      return true;
+    }
+    throw new Error('Bot not connected');
+  }
+
+  /**
+   * Get status (backward compatible)
+   */
+  getStatus() {
+    return this.getOverallStatus();
+  }
+
+  // Timer support
+  setTimer(minutes, hours, action = 'restart', botId = 'default') {
+    const totalMs = ((hours || 0) * 60 + (minutes || 0)) * 60 * 1000;
+    if (totalMs > 0) {
+      setTimeout(async () => {
+        if (action === 'restart') {
+          await this.restart(botId);
+        } else if (action === 'disconnect') {
+          this.disconnect(botId);
+        }
+      }, totalMs);
+    }
+  }
+}
+
+// Export as BotManager for backward compatibility
+export { BotPool as BotManager };

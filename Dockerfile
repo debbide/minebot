@@ -22,6 +22,9 @@ RUN npm run build
 # Stage 2: Production image
 FROM node:20-alpine AS production
 
+# Install PM2 globally
+RUN npm install -g pm2
+
 WORKDIR /app
 
 # Copy server package.json and install dependencies
@@ -36,8 +39,8 @@ COPY server/ ./
 WORKDIR /app
 COPY --from=frontend-builder /app/dist ./dist/
 
-# Create data directory for config persistence
-RUN mkdir -p /app/server/data
+# Create data and logs directory
+RUN mkdir -p /app/server/data /app/server/logs
 
 # Set environment variables
 ENV NODE_ENV=production
@@ -50,6 +53,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/check || exit 1
 
-# Start the server
+# Start with PM2 for process management
 WORKDIR /app/server
-CMD ["node", "index.js"]
+CMD ["pm2-runtime", "ecosystem.config.cjs"]
