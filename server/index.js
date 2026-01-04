@@ -15,6 +15,20 @@ import { RenewalService } from './services/RenewalService.js';
 
 dotenv.config();
 
+// 捕获未处理的异常，防止进程崩溃
+process.on('uncaughtException', (err) => {
+  console.error('[进程] 未捕获的异常:', err.message);
+  // 对于 PartialReadError 等非致命错误，不退出进程
+  if (err.name === 'PartialReadError' || err.message.includes('PartialReadError')) {
+    console.error('[进程] PartialReadError - 忽略并继续运行');
+    return;
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[进程] 未处理的 Promise 拒绝:', reason);
+});
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
