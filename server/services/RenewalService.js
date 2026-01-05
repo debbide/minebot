@@ -324,8 +324,8 @@ export class RenewalService {
       let usernameInput = null;
       let passwordInput = null;
 
-      // 等待表单元素出现（最多等待 10 秒）
-      for (let attempt = 0; attempt < 5; attempt++) {
+      // 等待表单元素出现（最多等待 30 秒，Clerk 等 SPA 需要更长时间）
+      for (let attempt = 0; attempt < 10; attempt++) {
         // 查找用户名输入框
         for (const selector of usernameSelectors) {
           try {
@@ -350,13 +350,29 @@ export class RenewalService {
 
         if (usernameInput && passwordInput) break;
 
-        this.log('info', `等待表单加载... (${attempt + 1}/5)`, id);
-        await this.delay(2000);
+        // 如果找到用户名但没找到密码，可能是 Clerk 的多步登录
+        if (usernameInput && !passwordInput) {
+          this.log('info', '找到用户名框但未找到密码框，可能是多步登录', id);
+          break;
+        }
+
+        this.log('info', `等待表单加载... (${attempt + 1}/10)`, id);
+        await this.delay(3000);
       }
 
-      if (!usernameInput || !passwordInput) {
-        this.log('error', '找不到登录表单，可能页面结构不同', id);
-        // 打印页面内容用于调试
+      // 如果找不到表单，打印页面上所有的 input 元素用于调试
+      if (!usernameInput) {
+        const allInputs = await page.$$eval('input', inputs =>
+          inputs.map(i => ({
+            type: i.type,
+            name: i.name,
+            id: i.id,
+            placeholder: i.placeholder,
+            autocomplete: i.autocomplete
+          }))
+        );
+        this.log('error', `页面上的 input 元素: ${JSON.stringify(allInputs)}`, id);
+
         const title = await page.title();
         this.log('error', `当前页面标题: ${title}`, id);
         throw new Error('找不到登录表单');
@@ -368,7 +384,78 @@ export class RenewalService {
       await this.delay(100);
       await usernameInput.type(panelUsername, { delay: 30 });
 
-      await this.delay(200);
+      // 如果是多步登录（有用户名输入但没有密码输入），需要先点击 Continue
+      if (!passwordInput) {
+        this.log('info', '多步登录：点击继续按钮后等待密码框出现...', id);
+
+        // 查找并点击 Continue/Next 按钮
+        const continueSelectors = [
+          'button[type="submit"]',
+          'button[data-localization-key="formButtonPrimary"]',
+          'button:has-text("Continue")',
+          'button:has-text("continue")',
+          'button:has-text("Next")',
+          'button:has-text("继续")',
+          'button:has-text("下一步")',
+          '.cl-formButtonPrimary',
+          'form button'
+        ];
+
+        let clickedContinue = false;
+        for (const selector of continueSelectors) {
+          try {
+            const continueBtn = await page.$(selector);
+            if (continueBtn) {
+              await continueBtn.click();
+              clickedContinue = true;
+              this.log('info', `点击继续按钮: ${selector}`, id);
+              break;
+            }
+          } catch (e) {}
+        }
+
+        if (!clickedContinue) {
+          // 尝试按回车
+          await page.keyboard.press('Enter');
+          this.log('info', '尝试按回车继续', id);
+        }
+
+        // 等待密码框出现
+        this.log('info', '等待密码输入框出现...', id);
+        for (let i = 0; i < 10; i++) {
+          await this.delay(2000);
+
+          for (const selector of passwordSelectors) {
+            try {
+              passwordInput = await page.$(selector);
+              if (passwordInput) {
+                this.log('info', `找到密码输入框: ${selector}`, id);
+                break;
+              }
+            } catch (e) {}
+          }
+
+          if (passwordInput) break;
+          this.log('info', `等待密码框... (${i + 1}/10)`, id);
+        }
+
+        if (!passwordInput) {
+          // 打印当前页面的 input 元素用于调试
+          const allInputs = await page.$$eval('input', inputs =>
+            inputs.map(i => ({
+              type: i.type,
+              name: i.name,
+              id: i.id,
+              placeholder: i.placeholder
+            }))
+          );
+          this.log('error', `未找到密码框，页面 input 元素: ${JSON.stringify(allInputs)}`, id);
+          throw new Error('多步登录失败：未找到密码输入框');
+        }
+      }
+
+      // 填写密码
+      await this.delay(500);
       await passwordInput.click({ clickCount: 3 });
       await this.delay(100);
       await passwordInput.type(panelPassword, { delay: 30 });
@@ -377,11 +464,15 @@ export class RenewalService {
       this.log('info', '查找登录按钮...', id);
       const submitSelectors = [
         'button[type="submit"]',
+        'button[data-localization-key="formButtonPrimary"]',
         'input[type="submit"]',
-        'button:contains("Login")',
-        'button:contains("登录")',
+        '.cl-formButtonPrimary',
+        'button:has-text("Sign in")',
+        'button:has-text("Login")',
+        'button:has-text("登录")',
         '.login-button',
-        '#login-button'
+        '#login-button',
+        'form button'
       ];
 
       let submitted = false;
@@ -391,7 +482,7 @@ export class RenewalService {
           if (submitBtn) {
             await submitBtn.click();
             submitted = true;
-            this.log('info', '点击登录按钮', id);
+            this.log('info', `点击登录按钮: ${selector}`, id);
             break;
           }
         } catch (e) {}
@@ -405,7 +496,7 @@ export class RenewalService {
 
       // 等待登录完成
       this.log('info', '等待登录完成...', id);
-      await this.delay(3000);
+      await this.delay(5000);
 
       // 等待页面跳转或登录完成
       try {
