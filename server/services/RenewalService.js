@@ -1399,7 +1399,16 @@ export class RenewalService {
 
     // 判断是否使用代理
     const useProxy = renewal.useProxy && renewal.proxyUrl;
-    const targetUrl = useProxy ? renewal.proxyUrl : renewal.url;
+
+    // 构建续期 URL（对于 zampto.net 自动添加 renew=true）
+    let renewUrl = renewal.renewPageUrl || renewal.url;
+    if (renewUrl.includes('zampto.net') && !renewUrl.includes('renew=')) {
+      const separator = renewUrl.includes('?') ? '&' : '?';
+      renewUrl = `${renewUrl}${separator}renew=true`;
+      this.log('info', '检测到 zampto.net，自动添加 renew=true 参数', id);
+    }
+
+    const targetUrl = useProxy ? renewal.proxyUrl : renewUrl;
 
     // 如果启用自动登录，尝试使用缓存的 Cookie
     let cookieString = null;
@@ -1416,7 +1425,7 @@ export class RenewalService {
       }
     }
 
-    this.log('info', `执行续期请求: ${renewal.method} ${renewal.url}${useProxy ? ' (通过CF代理)' : ''}${renewal.autoLogin ? ' (自动登录)' : ''}`, id);
+    this.log('info', `执行续期请求: GET ${renewUrl}${useProxy ? ' (通过CF代理)' : ''}${renewal.autoLogin ? ' (自动登录)' : ''}`, id);
 
     try {
       const requestHeaders = {
@@ -1452,11 +1461,13 @@ export class RenewalService {
       }
 
       const options = {
-        method: useProxy ? 'POST' : renewal.method,
+        method: useProxy ? 'POST' : 'GET',  // 续期通常用 GET
         headers: requestHeaders
       };
 
+      // 只有明确配置 POST 且有 body 时才用 POST
       if (renewal.method === 'POST' && renewal.body) {
+        options.method = 'POST';
         options.body = renewal.body;
         if (!options.headers['Content-Type']) {
           options.headers['Content-Type'] = 'application/json';
@@ -1480,8 +1491,11 @@ export class RenewalService {
       // 检查是否需要重新登录 (401/403 或者响应包含登录页面特征)
       const needReLogin = (status === 401 || status === 403) ||
                          responseText.includes('login') ||
+                         responseText.includes('sign-in') ||
+                         responseText.includes('Sign in') ||
                          responseText.includes('unauthorized') ||
-                         responseText.includes('unauthenticated');
+                         responseText.includes('unauthenticated') ||
+                         responseText.includes('Please sign in');
 
       if (needReLogin && renewal.autoLogin && retryWithLogin) {
         this.log('info', `Cookie 可能已过期 (状态码: ${status})，尝试重新登录...`, id);
