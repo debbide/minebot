@@ -1131,6 +1131,16 @@ export class RenewalService {
       // 查找续期按钮
       this.log('info', '查找续期按钮...', id);
 
+      // 先滚动页面，确保所有元素都加载
+      await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight / 2);
+      });
+      await this.delay(1000);
+      await page.evaluate(() => {
+        window.scrollTo(0, 0);
+      });
+      await this.delay(1000);
+
       let renewButton = null;
 
       // 如果指定了选择器，优先使用
@@ -1146,15 +1156,18 @@ export class RenewalService {
       // 自动查找续期按钮
       if (!renewButton) {
         const buttonSelectors = [
-          // 包含特定文字的按钮
+          // 包含特定文字的按钮和链接
           'button',
+          'a',  // 所有链接
           'a.btn',
           '[role="button"]',
           'input[type="submit"]',
-          'input[type="button"]'
+          'input[type="button"]',
+          'div[onclick]',
+          'span[onclick]'
         ];
 
-        const renewKeywords = ['renew', 'Renew', 'RENEW', '续期', '续订', '延长', 'extend', 'Extend'];
+        const renewKeywords = ['Renew Server', 'renew server', 'RENEW SERVER', 'renew', 'Renew', 'RENEW', '续期', '续订', '延长', 'extend', 'Extend'];
 
         for (const selector of buttonSelectors) {
           try {
