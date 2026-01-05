@@ -277,6 +277,18 @@ class ApiService {
     return this.request(`/api/bots/${id}`, { method: 'DELETE' });
   }
 
+  async updateServer(id: string, updates: {
+    name?: string;
+    username?: string;
+    host?: string;
+    port?: number;
+  }): Promise<{ success: boolean; config: unknown }> {
+    return this.request(`/api/bots/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
   async connectAll(): Promise<{ success: boolean; results: unknown[] }> {
     return this.request('/api/bots/connect-all', { method: 'POST' });
   }

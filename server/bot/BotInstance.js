@@ -549,11 +549,26 @@ export class BotInstance {
       this.log('success', `面板命令已发送: ${command}`, '🖥️');
       return { success: true, message: `已发送: ${command}` };
     } catch (error) {
-      const errMsg = error.response?.data?.errors?.[0]?.detail
-        || error.response?.data?.message
-        || error.message;
-      this.log('error', `面板命令失败: ${errMsg}`, '✗');
-      return { success: false, message: errMsg };
+      const status = error.response?.status;
+      const errDetail = error.response?.data?.errors?.[0]?.detail;
+      const errMsg = errDetail || error.response?.data?.message || error.message;
+
+      // 打印完整响应用于调试
+      console.log('[Panel API Error]', {
+        status,
+        data: error.response?.data,
+        headers: error.response?.headers
+      });
+
+      let hint = '';
+      if (status === 403) {
+        hint = ' (检查: API Key是否有效、IP是否被限制、账号是否有该服务器权限)';
+      } else if (status === 404) {
+        hint = ' (检查: 服务器ID是否正确)';
+      }
+
+      this.log('error', `面板命令失败 [${status}]: ${errMsg}${hint}`, '✗');
+      return { success: false, message: `${errMsg}${hint}` };
     }
   }
 

@@ -351,6 +351,36 @@ app.delete('/api/bots/:id', (req, res) => {
   }
 });
 
+// Update server config (name, username, host, port)
+app.put('/api/bots/:id', async (req, res) => {
+  try {
+    const { name, username, host, port } = req.body;
+    const id = req.params.id;
+
+    // Update in config for persistence
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (username !== undefined) updates.username = username;
+    if (host !== undefined) updates.host = host;
+    if (port !== undefined) updates.port = parseInt(port) || 25565;
+
+    const updatedConfig = configManager.updateServer(id, updates);
+
+    // Update in bot manager
+    const bot = botManager.bots.get(id);
+    if (bot) {
+      if (name !== undefined) bot.status.serverName = name;
+      if (username !== undefined) bot.config.username = username;
+      if (host !== undefined) bot.config.host = host;
+      if (port !== undefined) bot.config.port = parseInt(port) || 25565;
+    }
+
+    res.json({ success: true, config: updatedConfig });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Connect all servers from config
 app.post('/api/bots/connect-all', async (req, res) => {
   try {
