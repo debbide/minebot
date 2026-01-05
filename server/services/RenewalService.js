@@ -295,18 +295,23 @@ export class RenewalService {
       // 翼龙面板的登录表单 - 等待输入框出现
       // 尝试多种选择器
       const usernameSelectors = [
+        'input[name="identifier"]',  // zampto.net
         'input[name="user"]',
         'input[name="username"]',
         'input[name="email"]',
         'input[type="email"]',
         'input[id="user"]',
         'input[id="username"]',
+        'input[id="identifier"]',
         '#user',
         '#username',
+        '#identifier',
         'input[placeholder*="email"]',
         'input[placeholder*="Email"]',
         'input[placeholder*="user"]',
-        'input[placeholder*="User"]'
+        'input[placeholder*="User"]',
+        'input[autocomplete*="username"]',
+        'input[autocomplete*="email"]'
       ];
 
       const passwordSelectors = [
