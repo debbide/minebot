@@ -309,40 +309,37 @@ export function RenewalPanel() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
+    <Card className="overflow-hidden">
+      <CardHeader className="pb-3">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base">
               <RefreshCw className="h-5 w-5" />
               自动续期
             </CardTitle>
-            <CardDescription>
-              自动续期翼龙面板等服务器托管商的服务
-            </CardDescription>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant={showLogs ? "default" : "outline"}
-              onClick={() => setShowLogs(!showLogs)}
-            >
-              <ScrollText className="h-4 w-4 mr-1" />
-              日志
-            </Button>
-            <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) {
-              setFormData(defaultFormData);
-              setEditingId(null);
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-1" />
-                添加续期
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={showLogs ? "default" : "outline"}
+                onClick={() => setShowLogs(!showLogs)}
+                className="h-7 px-2"
+              >
+                <ScrollText className="h-3 w-3 mr-1" />
+                日志
               </Button>
-            </DialogTrigger>
+              <Dialog open={dialogOpen} onOpenChange={(open) => {
+              setDialogOpen(open);
+              if (!open) {
+                setFormData(defaultFormData);
+                setEditingId(null);
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="h-7 px-2">
+                  <Plus className="h-3 w-3 mr-1" />
+                  添加
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingId ? "编辑续期" : "添加续期"}</DialogTitle>
@@ -577,6 +574,7 @@ export function RenewalPanel() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+            </div>
           </div>
         </div>
       </CardHeader>
