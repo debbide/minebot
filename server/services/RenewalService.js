@@ -309,6 +309,24 @@ export class RenewalService {
       this.log('info', '等待页面渲染完成...', id);
       await this.delay(2000);
 
+      // 检查并处理 Cookie 同意对话框 (GDPR)
+      try {
+        const consentBtn = await page.$('.fc-cta-consent') ||
+                          await page.$('button.fc-button.fc-cta-consent') ||
+                          await page.$('[aria-label="Consent"]') ||
+                          await page.$('button:has-text("Accept")') ||
+                          await page.$('button:has-text("Consent")') ||
+                          await page.$('button:has-text("I agree")') ||
+                          await page.$('button:has-text("Accept all")');
+        if (consentBtn) {
+          this.log('info', '检测到 Cookie 同意对话框，点击同意...', id);
+          await page.evaluate(btn => btn.click(), consentBtn);
+          await this.delay(2000);
+        }
+      } catch (e) {
+        // 忽略错误，可能没有同意对话框
+      }
+
       // 尝试查找并填写登录表单
       this.log('info', '查找登录表单...', id);
 
@@ -663,6 +681,24 @@ export class RenewalService {
       this.log('info', '等待页面渲染完成...', id);
       await this.delay(2000);
 
+      // 检查并处理 Cookie 同意对话框 (GDPR)
+      try {
+        const consentBtn = await page.$('.fc-cta-consent') ||
+                          await page.$('button.fc-button.fc-cta-consent') ||
+                          await page.$('[aria-label="Consent"]') ||
+                          await page.$('button:has-text("Accept")') ||
+                          await page.$('button:has-text("Consent")') ||
+                          await page.$('button:has-text("I agree")') ||
+                          await page.$('button:has-text("Accept all")');
+        if (consentBtn) {
+          this.log('info', '检测到 Cookie 同意对话框，点击同意...', id);
+          await page.evaluate(btn => btn.click(), consentBtn);
+          await this.delay(2000);
+        }
+      } catch (e) {
+        // 忽略错误，可能没有同意对话框
+      }
+
       // 尝试查找并填写登录表单
       this.log('info', '查找登录表单...', id);
 
@@ -937,6 +973,20 @@ export class RenewalService {
 
       // 再等待页面渲染完成
       await this.delay(2000);
+
+      // 检查并处理续期页面的 Cookie 同意对话框 (GDPR)
+      try {
+        const consentBtn = await page.$('.fc-cta-consent') ||
+                          await page.$('button.fc-button.fc-cta-consent') ||
+                          await page.$('[aria-label="Consent"]');
+        if (consentBtn) {
+          this.log('info', '检测到续期页面 Cookie 同意对话框，点击同意...', id);
+          await page.evaluate(btn => btn.click(), consentBtn);
+          await this.delay(2000);
+        }
+      } catch (e) {
+        // 忽略错误
+      }
 
       // 查找续期按钮
       this.log('info', '查找续期按钮...', id);
