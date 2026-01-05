@@ -310,7 +310,7 @@ export function RenewalPanel() {
                 添加续期
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingId ? "编辑续期" : "添加续期"}</DialogTitle>
                 <DialogDescription>
