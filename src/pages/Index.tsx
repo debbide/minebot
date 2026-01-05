@@ -13,7 +13,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Header />
 
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="px-4 py-6">
         {/* Status Overview Bar */}
         <div className="mb-6 rounded-lg border border-border bg-card p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -101,7 +101,7 @@ const Index = () => {
 
       {/* Footer */}
       <footer className="border-t border-border py-6 mt-8">
-        <div className="mx-auto max-w-7xl px-4 text-center text-sm text-muted-foreground sm:px-6 lg:px-8">
+        <div className="px-4 text-center text-sm text-muted-foreground">
           <p>MC Bot — Minecraft 挂机助手</p>
         </div>
       </footer>
