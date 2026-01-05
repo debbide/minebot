@@ -13,6 +13,8 @@ import {
   Loader2,
   Settings2,
   Cloud,
+  Key,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +57,11 @@ interface RenewalFormData {
   intervalMinutes: number;
   useProxy: boolean;
   proxyUrl: string;
+  // 自动登录配置
+  autoLogin: boolean;
+  loginUrl: string;
+  panelUsername: string;
+  panelPassword: string;
 }
 
 const defaultFormData: RenewalFormData = {
@@ -67,6 +74,10 @@ const defaultFormData: RenewalFormData = {
   intervalMinutes: 0,
   useProxy: false,
   proxyUrl: "",
+  autoLogin: false,
+  loginUrl: "",
+  panelUsername: "",
+  panelPassword: "",
 };
 
 export function RenewalPanel() {
@@ -130,6 +141,10 @@ export function RenewalPanel() {
         enabled: true,
         useProxy: formData.useProxy,
         proxyUrl: formData.proxyUrl,
+        autoLogin: formData.autoLogin,
+        loginUrl: formData.loginUrl,
+        panelUsername: formData.panelUsername,
+        panelPassword: formData.panelPassword,
       };
 
       if (editingId) {
@@ -167,6 +182,10 @@ export function RenewalPanel() {
       intervalMinutes: minutes,
       useProxy: renewal.useProxy || false,
       proxyUrl: renewal.proxyUrl || "",
+      autoLogin: renewal.autoLogin || false,
+      loginUrl: renewal.loginUrl || "",
+      panelUsername: renewal.panelUsername || "",
+      panelPassword: renewal.panelPassword || "",
     });
     setEditingId(renewal.id);
     setDialogOpen(true);
@@ -373,6 +392,63 @@ export function RenewalPanel() {
                     </div>
                   )}
                 </div>
+                <div className="space-y-3 pt-2 border-t">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center gap-2">
+                        <Key className="h-4 w-4" />
+                        自动登录
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        使用账号密码自动获取 Cookie，Cookie 过期自动重新登录
+                      </p>
+                    </div>
+                    <Switch
+                      checked={formData.autoLogin}
+                      onCheckedChange={(checked) => setFormData({ ...formData, autoLogin: checked })}
+                    />
+                  </div>
+                  {formData.autoLogin && (
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label>登录页面 URL</Label>
+                        <Input
+                          placeholder="https://panel.example.com/auth/login"
+                          value={formData.loginUrl}
+                          onChange={(e) => setFormData({ ...formData, loginUrl: e.target.value })}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <User className="h-3 w-3" />
+                            面板账号
+                          </Label>
+                          <Input
+                            placeholder="your@email.com"
+                            value={formData.panelUsername}
+                            onChange={(e) => setFormData({ ...formData, panelUsername: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            <Key className="h-3 w-3" />
+                            面板密码
+                          </Label>
+                          <Input
+                            type="password"
+                            placeholder="••••••••"
+                            value={formData.panelPassword}
+                            onChange={(e) => setFormData({ ...formData, panelPassword: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        启用后将使用无头浏览器自动登录获取 Cookie，可自动通过 Cloudflare 5 秒盾
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
@@ -477,6 +553,12 @@ export function RenewalPanel() {
                       <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
                         <Cloud className="h-4 w-4" />
                         代理: {renewal.proxyUrl || "未配置"}
+                      </div>
+                    )}
+                    {renewal.autoLogin && (
+                      <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
+                        <Key className="h-4 w-4" />
+                        自动登录: {renewal.panelUsername || "未配置"}
                       </div>
                     )}
                     <div className="col-span-2 text-muted-foreground">

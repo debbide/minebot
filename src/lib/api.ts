@@ -79,6 +79,11 @@ export interface RenewalConfig {
   enabled: boolean;
   useProxy: boolean;
   proxyUrl: string;
+  // 自动登录配置
+  autoLogin: boolean;
+  loginUrl: string;
+  panelUsername: string;
+  panelPassword: string;
   lastRun: string | null;
   lastResult: RenewalResult | null;
   running?: boolean;
