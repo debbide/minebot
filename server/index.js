@@ -493,6 +493,49 @@ app.post('/api/bots/:id/mode', (req, res) => {
   }
 });
 
+// Set Pterodactyl panel config for a bot
+app.post('/api/bots/:id/pterodactyl', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const result = bot.setPterodactylConfig(req.body);
+    res.json({ success: true, pterodactyl: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Send console command via Pterodactyl panel
+app.post('/api/bots/:id/panel-command', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { command } = req.body;
+    const result = await bot.sendPanelCommand(command);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Manually trigger auto-OP
+app.post('/api/bots/:id/auto-op', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    await bot.autoOpSelf();
+    res.json({ success: true, message: `已尝试给 ${bot.status.username} OP权限` });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // ==================== 续期 API ====================
 
 // 获取所有续期配置

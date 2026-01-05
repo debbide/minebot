@@ -2,6 +2,7 @@ import mineflayer from 'mineflayer';
 import pkg from 'mineflayer-pathfinder';
 const { pathfinder, Movements, goals } = pkg;
 import { BehaviorManager } from './behaviors/index.js';
+import axios from 'axios';
 
 /**
  * Single bot instance for one server connection
@@ -27,6 +28,7 @@ export class BotInstance {
     this.lastActivity = Date.now();
     this.destroyed = false;
     this.spawnPosition = null; // 记录出生点用于巡逻
+    this.hasAutoOpped = false; // 是否已自动给予OP权限
 
     this.status = {
       id: this.id,
@@ -43,7 +45,9 @@ export class BotInstance {
         enabled: false,
         intervalMinutes: 0,
         nextRestart: null
-      }
+      },
+      pterodactyl: config.pterodactyl || null, // 翼龙面板配置
+      autoOp: config.autoOp !== false // 默认启用自动OP
     };
 
     this.modes = {
@@ -268,6 +272,12 @@ export class BotInstance {
           this.behaviors = new BehaviorManager(this.bot, goals);
 
           this.log('success', `进入世界 (版本: ${this.bot.version})`, '✓');
+
+          // 自动给机器人 OP 权限（通过翼龙面板）
+          if (this.status.autoOp && this.status.pterodactyl && !this.hasAutoOpped) {
+            this.autoOpSelf();
+          }
+
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
           resolve();
         });
@@ -457,6 +467,62 @@ export class BotInstance {
       return { success: true, message: '已发送 /restart' };
     }
     return { success: false, message: 'Bot 未连接' };
+  }
+
+  /**
+   * 通过翼龙面板发送控制台命令
+   */
+  async sendPanelCommand(command) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, message: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/command`;
+      await axios.post(url, { command }, {
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+      this.log('success', `面板命令已发送: ${command}`, '🖥️');
+      return { success: true, message: `已发送: ${command}` };
+    } catch (error) {
+      this.log('error', `面板命令失败: ${error.message}`, '✗');
+      return { success: false, message: error.message };
+    }
+  }
+
+  /**
+   * 自动给机器人 OP 权限
+   */
+  async autoOpSelf() {
+    if (!this.status.username) {
+      this.log('warning', '无法自动OP：用户名未知', '⚠');
+      return;
+    }
+
+    const result = await this.sendPanelCommand(`op ${this.status.username}`);
+    if (result.success) {
+      this.hasAutoOpped = true;
+      this.log('success', `已自动授予 OP 权限: ${this.status.username}`, '👑');
+    }
+  }
+
+  /**
+   * 设置翼龙面板配置
+   */
+  setPterodactylConfig(config) {
+    this.status.pterodactyl = {
+      url: (config.url || '').replace(/\/$/, ''),
+      apiKey: config.apiKey || '',
+      serverId: config.serverId || ''
+    };
+    this.log('info', '翼龙面板配置已更新', '🔑');
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+    return this.status.pterodactyl;
   }
 
   async handleCommand(username, message) {
