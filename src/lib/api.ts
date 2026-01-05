@@ -84,6 +84,10 @@ export interface RenewalConfig {
   loginUrl: string;
   panelUsername: string;
   panelPassword: string;
+  // 浏览器点击续期模式
+  useBrowserClick: boolean;
+  renewPageUrl: string;  // 续期页面 URL（服务器详情页）
+  renewButtonSelector: string;  // 续期按钮选择器
   lastRun: string | null;
   lastResult: RenewalResult | null;
   running?: boolean;

@@ -16,6 +16,7 @@ import {
   Key,
   User,
   ScrollText,
+  MousePointer2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +72,10 @@ interface RenewalFormData {
   loginUrl: string;
   panelUsername: string;
   panelPassword: string;
+  // 浏览器点击续期模式
+  useBrowserClick: boolean;
+  renewPageUrl: string;
+  renewButtonSelector: string;
 }
 
 const defaultFormData: RenewalFormData = {
@@ -87,6 +92,9 @@ const defaultFormData: RenewalFormData = {
   loginUrl: "",
   panelUsername: "",
   panelPassword: "",
+  useBrowserClick: false,
+  renewPageUrl: "",
+  renewButtonSelector: "",
 };
 
 export function RenewalPanel() {
@@ -174,6 +182,9 @@ export function RenewalPanel() {
         loginUrl: formData.loginUrl,
         panelUsername: formData.panelUsername,
         panelPassword: formData.panelPassword,
+        useBrowserClick: formData.useBrowserClick,
+        renewPageUrl: formData.renewPageUrl,
+        renewButtonSelector: formData.renewButtonSelector,
       };
 
       if (editingId) {
@@ -215,6 +226,9 @@ export function RenewalPanel() {
       loginUrl: renewal.loginUrl || "",
       panelUsername: renewal.panelUsername || "",
       panelPassword: renewal.panelPassword || "",
+      useBrowserClick: renewal.useBrowserClick || false,
+      renewPageUrl: renewal.renewPageUrl || "",
+      renewButtonSelector: renewal.renewButtonSelector || "",
     });
     setEditingId(renewal.id);
     setDialogOpen(true);
@@ -487,6 +501,51 @@ export function RenewalPanel() {
                     </div>
                   )}
                 </div>
+                {formData.autoLogin && (
+                  <div className="space-y-3 pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="flex items-center gap-2">
+                          <MousePointer2 className="h-4 w-4" />
+                          浏览器点击续期
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          登录后直接在页面上点击续期按钮，更稳定可靠
+                        </p>
+                      </div>
+                      <Switch
+                        checked={formData.useBrowserClick}
+                        onCheckedChange={(checked) => setFormData({ ...formData, useBrowserClick: checked })}
+                      />
+                    </div>
+                    {formData.useBrowserClick && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label>续期页面 URL</Label>
+                          <Input
+                            placeholder="https://panel.example.com/server/xxx（服务器详情页）"
+                            value={formData.renewPageUrl}
+                            onChange={(e) => setFormData({ ...formData, renewPageUrl: e.target.value })}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            留空则使用续期 URL 作为页面地址
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>续期按钮选择器</Label>
+                          <Input
+                            placeholder='button:has-text("Renew") 或 CSS 选择器'
+                            value={formData.renewButtonSelector}
+                            onChange={(e) => setFormData({ ...formData, renewButtonSelector: e.target.value })}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            留空则自动查找包含 Renew、续期 等文字的按钮
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
@@ -637,6 +696,7 @@ export function RenewalPanel() {
                       <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
                         <Key className="h-4 w-4" />
                         自动登录: {renewal.panelUsername || "未配置"}
+                        {renewal.useBrowserClick && " (浏览器点击)"}
                       </div>
                     )}
                     <div className="col-span-2 text-muted-foreground">

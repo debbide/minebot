@@ -99,6 +99,10 @@ export class RenewalService {
       loginUrl: renewalConfig.loginUrl || '',
       panelUsername: renewalConfig.panelUsername || '',
       panelPassword: renewalConfig.panelPassword || '',
+      // 浏览器点击续期模式
+      useBrowserClick: renewalConfig.useBrowserClick || false,
+      renewPageUrl: renewalConfig.renewPageUrl || '',
+      renewButtonSelector: renewalConfig.renewButtonSelector || '',
       lastRun: null,
       lastResult: null
     };
@@ -595,6 +599,263 @@ export class RenewalService {
   }
 
   /**
+   * 使用浏览器点击续期按钮
+   */
+  async browserClickRenew(renewal) {
+    const { id, url, renewPageUrl, renewButtonSelector, loginUrl, panelUsername, panelPassword } = renewal;
+
+    this.log('info', '开始浏览器点击续期...', id);
+
+    const browser = await this.getBrowser();
+    const page = await browser.newPage();
+
+    try {
+      // 设置视口和 User-Agent
+      await page.setViewport({ width: 1920, height: 1080 });
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+
+      // 先登录
+      this.log('info', `访问登录页面: ${loginUrl}`, id);
+      await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+
+      // 等待 Cloudflare 验证
+      await this.delay(3000);
+      let pageContent = await page.content();
+      let waitCount = 0;
+      while ((pageContent.includes('checking your browser') || pageContent.includes('Just a moment')) && waitCount < 10) {
+        this.log('info', '等待 Cloudflare 验证完成...', id);
+        await this.delay(3000);
+        pageContent = await page.content();
+        waitCount++;
+      }
+
+      // 等待页面渲染
+      await this.delay(2000);
+
+      // 查找登录表单
+      const usernameSelectors = [
+        'input[name="identifier"]',
+        'input[name="user"]',
+        'input[name="username"]',
+        'input[name="email"]',
+        'input[type="email"]',
+        'input[id="user"]',
+        'input[id="username"]'
+      ];
+
+      const passwordSelectors = [
+        'input[name="password"]',
+        'input[type="password"]',
+        'input[id="password"]'
+      ];
+
+      let usernameInput = null;
+      let passwordInput = null;
+
+      // 等待表单加载
+      for (let attempt = 0; attempt < 10; attempt++) {
+        for (const selector of usernameSelectors) {
+          try {
+            usernameInput = await page.$(selector);
+            if (usernameInput) break;
+          } catch (e) {}
+        }
+
+        for (const selector of passwordSelectors) {
+          try {
+            passwordInput = await page.$(selector);
+            if (passwordInput) break;
+          } catch (e) {}
+        }
+
+        if (usernameInput && passwordInput) break;
+        if (usernameInput && !passwordInput) break; // 多步登录
+        await this.delay(2000);
+      }
+
+      if (!usernameInput) {
+        throw new Error('找不到登录表单');
+      }
+
+      // 填写用户名
+      this.log('info', '填写登录信息...', id);
+      await usernameInput.click({ clickCount: 3 });
+      await this.delay(100);
+      await usernameInput.type(panelUsername, { delay: 30 });
+
+      // 处理多步登录
+      if (!passwordInput) {
+        this.log('info', '多步登录：点击继续按钮...', id);
+        const continueBtn = await page.$('button[type="submit"]') || await page.$('form button');
+        if (continueBtn) {
+          await continueBtn.click();
+        } else {
+          await page.keyboard.press('Enter');
+        }
+
+        // 等待密码框出现
+        for (let i = 0; i < 10; i++) {
+          await this.delay(2000);
+          for (const selector of passwordSelectors) {
+            try {
+              passwordInput = await page.$(selector);
+              if (passwordInput) break;
+            } catch (e) {}
+          }
+          if (passwordInput) break;
+        }
+
+        if (!passwordInput) {
+          throw new Error('多步登录失败：未找到密码框');
+        }
+      }
+
+      // 填写密码
+      await this.delay(500);
+      await passwordInput.click({ clickCount: 3 });
+      await this.delay(100);
+      await passwordInput.type(panelPassword, { delay: 30 });
+
+      // 提交登录
+      const submitBtn = await page.$('button[type="submit"]') || await page.$('form button');
+      if (submitBtn) {
+        await submitBtn.click();
+      } else {
+        await page.keyboard.press('Enter');
+      }
+
+      this.log('info', '等待登录完成...', id);
+      await this.delay(5000);
+
+      try {
+        await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 });
+      } catch (e) {}
+
+      // 检查登录是否成功
+      const currentUrl = page.url();
+      this.log('info', `登录后页面: ${currentUrl}`, id);
+
+      // 导航到续期页面
+      const targetUrl = renewPageUrl || url;
+      this.log('info', `导航到续期页面: ${targetUrl}`, id);
+      await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+
+      // 等待页面加载
+      await this.delay(3000);
+
+      // 查找续期按钮
+      this.log('info', '查找续期按钮...', id);
+
+      let renewButton = null;
+
+      // 如果指定了选择器，优先使用
+      if (renewButtonSelector) {
+        try {
+          renewButton = await page.$(renewButtonSelector);
+          if (renewButton) {
+            this.log('info', `找到指定的续期按钮: ${renewButtonSelector}`, id);
+          }
+        } catch (e) {}
+      }
+
+      // 自动查找续期按钮
+      if (!renewButton) {
+        const buttonSelectors = [
+          // 包含特定文字的按钮
+          'button',
+          'a.btn',
+          '[role="button"]',
+          'input[type="submit"]',
+          'input[type="button"]'
+        ];
+
+        const renewKeywords = ['renew', 'Renew', 'RENEW', '续期', '续订', '延长', 'extend', 'Extend'];
+
+        for (const selector of buttonSelectors) {
+          try {
+            const buttons = await page.$$(selector);
+            for (const btn of buttons) {
+              const text = await page.evaluate(el => el.textContent || el.value || '', btn);
+              for (const keyword of renewKeywords) {
+                if (text.includes(keyword)) {
+                  renewButton = btn;
+                  this.log('info', `找到续期按钮 (包含 "${keyword}"): ${text.trim().substring(0, 50)}`, id);
+                  break;
+                }
+              }
+              if (renewButton) break;
+            }
+            if (renewButton) break;
+          } catch (e) {}
+        }
+      }
+
+      if (!renewButton) {
+        // 打印页面上所有按钮用于调试
+        const allButtons = await page.$$eval('button, a.btn, [role="button"]', buttons =>
+          buttons.map(b => ({
+            tag: b.tagName,
+            text: (b.textContent || '').trim().substring(0, 50),
+            class: b.className
+          }))
+        );
+        this.log('error', `未找到续期按钮，页面按钮: ${JSON.stringify(allButtons.slice(0, 10))}`, id);
+        throw new Error('找不到续期按钮');
+      }
+
+      // 点击续期按钮
+      this.log('info', '点击续期按钮...', id);
+      await renewButton.click();
+
+      // 等待续期完成
+      await this.delay(3000);
+
+      // 检查是否有确认对话框
+      try {
+        const confirmBtn = await page.$('button:has-text("Confirm")') ||
+                          await page.$('button:has-text("确认")') ||
+                          await page.$('button:has-text("OK")') ||
+                          await page.$('.modal button[type="submit"]') ||
+                          await page.$('.dialog button[type="submit"]');
+        if (confirmBtn) {
+          this.log('info', '点击确认按钮...', id);
+          await confirmBtn.click();
+          await this.delay(2000);
+        }
+      } catch (e) {}
+
+      // 检查结果
+      const finalContent = await page.content();
+      const success = finalContent.includes('success') ||
+                     finalContent.includes('Success') ||
+                     finalContent.includes('成功') ||
+                     finalContent.includes('renewed') ||
+                     finalContent.includes('extended');
+
+      const result = {
+        success: true,
+        message: '浏览器点击续期完成',
+        response: success ? '检测到成功提示' : '已点击续期按钮',
+        timestamp: new Date().toISOString()
+      };
+
+      this.log('success', '浏览器点击续期完成', id);
+      return result;
+
+    } catch (error) {
+      this.log('error', `浏览器点击续期失败: ${error.message}`, id);
+      return {
+        success: false,
+        error: error.message,
+        message: `浏览器点击续期失败: ${error.message}`,
+        timestamp: new Date().toISOString()
+      };
+    } finally {
+      await page.close();
+    }
+  }
+
+  /**
    * 执行续期请求
    */
   async executeRenewal(id, retryWithLogin = true) {
@@ -607,6 +868,15 @@ export class RenewalService {
     if (!renewal.url) {
       this.log('error', `续期URL未配置`, id);
       return { success: false, error: 'URL未配置' };
+    }
+
+    // 如果启用浏览器点击续期模式
+    if (renewal.autoLogin && renewal.useBrowserClick) {
+      this.log('info', '使用浏览器点击续期模式...', id);
+      const result = await this.browserClickRenew(renewal);
+      this.updateRenewalResult(id, result);
+      this.broadcast('renewalResult', { id, result });
+      return result;
     }
 
     // 判断是否使用代理
