@@ -351,6 +351,14 @@ class ApiService {
   async getRenewalLogs(): Promise<LogEntry[]> {
     return this.request('/api/renewals/logs');
   }
+
+  async getRenewalLogsById(id: string): Promise<LogEntry[]> {
+    return this.request(`/api/renewals/${id}/logs`);
+  }
+
+  async clearRenewalLogs(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/renewals/${id}/logs`, { method: 'DELETE' });
+  }
 }
 
 export const api = new ApiService();

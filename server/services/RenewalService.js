@@ -16,8 +16,10 @@ export class RenewalService {
     this.timers = new Map(); // id -> timer
     this.cookies = new Map(); // id -> cookies (缓存登录后的 cookies)
     this.browser = null; // 共享浏览器实例
-    this.logs = [];
-    this.maxLogs = 100;
+    this.logs = new Map(); // id -> logs[] (每个续期配置单独的日志)
+    this.globalLogs = []; // 全局日志
+    this.maxLogsPerRenewal = 50;
+    this.maxGlobalLogs = 100;
 
     // 启动时加载已保存的续期配置
     this.loadSavedRenewals();
@@ -29,14 +31,28 @@ export class RenewalService {
       id: Date.now(),
       timestamp,
       type,
-      message: renewalId ? `[${renewalId}] ${message}` : message,
+      message,
       renewalId
     };
 
-    console.log(`[${timestamp}] [续期] ${message}`);
-    this.logs.push(entry);
-    if (this.logs.length > this.maxLogs) {
-      this.logs.shift();
+    console.log(`[${timestamp}] [续期]${renewalId ? ` [${renewalId}]` : ''} ${message}`);
+
+    // 添加到全局日志
+    this.globalLogs.push(entry);
+    if (this.globalLogs.length > this.maxGlobalLogs) {
+      this.globalLogs.shift();
+    }
+
+    // 如果有 renewalId，添加到该续期的单独日志
+    if (renewalId) {
+      if (!this.logs.has(renewalId)) {
+        this.logs.set(renewalId, []);
+      }
+      const renewalLogs = this.logs.get(renewalId);
+      renewalLogs.push(entry);
+      if (renewalLogs.length > this.maxLogsPerRenewal) {
+        renewalLogs.shift();
+      }
     }
 
     this.broadcast('renewalLog', entry);
@@ -1042,10 +1058,25 @@ export class RenewalService {
   }
 
   /**
-   * 获取续期日志
+   * 获取全局续期日志
    */
   getLogs() {
-    return this.logs.slice(-50);
+    return this.globalLogs.slice(-50);
+  }
+
+  /**
+   * 获取单个续期的日志
+   */
+  getRenewalLogs(id) {
+    const logs = this.logs.get(id);
+    return logs ? logs.slice(-50) : [];
+  }
+
+  /**
+   * 清除单个续期的日志
+   */
+  clearRenewalLogs(id) {
+    this.logs.set(id, []);
   }
 
   /**

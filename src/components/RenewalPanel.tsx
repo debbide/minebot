@@ -105,7 +105,8 @@ export function RenewalPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<RenewalFormData>(defaultFormData);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [logs, setLogs] = useState<RenewalLog[]>([]);
+  const [globalLogs, setGlobalLogs] = useState<RenewalLog[]>([]);
+  const [renewalLogs, setRenewalLogs] = useState<Record<string, RenewalLog[]>>({});
   const [showLogs, setShowLogs] = useState(false);
   const { toast } = useToast();
 
@@ -118,12 +119,21 @@ export function RenewalPanel() {
     }
   };
 
-  const fetchLogs = async () => {
+  const fetchGlobalLogs = async () => {
     try {
       const data = await api.getRenewalLogs();
-      setLogs(data as RenewalLog[]);
+      setGlobalLogs(data as RenewalLog[]);
     } catch (error) {
       console.error("Failed to fetch logs:", error);
+    }
+  };
+
+  const fetchRenewalLogs = async (id: string) => {
+    try {
+      const data = await api.getRenewalLogsById(id);
+      setRenewalLogs(prev => ({ ...prev, [id]: data as RenewalLog[] }));
+    } catch (error) {
+      console.error("Failed to fetch renewal logs:", error);
     }
   };
 
@@ -133,14 +143,23 @@ export function RenewalPanel() {
     return () => clearInterval(interval);
   }, []);
 
-  // 当显示日志或测试时，更频繁地获取日志
+  // 当显示全局日志或测试时，更频繁地获取全局日志
   useEffect(() => {
     if (showLogs || testingId) {
-      fetchLogs();
-      const interval = setInterval(fetchLogs, 1000);
+      fetchGlobalLogs();
+      const interval = setInterval(fetchGlobalLogs, 1000);
       return () => clearInterval(interval);
     }
   }, [showLogs, testingId]);
+
+  // 当展开某个续期配置时，获取该配置的日志
+  useEffect(() => {
+    if (expandedId) {
+      fetchRenewalLogs(expandedId);
+      const interval = setInterval(() => fetchRenewalLogs(expandedId), 2000);
+      return () => clearInterval(interval);
+    }
+  }, [expandedId]);
 
   const handleSubmit = async () => {
     if (!formData.url) {
@@ -562,29 +581,29 @@ export function RenewalPanel() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {/* 日志面板 */}
+        {/* 全局日志面板 */}
         {showLogs && (
           <div className="p-3 rounded-lg border bg-muted/50 mb-3">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium flex items-center gap-2">
                 <ScrollText className="h-4 w-4" />
-                运行日志
+                全局日志
               </div>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setLogs([])}
+                onClick={() => setGlobalLogs([])}
               >
                 清空
               </Button>
             </div>
             <div className="h-48 overflow-y-auto space-y-1 font-mono text-xs">
-              {logs.length === 0 ? (
+              {globalLogs.length === 0 ? (
                 <div className="text-muted-foreground text-center py-4">
                   暂无日志
                 </div>
               ) : (
-                logs.slice().reverse().map((log) => (
+                globalLogs.slice().reverse().map((log) => (
                   <div
                     key={log.id}
                     className={`flex gap-2 ${
@@ -594,6 +613,7 @@ export function RenewalPanel() {
                     }`}
                   >
                     <span className="text-muted-foreground">[{log.timestamp}]</span>
+                    {log.renewalId && <span className="text-blue-500">[{log.renewalId}]</span>}
                     <span>{log.message}</span>
                   </div>
                 ))
@@ -710,6 +730,46 @@ export function RenewalPanel() {
                         </div>
                       </div>
                     )}
+                  </div>
+                  {/* 单独的日志面板 */}
+                  <div className="mt-3 p-2 rounded border bg-muted/30">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-medium flex items-center gap-1">
+                        <ScrollText className="h-3 w-3" />
+                        执行日志
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs"
+                        onClick={async () => {
+                          await api.clearRenewalLogs(renewal.id);
+                          setRenewalLogs(prev => ({ ...prev, [renewal.id]: [] }));
+                        }}
+                      >
+                        清空
+                      </Button>
+                    </div>
+                    <div className="h-32 overflow-y-auto space-y-0.5 font-mono text-xs">
+                      {(!renewalLogs[renewal.id] || renewalLogs[renewal.id].length === 0) ? (
+                        <div className="text-muted-foreground text-center py-2">
+                          暂无日志
+                        </div>
+                      ) : (
+                        renewalLogs[renewal.id].slice().reverse().map((log) => (
+                          <div
+                            key={log.id}
+                            className={`${
+                              log.type === 'error' ? 'text-red-500' :
+                              log.type === 'success' ? 'text-green-500' :
+                              'text-muted-foreground'
+                            }`}
+                          >
+                            <span className="opacity-60">[{log.timestamp}]</span> {log.message}
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-2 pt-2">
                     <Button

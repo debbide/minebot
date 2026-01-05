@@ -518,6 +518,26 @@ app.get('/api/renewals/logs', (req, res) => {
   }
 });
 
+// 获取单个续期的日志
+app.get('/api/renewals/:id/logs', (req, res) => {
+  try {
+    const logs = renewalService.getRenewalLogs(req.params.id);
+    res.json(logs);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 清除单个续期的日志
+app.delete('/api/renewals/:id/logs', (req, res) => {
+  try {
+    renewalService.clearRenewalLogs(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Serve frontend for all other routes
 app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../dist/index.html'));
