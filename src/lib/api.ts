@@ -72,25 +72,36 @@ export interface RenewalConfig {
   id: string;
   name: string;
   url: string;
+  interval: number;
+  enabled: boolean;
+
+  // 续期模式：'http' | 'autoLoginHttp' | 'browserClick'
+  mode?: 'http' | 'autoLoginHttp' | 'browserClick';
+
+  // HTTP 模式配置
   method: 'GET' | 'POST';
   headers: Record<string, string>;
   body: string;
-  interval: number;
-  enabled: boolean;
   useProxy: boolean;
   proxyUrl: string;
-  // 自动登录配置
-  autoLogin: boolean;
+
+  // 登录配置（autoLoginHttp 和 browserClick 模式）
   loginUrl: string;
   panelUsername: string;
   panelPassword: string;
-  // 浏览器点击续期模式
-  useBrowserClick: boolean;
-  renewPageUrl: string;  // 续期页面 URL（服务器详情页）
-  renewButtonSelector: string;  // 续期按钮选择器
+
+  // 浏览器点击配置（browserClick 模式）
+  renewButtonSelector: string;
+
+  // 状态
   lastRun: string | null;
   lastResult: RenewalResult | null;
   running?: boolean;
+
+  // 兼容旧配置（已废弃）
+  autoLogin?: boolean;
+  useBrowserClick?: boolean;
+  renewPageUrl?: string;
 }
 
 export interface RenewalResult {

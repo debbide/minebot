@@ -99,26 +99,48 @@ export class RenewalService {
     }
 
     const id = renewalConfig.id || `renewal_${Date.now()}`;
+
+    // 新的简化模式：'http' | 'autoLoginHttp' | 'browserClick'
+    // 兼容旧配置：根据旧字段推断模式
+    let mode = renewalConfig.mode;
+    if (!mode) {
+      if (renewalConfig.useBrowserClick && renewalConfig.autoLogin) {
+        mode = 'browserClick';
+      } else if (renewalConfig.autoLogin) {
+        mode = 'autoLoginHttp';
+      } else {
+        mode = 'http';
+      }
+    }
+
     const renewal = {
       id,
       name: renewalConfig.name || '未命名续期',
+      interval: renewalConfig.interval || 21600000, // 默认6小时
+      enabled: renewalConfig.enabled !== false,
+
+      // 续期模式：'http' | 'autoLoginHttp' | 'browserClick'
+      mode,
+
+      // 续期目标 URL
       url: renewalConfig.url || '',
+
+      // HTTP 模式配置
       method: renewalConfig.method || 'GET',
       headers: renewalConfig.headers || {},
       body: renewalConfig.body || '',
-      interval: renewalConfig.interval || 21600000, // 默认6小时
-      enabled: renewalConfig.enabled !== false,
       useProxy: renewalConfig.useProxy || false,
       proxyUrl: renewalConfig.proxyUrl || '',
-      // 自动登录配置
-      autoLogin: renewalConfig.autoLogin || false,
+
+      // 登录配置（autoLoginHttp 和 browserClick 模式需要）
       loginUrl: renewalConfig.loginUrl || '',
       panelUsername: renewalConfig.panelUsername || '',
       panelPassword: renewalConfig.panelPassword || '',
-      // 浏览器点击续期模式
-      useBrowserClick: renewalConfig.useBrowserClick || false,
-      renewPageUrl: renewalConfig.renewPageUrl || '',
+
+      // 浏览器点击配置（browserClick 模式）
       renewButtonSelector: renewalConfig.renewButtonSelector || '',
+
+      // 状态
       lastRun: null,
       lastResult: null
     };
@@ -1440,28 +1462,30 @@ export class RenewalService {
       return { success: false, error: 'URL未配置' };
     }
 
-    // 如果启用浏览器点击续期模式
-    if (renewal.autoLogin && renewal.useBrowserClick) {
-      this.log('info', '使用浏览器点击续期模式...', id);
+    // 获取续期模式（兼容旧配置）
+    const mode = renewal.mode ||
+      (renewal.useBrowserClick && renewal.autoLogin ? 'browserClick' :
+       renewal.autoLogin ? 'autoLoginHttp' : 'http');
+
+    // 模式1: 浏览器自动点击
+    if (mode === 'browserClick') {
+      this.log('info', '使用浏览器自动点击模式...', id);
       const result = await this.browserClickRenew(renewal);
       this.updateRenewalResult(id, result);
       this.broadcast('renewalResult', { id, result });
       return result;
     }
 
-    // 判断是否使用代理
+    // 模式2 和 模式3: HTTP 请求（区别在于是否自动登录获取 Cookie）
     const useProxy = renewal.useProxy && renewal.proxyUrl;
-
-    // 构建续期 URL
-    const renewUrl = renewal.renewPageUrl || renewal.url;
+    const renewUrl = renewal.url;
     const targetUrl = useProxy ? renewal.proxyUrl : renewUrl;
 
-    // 如果启用自动登录，尝试使用缓存的 Cookie
+    // 模式2: 自动登录获取 Cookie
     let cookieString = null;
-    if (renewal.autoLogin) {
+    if (mode === 'autoLoginHttp') {
       cookieString = this.getCachedCookieString(id);
       if (!cookieString && retryWithLogin) {
-        // 没有缓存的 Cookie，先登录获取
         try {
           this.log('info', '没有缓存的 Cookie，尝试自动登录...', id);
           cookieString = await this.autoLoginAndGetCookies(renewal);
@@ -1471,7 +1495,8 @@ export class RenewalService {
       }
     }
 
-    this.log('info', `执行续期请求: GET ${renewUrl}${useProxy ? ' (通过CF代理)' : ''}${renewal.autoLogin ? ' (自动登录)' : ''}`, id);
+    const modeLabel = mode === 'autoLoginHttp' ? '自动登录' : 'HTTP';
+    this.log('info', `执行续期请求: ${renewal.method} ${renewUrl}${useProxy ? ' (通过CF代理)' : ''} [${modeLabel}]`, id);
 
     try {
       const requestHeaders = {
@@ -1480,7 +1505,7 @@ export class RenewalService {
       };
 
       // 如果有自动登录获取的 Cookie，使用它替换或添加到 headers
-      if (cookieString && renewal.autoLogin) {
+      if (cookieString && mode === 'autoLoginHttp') {
         requestHeaders['Cookie'] = cookieString;
         // 添加 XSRF-TOKEN 到请求头（翼龙面板需要）
         const xsrfToken = this.getXsrfToken(id);
@@ -1496,7 +1521,7 @@ export class RenewalService {
         requestHeaders['X-Target-Method'] = renewal.method;
         // 将实际的请求头（包括 Cookie 和 XSRF-TOKEN）传给代理
         const headersForProxy = { ...renewal.headers };
-        if (cookieString && renewal.autoLogin) {
+        if (cookieString && mode === 'autoLoginHttp') {
           headersForProxy['Cookie'] = cookieString;
           const xsrfToken = this.getXsrfToken(id);
           if (xsrfToken) {
@@ -1507,13 +1532,12 @@ export class RenewalService {
       }
 
       const options = {
-        method: useProxy ? 'POST' : 'GET',  // 续期通常用 GET
+        method: useProxy ? 'POST' : renewal.method,
         headers: requestHeaders
       };
 
-      // 只有明确配置 POST 且有 body 时才用 POST
+      // POST 请求带 body
       if (renewal.method === 'POST' && renewal.body) {
-        options.method = 'POST';
         options.body = renewal.body;
         if (!options.headers['Content-Type']) {
           options.headers['Content-Type'] = 'application/json';
@@ -1543,7 +1567,7 @@ export class RenewalService {
                          responseText.includes('unauthenticated') ||
                          responseText.includes('Please sign in');
 
-      if (needReLogin && renewal.autoLogin && retryWithLogin) {
+      if (needReLogin && mode === 'autoLoginHttp' && retryWithLogin) {
         this.log('info', `Cookie 可能已过期 (状态码: ${status})，尝试重新登录...`, id);
         // 清除旧的 Cookie 缓存
         this.cookies.delete(id);

@@ -57,43 +57,48 @@ interface RenewalLog {
   renewalId?: string;
 }
 
+// 续期模式类型
+type RenewalMode = "http" | "autoLoginHttp" | "browserClick";
+
 interface RenewalFormData {
   name: string;
   url: string;
+  intervalHours: number;
+  intervalMinutes: number;
+
+  // 续期模式
+  mode: RenewalMode;
+
+  // HTTP 模式配置
   method: "GET" | "POST";
   headers: string;
   body: string;
-  intervalHours: number;
-  intervalMinutes: number;
   useProxy: boolean;
   proxyUrl: string;
-  // 自动登录配置
-  autoLogin: boolean;
+
+  // 登录配置（autoLoginHttp 和 browserClick 模式）
   loginUrl: string;
   panelUsername: string;
   panelPassword: string;
-  // 浏览器点击续期模式
-  useBrowserClick: boolean;
-  renewPageUrl: string;
+
+  // 浏览器点击配置（browserClick 模式）
   renewButtonSelector: string;
 }
 
 const defaultFormData: RenewalFormData = {
   name: "",
   url: "",
+  intervalHours: 6,
+  intervalMinutes: 0,
+  mode: "browserClick",
   method: "GET",
   headers: "",
   body: "",
-  intervalHours: 6,
-  intervalMinutes: 0,
   useProxy: false,
   proxyUrl: "",
-  autoLogin: false,
   loginUrl: "",
   panelUsername: "",
   panelPassword: "",
-  useBrowserClick: false,
-  renewPageUrl: "",
   renewButtonSelector: "",
 };
 
@@ -167,6 +172,13 @@ export function RenewalPanel() {
       return;
     }
 
+    // 验证登录模式必填项
+    if ((formData.mode === "autoLoginHttp" || formData.mode === "browserClick") &&
+        (!formData.loginUrl || !formData.panelUsername || !formData.panelPassword)) {
+      toast({ title: "错误", description: "请填写登录URL、账号和密码", variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
     try {
       // Parse headers
@@ -190,19 +202,17 @@ export function RenewalPanel() {
       const renewalData = {
         name: formData.name || "未命名续期",
         url: formData.url,
+        interval: interval || 21600000,
+        enabled: true,
+        mode: formData.mode,
         method: formData.method,
         headers,
         body: formData.body,
-        interval: interval || 21600000, // Default 6 hours
-        enabled: true,
         useProxy: formData.useProxy,
         proxyUrl: formData.proxyUrl,
-        autoLogin: formData.autoLogin,
         loginUrl: formData.loginUrl,
         panelUsername: formData.panelUsername,
         panelPassword: formData.panelPassword,
-        useBrowserClick: formData.useBrowserClick,
-        renewPageUrl: formData.renewPageUrl,
         renewButtonSelector: formData.renewButtonSelector,
       };
 
@@ -229,24 +239,34 @@ export function RenewalPanel() {
     const hours = Math.floor(renewal.interval / 3600000);
     const minutes = Math.floor((renewal.interval % 3600000) / 60000);
 
+    // 兼容旧配置：根据旧字段推断模式
+    let mode: RenewalMode = (renewal as any).mode;
+    if (!mode) {
+      if ((renewal as any).useBrowserClick && (renewal as any).autoLogin) {
+        mode = "browserClick";
+      } else if ((renewal as any).autoLogin) {
+        mode = "autoLoginHttp";
+      } else {
+        mode = "http";
+      }
+    }
+
     setFormData({
       name: renewal.name,
       url: renewal.url,
+      intervalHours: hours,
+      intervalMinutes: minutes,
+      mode,
       method: renewal.method,
       headers: Object.keys(renewal.headers).length > 0
         ? JSON.stringify(renewal.headers, null, 2)
         : "",
       body: renewal.body,
-      intervalHours: hours,
-      intervalMinutes: minutes,
       useProxy: renewal.useProxy || false,
       proxyUrl: renewal.proxyUrl || "",
-      autoLogin: renewal.autoLogin || false,
       loginUrl: renewal.loginUrl || "",
       panelUsername: renewal.panelUsername || "",
       panelPassword: renewal.panelPassword || "",
-      useBrowserClick: renewal.useBrowserClick || false,
-      renewPageUrl: renewal.renewPageUrl || "",
       renewButtonSelector: renewal.renewButtonSelector || "",
     });
     setEditingId(renewal.id);
@@ -348,37 +368,15 @@ export function RenewalPanel() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>名称</Label>
-                  <Input
-                    placeholder="我的服务器"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>续期 URL *</Label>
-                  <Input
-                    placeholder="https://panel.example.com/api/renew"
-                    value={formData.url}
-                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  />
-                </div>
+                {/* 基本信息 */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>请求方法</Label>
-                    <Select
-                      value={formData.method}
-                      onValueChange={(v) => setFormData({ ...formData, method: v as "GET" | "POST" })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GET">GET</SelectItem>
-                        <SelectItem value="POST">POST</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label>名称</Label>
+                    <Input
+                      placeholder="我的服务器"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>续期间隔</Label>
@@ -386,181 +384,191 @@ export function RenewalPanel() {
                       <Input
                         type="number"
                         min="0"
-                        placeholder="6"
                         value={formData.intervalHours}
                         onChange={(e) => setFormData({ ...formData, intervalHours: parseInt(e.target.value) || 0 })}
-                        className="w-20"
+                        className="w-16"
                       />
                       <span className="flex items-center text-sm text-muted-foreground">时</span>
                       <Input
                         type="number"
                         min="0"
                         max="59"
-                        placeholder="0"
                         value={formData.intervalMinutes}
                         onChange={(e) => setFormData({ ...formData, intervalMinutes: parseInt(e.target.value) || 0 })}
-                        className="w-20"
+                        className="w-16"
                       />
                       <span className="flex items-center text-sm text-muted-foreground">分</span>
                     </div>
                   </div>
                 </div>
+
+                {/* 续期模式选择 */}
                 <div className="space-y-2">
-                  <Label>请求头 (JSON 或 Key: Value 格式)</Label>
-                  <Textarea
-                    placeholder={`{
-  "Cookie": "session=xxx",
-  "Authorization": "Bearer xxx"
-}`}
-                    value={formData.headers}
-                    onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
-                    rows={4}
-                    className="font-mono text-xs"
+                  <Label className="flex items-center gap-2">
+                    <Settings2 className="h-4 w-4" />
+                    续期模式
+                  </Label>
+                  <Select
+                    value={formData.mode}
+                    onValueChange={(v) => setFormData({ ...formData, mode: v as RenewalMode })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="browserClick">
+                        <div className="flex items-center gap-2">
+                          <MousePointer2 className="h-4 w-4" />
+                          浏览器自动点击（推荐）
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="autoLoginHttp">
+                        <div className="flex items-center gap-2">
+                          <Key className="h-4 w-4" />
+                          自动登录 + HTTP 请求
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="http">
+                        <div className="flex items-center gap-2">
+                          <Cloud className="h-4 w-4" />
+                          纯 HTTP 请求
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.mode === "browserClick" && "使用无头浏览器自动登录并点击续期按钮，最稳定可靠"}
+                    {formData.mode === "autoLoginHttp" && "自动登录获取 Cookie，然后发送 HTTP 请求"}
+                    {formData.mode === "http" && "直接发送 HTTP 请求，需要手动配置 Cookie"}
+                  </p>
+                </div>
+
+                {/* 续期 URL */}
+                <div className="space-y-2">
+                  <Label>续期 URL *</Label>
+                  <Input
+                    placeholder={formData.mode === "browserClick"
+                      ? "https://panel.example.com/server/xxx（服务器详情页）"
+                      : "https://panel.example.com/api/renew"}
+                    value={formData.url}
+                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                   />
                 </div>
-                {formData.method === "POST" && (
+
+                {/* 登录配置（autoLoginHttp 和 browserClick 模式） */}
+                {(formData.mode === "autoLoginHttp" || formData.mode === "browserClick") && (
+                  <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+                    <Label className="flex items-center gap-2 text-sm font-medium">
+                      <User className="h-4 w-4" />
+                      登录配置
+                    </Label>
+                    <div className="space-y-2">
+                      <Label className="text-xs">登录页面 URL *</Label>
+                      <Input
+                        placeholder="https://auth.example.com/sign-in"
+                        value={formData.loginUrl}
+                        onChange={(e) => setFormData({ ...formData, loginUrl: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-xs">账号 *</Label>
+                        <Input
+                          placeholder="your@email.com"
+                          value={formData.panelUsername}
+                          onChange={(e) => setFormData({ ...formData, panelUsername: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">密码 *</Label>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          value={formData.panelPassword}
+                          onChange={(e) => setFormData({ ...formData, panelPassword: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 浏览器点击配置（browserClick 模式） */}
+                {formData.mode === "browserClick" && (
                   <div className="space-y-2">
-                    <Label>请求体</Label>
-                    <Textarea
-                      placeholder='{"action": "renew"}'
-                      value={formData.body}
-                      onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                      rows={3}
-                      className="font-mono text-xs"
+                    <Label className="text-xs">续期按钮选择器（可选）</Label>
+                    <Input
+                      placeholder="留空自动查找 Renew/续期 按钮"
+                      value={formData.renewButtonSelector}
+                      onChange={(e) => setFormData({ ...formData, renewButtonSelector: e.target.value })}
                     />
                   </div>
                 )}
-                <div className="space-y-3 pt-2 border-t">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center gap-2">
-                        <Cloud className="h-4 w-4" />
-                        CF Workers 代理
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        通过 Cloudflare Workers 中转请求
-                      </p>
-                    </div>
-                    <Switch
-                      checked={formData.useProxy}
-                      onCheckedChange={(checked) => setFormData({ ...formData, useProxy: checked })}
-                    />
-                  </div>
-                  {formData.useProxy && (
-                    <div className="space-y-2">
-                      <Label>代理 URL</Label>
-                      <Input
-                        placeholder="https://your-worker.workers.dev"
-                        value={formData.proxyUrl}
-                        onChange={(e) => setFormData({ ...formData, proxyUrl: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        请求将发送到此代理地址，由代理转发到目标 URL
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-3 pt-2 border-t">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center gap-2">
-                        <Key className="h-4 w-4" />
-                        自动登录
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        使用账号密码自动获取 Cookie，Cookie 过期自动重新登录
-                      </p>
-                    </div>
-                    <Switch
-                      checked={formData.autoLogin}
-                      onCheckedChange={(checked) => setFormData({ ...formData, autoLogin: checked })}
-                    />
-                  </div>
-                  {formData.autoLogin && (
-                    <div className="space-y-3">
+
+                {/* HTTP 模式配置 */}
+                {(formData.mode === "http" || formData.mode === "autoLoginHttp") && (
+                  <Collapsible>
+                    <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                      <ChevronDown className="h-4 w-4" />
+                      HTTP 请求配置
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-3">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label className="text-xs">请求方法</Label>
+                          <Select
+                            value={formData.method}
+                            onValueChange={(v) => setFormData({ ...formData, method: v as "GET" | "POST" })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="GET">GET</SelectItem>
+                              <SelectItem value="POST">POST</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs">CF 代理</Label>
+                            <Switch
+                              checked={formData.useProxy}
+                              onCheckedChange={(checked) => setFormData({ ...formData, useProxy: checked })}
+                            />
+                          </div>
+                          {formData.useProxy && (
+                            <Input
+                              placeholder="https://your-worker.workers.dev"
+                              value={formData.proxyUrl}
+                              onChange={(e) => setFormData({ ...formData, proxyUrl: e.target.value })}
+                            />
+                          )}
+                        </div>
+                      </div>
                       <div className="space-y-2">
-                        <Label>登录页面 URL</Label>
-                        <Input
-                          placeholder="https://panel.example.com/auth/login"
-                          value={formData.loginUrl}
-                          onChange={(e) => setFormData({ ...formData, loginUrl: e.target.value })}
+                        <Label className="text-xs">请求头 (JSON 格式)</Label>
+                        <Textarea
+                          placeholder={'{\n  "Cookie": "session=xxx"\n}'}
+                          value={formData.headers}
+                          onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
+                          rows={3}
+                          className="font-mono text-xs"
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
+                      {formData.method === "POST" && (
                         <div className="space-y-2">
-                          <Label className="flex items-center gap-2">
-                            <User className="h-3 w-3" />
-                            面板账号
-                          </Label>
-                          <Input
-                            placeholder="your@email.com"
-                            value={formData.panelUsername}
-                            onChange={(e) => setFormData({ ...formData, panelUsername: e.target.value })}
+                          <Label className="text-xs">请求体</Label>
+                          <Textarea
+                            placeholder='{"action": "renew"}'
+                            value={formData.body}
+                            onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+                            rows={2}
+                            className="font-mono text-xs"
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label className="flex items-center gap-2">
-                            <Key className="h-3 w-3" />
-                            面板密码
-                          </Label>
-                          <Input
-                            type="password"
-                            placeholder="••••••••"
-                            value={formData.panelPassword}
-                            onChange={(e) => setFormData({ ...formData, panelPassword: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        启用后将使用无头浏览器自动登录获取 Cookie，可自动通过 Cloudflare 5 秒盾
-                      </p>
-                    </div>
-                  )}
-                </div>
-                {formData.autoLogin && (
-                  <div className="space-y-3 pt-2 border-t">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="flex items-center gap-2">
-                          <MousePointer2 className="h-4 w-4" />
-                          浏览器点击续期
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          登录后直接在页面上点击续期按钮，更稳定可靠
-                        </p>
-                      </div>
-                      <Switch
-                        checked={formData.useBrowserClick}
-                        onCheckedChange={(checked) => setFormData({ ...formData, useBrowserClick: checked })}
-                      />
-                    </div>
-                    {formData.useBrowserClick && (
-                      <div className="space-y-3">
-                        <div className="space-y-2">
-                          <Label>续期页面 URL</Label>
-                          <Input
-                            placeholder="https://panel.example.com/server/xxx（服务器详情页）"
-                            value={formData.renewPageUrl}
-                            onChange={(e) => setFormData({ ...formData, renewPageUrl: e.target.value })}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            留空则使用续期 URL 作为页面地址
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>续期按钮选择器</Label>
-                          <Input
-                            placeholder='button:has-text("Renew") 或 CSS 选择器'
-                            value={formData.renewButtonSelector}
-                            onChange={(e) => setFormData({ ...formData, renewButtonSelector: e.target.value })}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            留空则自动查找包含 Renew、续期 等文字的按钮
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
                 )}
               </div>
               <DialogFooter>
@@ -702,22 +710,20 @@ export function RenewalPanel() {
                       <Clock className="h-4 w-4" />
                       间隔: {formatInterval(renewal.interval)}
                     </div>
-                    <div className="text-muted-foreground">
-                      方法: {renewal.method}
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      {(() => {
+                        const mode = (renewal as any).mode ||
+                          ((renewal as any).useBrowserClick && (renewal as any).autoLogin ? 'browserClick' :
+                           (renewal as any).autoLogin ? 'autoLoginHttp' : 'http');
+                        return (
+                          <>
+                            {mode === 'browserClick' && <><MousePointer2 className="h-4 w-4" />浏览器点击</>}
+                            {mode === 'autoLoginHttp' && <><Key className="h-4 w-4" />自动登录</>}
+                            {mode === 'http' && <><Cloud className="h-4 w-4" />HTTP</>}
+                          </>
+                        );
+                      })()}
                     </div>
-                    {renewal.useProxy && (
-                      <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
-                        <Cloud className="h-4 w-4" />
-                        代理: {renewal.proxyUrl || "未配置"}
-                      </div>
-                    )}
-                    {renewal.autoLogin && (
-                      <div className="col-span-2 flex items-center gap-2 text-muted-foreground">
-                        <Key className="h-4 w-4" />
-                        自动登录: {renewal.panelUsername || "未配置"}
-                        {renewal.useBrowserClick && " (浏览器点击)"}
-                      </div>
-                    )}
                     <div className="col-span-2 text-muted-foreground">
                       上次执行: {formatTime(renewal.lastRun)}
                     </div>
