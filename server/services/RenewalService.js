@@ -1219,25 +1219,6 @@ export class RenewalService {
       // 再等待页面渲染完成
       await this.delay(2000);
 
-      // 检查是否通过 URL 参数直接续期成功（如 zampto.net 的 renew=true）
-      renewPageContent = await page.content();
-      const renewedByUrl = renewPageContent.includes('renewed') ||
-                          renewPageContent.includes('Renewed') ||
-                          renewPageContent.includes('successfully') ||
-                          renewPageContent.includes('Success') ||
-                          renewPageContent.includes('extended') ||
-                          renewPageContent.includes('Server renewal successful');
-
-      if (renewedByUrl) {
-        this.log('success', '通过 URL 参数续期成功', id);
-        return {
-          success: true,
-          message: '续期成功（通过URL参数）',
-          response: '检测到成功提示',
-          timestamp: new Date().toISOString()
-        };
-      }
-
       // 检查并处理续期页面的 Cookie 同意对话框 (GDPR)
       try {
         const consentBtn = await page.$('.fc-cta-consent') ||
