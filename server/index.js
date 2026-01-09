@@ -789,7 +789,7 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Default login: admin / admin123`);
   broadcast('log', {
@@ -797,4 +797,28 @@ server.listen(PORT, '0.0.0.0', () => {
     icon: '🚀',
     message: `服务器已启动，端口 ${PORT}`
   });
+
+  // 自动加载并连接保存的服务器
+  try {
+    const servers = configManager.getServers();
+    if (servers && servers.length > 0) {
+      console.log(`发现 ${servers.length} 个保存的服务器，正在自动连接...`);
+      broadcast('log', {
+        type: 'info',
+        icon: '🔄',
+        message: `正在自动连接 ${servers.length} 个服务器...`
+      });
+
+      for (const serverConfig of servers) {
+        try {
+          await botManager.addBot(serverConfig);
+          console.log(`已连接: ${serverConfig.name || serverConfig.host}`);
+        } catch (err) {
+          console.error(`连接失败 ${serverConfig.host}: ${err.message}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('自动连接失败:', err.message);
+  }
 });
