@@ -199,30 +199,33 @@ export class BotInstance {
     this.activityMonitorInterval = setInterval(() => {
       if (Date.now() - this.lastActivity > 300000) {
         this.log('warning', 'Bot 可能卡死，尝试重连...', '⏱️');
-        this.scheduleReconnect();
+        this.attemptRepair('卡死');
       }
     }, 30000);
   }
 
   /**
-   * 简化的重连逻辑 - 参考 Pathfinder PRO
-   * 只要没有被销毁，就永远尝试重连
+   * 重连逻辑 - 完全照抄 Pathfinder PRO
    */
-  scheduleReconnect() {
-    // 如果已经在重连中或已被销毁，跳过
-    if (this.reconnecting) {
-      console.log(`[${this.id}] scheduleReconnect 跳过: 已在重连中`);
-      return;
-    }
-    if (this.destroyed) {
-      console.log(`[${this.id}] scheduleReconnect 跳过: 已被销毁`);
-      return;
-    }
+  attemptRepair(reason = '断开') {
+    if (this.destroyed || this.reconnecting) return;
 
     this.reconnecting = true;
     this.status.connected = false;
+    this.log('warning', `连接${reason}，10秒后重连...`, '🔄');
 
-    // 清理旧连接（但不清理 reconnectTimeout，因为我们马上要设置新的）
+    // 清理旧实例
+    if (this.bot) {
+      try {
+        this.bot.removeAllListeners();
+        this.bot.end();
+      } catch (e) {}
+      this.bot = null;
+    }
+    if (this.behaviors) {
+      this.behaviors.stopAll();
+      this.behaviors = null;
+    }
     if (this.activityMonitorInterval) {
       clearInterval(this.activityMonitorInterval);
       this.activityMonitorInterval = null;
@@ -231,47 +234,15 @@ export class BotInstance {
       clearInterval(this.autoChatInterval);
       this.autoChatInterval = null;
     }
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-      this.connectionTimeout = null;
-    }
-    if (this.restartCommandTimer) {
-      clearInterval(this.restartCommandTimer);
-      this.restartCommandTimer = null;
-    }
-    if (this.behaviors) {
-      this.behaviors.stopAll();
-      this.behaviors = null;
-    }
-    if (this.bot) {
-      try {
-        this.bot.removeAllListeners();
-        if (this.bot._client) {
-          this.bot._client.removeAllListeners();
-        }
-      } catch (e) {}
-      this.bot = null;
-    }
 
-    // 5秒后尝试重连
-    const delay = 5000;
-    this.log('info', `${delay/1000} 秒后自动重连...`, '🔄');
-    console.log(`[${this.id}] 设置重连定时器: ${delay}ms`);
-
-    this.reconnectTimeout = setTimeout(() => {
-      if (this.destroyed) {
-        console.log(`[${this.id}] 重连定时器触发但已销毁，跳过`);
-        return;
-      }
-
-      console.log(`[${this.id}] 重连定时器触发，开始连接...`);
+    // 10秒后重新连接
+    setTimeout(() => {
+      if (this.destroyed) return;
       this.reconnecting = false;
       this.connect().catch(err => {
         this.log('error', `重连失败: ${err.message}`, '✗');
-        // 失败后继续尝试，永不放弃
-        this.scheduleReconnect();
       });
-    }, delay);
+    }, 10000);
   }
 
   async connect() {
@@ -280,14 +251,19 @@ export class BotInstance {
       return;
     }
 
-    this.cleanup();
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    this.reconnecting = false;
+    // 确保旧连接已清理
+    if (this.bot) {
+      try {
+        this.bot.removeAllListeners();
+        this.bot.end();
+      } catch (e) {}
+      this.bot = null;
+    }
 
     const host = this.config.host;
     const port = this.config.port || 25565;
     const username = this.config.username || this.generateUsername();
-    const version = this.config.version || false; // Auto-detect
+    const version = this.config.version || false;
 
     this.status.username = username;
     this.log('info', `正在连接 ${host}:${port} (用户: ${username})...`, '⚡');
@@ -403,13 +379,14 @@ export class BotInstance {
 
         this.bot.on('error', (err) => {
           this.log('error', `错误: ${err.message}`, '✗');
+          this.attemptRepair('错误');
         });
 
         this.bot.on('kicked', (reason) => {
           this.log('error', `被踢出: ${reason}`, '👢');
           this.status.connected = false;
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
-          this.scheduleReconnect();
+          this.attemptRepair('被踢');
         });
 
         this.bot.on('end', () => {
@@ -417,11 +394,12 @@ export class BotInstance {
           this.status.connected = false;
           this.bot = null;
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
-          this.scheduleReconnect();
+          this.attemptRepair('断开');
         });
 
       } catch (error) {
         this.log('error', `连接失败: ${error.message}`, '✗');
+        this.attemptRepair('连接失败');
         reject(error);
       }
     });
