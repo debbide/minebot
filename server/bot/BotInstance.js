@@ -259,7 +259,9 @@ export class BotInstance {
           username,
           version: version || undefined,
           auth: 'offline',
-          connectTimeout: 30000
+          connectTimeout: 30000,
+          // 增加 keepalive 检查间隔，避免因网络波动被踢
+          checkTimeoutInterval: 60000
         };
 
         this.bot = mineflayer.createBot(botOptions);
@@ -305,8 +307,8 @@ export class BotInstance {
             this.log('warning', '路径规划初始化失败', '⚠');
           }
 
-          // 初始化行为管理器
-          this.behaviors = new BehaviorManager(this.bot, goals);
+          // 初始化行为管理器，传递日志函数以便巡逻等行为输出坐标
+          this.behaviors = new BehaviorManager(this.bot, goals, this.log.bind(this));
 
           this.log('success', `进入世界 (版本: ${this.bot.version})`, '✓');
 

@@ -157,9 +157,10 @@ export class AttackBehavior {
  * 巡逻行为
  */
 export class PatrolBehavior {
-  constructor(bot, goals) {
+  constructor(bot, goals, logFn = null) {
     this.bot = bot;
     this.goals = goals;
+    this.log = logFn; // 日志函数
     this.active = false;
     this.waypoints = [];
     this.currentIndex = 0;
@@ -177,6 +178,9 @@ export class PatrolBehavior {
     // 记录当前位置作为中心点（如果没有设置的话）
     if (!this.centerPos && this.bot?.entity) {
       this.centerPos = this.bot.entity.position.clone();
+      if (this.log) {
+        this.log('info', `巡逻中心点: X:${Math.floor(this.centerPos.x)} Y:${Math.floor(this.centerPos.y)} Z:${Math.floor(this.centerPos.z)}`, '📍');
+      }
     }
 
     if (waypoints && waypoints.length > 0) {
@@ -206,6 +210,12 @@ export class PatrolBehavior {
     if (!this.active) return;
     this.isMoving = false;
 
+    // 记录到达位置
+    if (this.log && this.bot?.entity) {
+      const pos = this.bot.entity.position;
+      this.log('info', `巡逻到达: X:${Math.floor(pos.x)} Y:${Math.floor(pos.y)} Z:${Math.floor(pos.z)}`, '📍');
+    }
+
     // 随机等待后继续巡逻
     const waitTime = 3000 + Math.random() * 5000;
     this.patrolTimeout = setTimeout(() => {
@@ -230,6 +240,10 @@ export class PatrolBehavior {
       const goal = new this.goals.GoalNear(targetX, center.y, targetZ, 1);
       this.bot.pathfinder.setGoal(goal);
       this.isMoving = true;
+
+      if (this.log) {
+        this.log('info', `巡逻前往: X:${Math.floor(targetX)} Z:${Math.floor(targetZ)}`, '🚶');
+      }
     } catch (e) {
       // 忽略路径规划错误
       this.isMoving = false;
@@ -585,13 +599,14 @@ export class ActionBehavior {
  * 行为管理器 - 统一管理所有行为
  */
 export class BehaviorManager {
-  constructor(bot, goals) {
+  constructor(bot, goals, logFn = null) {
     this.bot = bot;
     this.goals = goals;
+    this.log = logFn;
 
     this.follow = new FollowBehavior(bot, goals);
     this.attack = new AttackBehavior(bot, goals);
-    this.patrol = new PatrolBehavior(bot, goals);
+    this.patrol = new PatrolBehavior(bot, goals, logFn); // 传递日志函数
     this.mining = new MiningBehavior(bot);
     this.action = new ActionBehavior(bot);
     this.aiView = new AiViewBehavior(bot);
