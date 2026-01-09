@@ -113,6 +113,27 @@ export function BotControlPanel({
   const [panelApiKey, setPanelApiKey] = useState(pterodactyl?.apiKey || "");
   const [panelServerId, setPanelServerId] = useState(pterodactyl?.serverId || "");
 
+  // 打开设置对话框时获取最新配置
+  const handleOpenSettings = async () => {
+    setSettingsOpen(true);
+    try {
+      const result = await api.getBotConfig(botId);
+      if (result.success && result.config) {
+        const cfg = result.config;
+        // 同步所有配置到 state
+        setRestartMinutes(cfg.restartTimer?.intervalMinutes?.toString() || "0");
+        setAutoChatEnabled(cfg.autoChat?.enabled || false);
+        setAutoChatInterval(((cfg.autoChat?.interval || 60000) / 1000).toString());
+        setAutoChatMessages(cfg.autoChat?.messages?.join("\n") || "");
+        setPanelUrl(cfg.pterodactyl?.url || "");
+        setPanelApiKey(cfg.pterodactyl?.apiKey || "");
+        setPanelServerId(cfg.pterodactyl?.serverId || "");
+      }
+    } catch (error) {
+      console.error("Failed to load bot config:", error);
+    }
+  };
+
   // 同步props到state
   useEffect(() => {
     setRestartMinutes(restartTimer?.intervalMinutes?.toString() || "0");
@@ -333,7 +354,7 @@ export function BotControlPanel({
         </Button>
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" variant="outline" title="服务器设置">
+            <Button size="sm" variant="outline" title="服务器设置" onClick={handleOpenSettings}>
               <Settings className="h-4 w-4 mr-1" />
               <span className="text-xs">设置</span>
             </Button>
