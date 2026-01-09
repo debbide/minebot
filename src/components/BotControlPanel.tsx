@@ -326,32 +326,39 @@ export function BotControlPanel({
     }
   };
 
-  if (!connected) return null;
+  // 设置按钮始终可见（用于翼龙面板开机等功能）
+  // 其他功能按钮只在连接后显示
 
   return (
     <div className="space-y-2 mt-2">
-      {/* 快捷操作栏 - 始终可见 */}
+      {/* 快捷操作栏 */}
       <div className="flex gap-2 flex-wrap">
-        <Button
-          size="sm"
-          variant={modes.aiView ? "default" : "outline"}
-          onClick={() => handleModeToggle("aiView", !modes.aiView)}
-          disabled={loading !== null}
-          title="AI视角 - 自动看向附近玩家"
-        >
-          {loading === "aiView" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4 mr-1" />}
-          <span className="text-xs">AI视角</span>
-        </Button>
-        <Button
-          size="sm"
-          variant={modes.autoChat ? "default" : "outline"}
-          onClick={() => handleModeToggle("autoChat", !modes.autoChat)}
-          disabled={loading !== null}
-          title="自动喊话"
-        >
-          {loading === "autoChat" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-1" />}
-          <span className="text-xs">喊话</span>
-        </Button>
+        {/* 需要连接才能使用的功能 */}
+        {connected && (
+          <>
+            <Button
+              size="sm"
+              variant={modes.aiView ? "default" : "outline"}
+              onClick={() => handleModeToggle("aiView", !modes.aiView)}
+              disabled={loading !== null}
+              title="AI视角 - 自动看向附近玩家"
+            >
+              {loading === "aiView" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4 mr-1" />}
+              <span className="text-xs">AI视角</span>
+            </Button>
+            <Button
+              size="sm"
+              variant={modes.autoChat ? "default" : "outline"}
+              onClick={() => handleModeToggle("autoChat", !modes.autoChat)}
+              disabled={loading !== null}
+              title="自动喊话"
+            >
+              {loading === "autoChat" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 mr-1" />}
+              <span className="text-xs">喊话</span>
+            </Button>
+          </>
+        )}
+        {/* 设置按钮始终可见 */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DialogTrigger asChild>
             <Button size="sm" variant="outline" title="服务器设置" onClick={handleOpenSettings}>
@@ -558,23 +565,26 @@ export function BotControlPanel({
         </Dialog>
       </div>
 
-      {/* 状态徽章 */}
-      <div className="flex flex-wrap gap-1">
-        {modes.follow && <Badge variant="secondary">跟随中</Badge>}
-        {modes.autoAttack && <Badge variant="destructive">攻击中</Badge>}
-        {modes.patrol && <Badge variant="secondary">巡逻中</Badge>}
-        {modes.mining && <Badge variant="secondary">挖矿中</Badge>}
-        {modes.aiView && <Badge variant="secondary">AI视角</Badge>}
-        {modes.autoChat && <Badge variant="secondary">自动喊话</Badge>}
-        {restartTimer?.enabled && (
-          <Badge variant="outline">
-            定时重启: {restartTimer.intervalMinutes}分钟
-          </Badge>
-        )}
-      </div>
+      {/* 以下内容只在连接后显示 */}
+      {connected && (
+        <>
+          {/* 状态徽章 */}
+          <div className="flex flex-wrap gap-1">
+            {modes.follow && <Badge variant="secondary">跟随中</Badge>}
+            {modes.autoAttack && <Badge variant="destructive">攻击中</Badge>}
+            {modes.patrol && <Badge variant="secondary">巡逻中</Badge>}
+            {modes.mining && <Badge variant="secondary">挖矿中</Badge>}
+            {modes.aiView && <Badge variant="secondary">AI视角</Badge>}
+            {modes.autoChat && <Badge variant="secondary">自动喊话</Badge>}
+            {restartTimer?.enabled && (
+              <Badge variant="outline">
+                定时重启: {restartTimer.intervalMinutes}分钟
+              </Badge>
+            )}
+          </div>
 
-      {/* 行为控制折叠面板 */}
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+          {/* 行为控制折叠面板 */}
+          <Collapsible open={isOpen} onOpenChange={setIsOpen}>
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm" className="w-full justify-between">
             <span className="text-xs">更多控制</span>
@@ -665,6 +675,8 @@ export function BotControlPanel({
         </div>
       </CollapsibleContent>
     </Collapsible>
+        </>
+      )}
     </div>
   );
 }
