@@ -154,7 +154,7 @@ export class AttackBehavior {
 }
 
 /**
- * 巡逻行为 - 参考 Pathfinder PRO 实现
+ * 巡逻行为 - 完全参考 Pathfinder PRO 实现
  */
 export class PatrolBehavior {
   constructor(bot, goals, logFn = null) {
@@ -166,13 +166,17 @@ export class PatrolBehavior {
     this.isMoving = false;
     this.patrolInterval = null;
     this.radius = 12;
+    this.onGoalReachedBound = null;
   }
 
   start() {
+    // 先清理旧的监听器（防止重复绑定）
+    this.cleanup();
+
     this.active = true;
     this.isMoving = false;
 
-    // 记录当前位置作为中心点
+    // 记录当前位置作为中心点（和 Pathfinder PRO 一样）
     if (this.bot?.entity) {
       this.centerPos = this.bot.entity.position.clone();
       if (this.log) {
@@ -180,27 +184,21 @@ export class PatrolBehavior {
       }
     }
 
-    // 监听到达目标
+    // 监听到达目标（和 Pathfinder PRO 一样只监听 goal_reached）
     this.onGoalReachedBound = () => {
       this.isMoving = false;
-      if (this.log && this.bot?.entity) {
-        const pos = this.bot.entity.position;
-        this.log('info', `巡逻到达: X:${Math.floor(pos.x)} Z:${Math.floor(pos.z)}`, '📍');
+      if (this.log && this.active) {
+        this.log('info', `巡逻到达目标点`, '📍');
       }
     };
     this.bot.on('goal_reached', this.onGoalReachedBound);
 
-    // 监听路径停止（包括失败、中断等情况）
-    this.onPathStopBound = () => {
-      this.isMoving = false;
-    };
-    this.bot.on('path_stop', this.onPathStopBound);
-
-    // 每 8 秒检查一次，70% 概率移动（和 Pathfinder PRO 一样）
+    // 每 8 秒检查一次，70% 概率移动（和 Pathfinder PRO 完全一样）
     this.patrolInterval = setInterval(() => {
       if (!this.active || !this.bot?.entity) return;
 
-      if (!this.isMoving && Math.random() > 0.3) {
+      // 和 Pathfinder PRO 一样：!isMoving && Math.random() > 0.7
+      if (!this.isMoving && Math.random() > 0.7) {
         this.doMove();
       }
     }, 8000);
@@ -213,28 +211,26 @@ export class PatrolBehavior {
 
   doMove() {
     if (!this.active || !this.bot?.entity || this.isMoving) return;
+    if (!this.centerPos) return;
 
-    const center = this.centerPos || this.bot.entity.position;
-    const targetX = center.x + (Math.random() - 0.5) * this.radius * 2;
-    const targetZ = center.z + (Math.random() - 0.5) * this.radius * 2;
+    this.isMoving = true;
 
-    try {
-      this.isMoving = true;
-      const goal = new this.goals.GoalNear(targetX, center.y, targetZ, 1);
-      this.bot.pathfinder.setGoal(goal);
+    // 和 Pathfinder PRO 完全一样的计算方式：offset((Math.random()-0.5)*12, 0, (Math.random()-0.5)*12)
+    const targetPos = this.centerPos.offset(
+      (Math.random() - 0.5) * this.radius,
+      0,
+      (Math.random() - 0.5) * this.radius
+    );
 
-      if (this.log) {
-        this.log('info', `巡逻前往: X:${Math.floor(targetX)} Z:${Math.floor(targetZ)}`, '🚶');
-      }
-    } catch (e) {
-      this.isMoving = false;
+    if (this.log) {
+      this.log('info', `巡逻前往: X:${Math.floor(targetPos.x)} Z:${Math.floor(targetPos.z)}`, '🚶');
     }
+
+    // 和 Pathfinder PRO 一样使用 GoalNear
+    this.bot.pathfinder.setGoal(new this.goals.GoalNear(targetPos.x, targetPos.y, targetPos.z, 1));
   }
 
-  stop() {
-    this.active = false;
-    this.isMoving = false;
-
+  cleanup() {
     if (this.patrolInterval) {
       clearInterval(this.patrolInterval);
       this.patrolInterval = null;
@@ -244,14 +240,17 @@ export class PatrolBehavior {
       this.bot.removeListener('goal_reached', this.onGoalReachedBound);
       this.onGoalReachedBound = null;
     }
+  }
 
-    if (this.bot && this.onPathStopBound) {
-      this.bot.removeListener('path_stop', this.onPathStopBound);
-      this.onPathStopBound = null;
-    }
+  stop() {
+    this.active = false;
+    this.isMoving = false;
 
+    this.cleanup();
+
+    // 和 Pathfinder PRO 一样：停止时清除目标
     if (this.bot?.pathfinder) {
-      this.bot.pathfinder.stop();
+      this.bot.pathfinder.setGoal(null);
     }
 
     return { success: true, message: '停止巡逻' };
