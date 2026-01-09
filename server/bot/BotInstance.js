@@ -135,6 +135,10 @@ export class BotInstance {
   getStatus() {
     return {
       ...this.status,
+      // 添加配置中的服务器连接信息
+      host: this.config.host,
+      port: this.config.port,
+      name: this.config.name || this.status.serverName,
       modes: this.modes,
       autoChat: this.autoChatConfig,
       behaviors: this.behaviors?.getStatus() || null
