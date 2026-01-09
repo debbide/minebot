@@ -54,8 +54,8 @@ export class BotInstance {
       autoOp: config.autoOp !== false // 默认启用自动OP
     };
 
-    // 从配置加载模式设置
-    this.modes = config.modes || {
+    // 从配置加载模式设置 (确保所有模式都有默认值)
+    const defaultModes = {
       aiView: false,
       patrol: false,
       autoChat: config.autoChat?.enabled || false,
@@ -64,6 +64,7 @@ export class BotInstance {
       mining: false,
       invincible: false  // 无敌模式
     };
+    this.modes = { ...defaultModes, ...(config.modes || {}) };
 
     // 自动喊话配置
     this.autoChatConfig = config.autoChat || {
