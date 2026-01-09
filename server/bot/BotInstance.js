@@ -210,21 +210,61 @@ export class BotInstance {
    */
   scheduleReconnect() {
     // 如果已经在重连中或已被销毁，跳过
-    if (this.reconnecting || this.destroyed) return;
+    if (this.reconnecting) {
+      console.log(`[${this.id}] scheduleReconnect 跳过: 已在重连中`);
+      return;
+    }
+    if (this.destroyed) {
+      console.log(`[${this.id}] scheduleReconnect 跳过: 已被销毁`);
+      return;
+    }
 
     this.reconnecting = true;
     this.status.connected = false;
 
-    // 清理旧连接
-    this.cleanup();
+    // 清理旧连接（但不清理 reconnectTimeout，因为我们马上要设置新的）
+    if (this.activityMonitorInterval) {
+      clearInterval(this.activityMonitorInterval);
+      this.activityMonitorInterval = null;
+    }
+    if (this.autoChatInterval) {
+      clearInterval(this.autoChatInterval);
+      this.autoChatInterval = null;
+    }
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    if (this.restartCommandTimer) {
+      clearInterval(this.restartCommandTimer);
+      this.restartCommandTimer = null;
+    }
+    if (this.behaviors) {
+      this.behaviors.stopAll();
+      this.behaviors = null;
+    }
+    if (this.bot) {
+      try {
+        this.bot.removeAllListeners();
+        if (this.bot._client) {
+          this.bot._client.removeAllListeners();
+        }
+      } catch (e) {}
+      this.bot = null;
+    }
 
     // 5秒后尝试重连
     const delay = 5000;
     this.log('info', `${delay/1000} 秒后自动重连...`, '🔄');
+    console.log(`[${this.id}] 设置重连定时器: ${delay}ms`);
 
     this.reconnectTimeout = setTimeout(() => {
-      if (this.destroyed) return;
+      if (this.destroyed) {
+        console.log(`[${this.id}] 重连定时器触发但已销毁，跳过`);
+        return;
+      }
 
+      console.log(`[${this.id}] 重连定时器触发，开始连接...`);
       this.reconnecting = false;
       this.connect().catch(err => {
         this.log('error', `重连失败: ${err.message}`, '✗');
