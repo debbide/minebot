@@ -61,7 +61,8 @@ export class BotInstance {
       autoChat: config.autoChat?.enabled || false,
       autoAttack: false,
       follow: false,
-      mining: false
+      mining: false,
+      invincible: false  // 无敌模式
     };
 
     // 自动喊话配置
@@ -80,6 +81,7 @@ export class BotInstance {
       '!follow': this.cmdFollow.bind(this),
       '!attack': this.cmdAttack.bind(this),
       '!patrol': this.cmdPatrol.bind(this),
+      '!god': this.cmdGod.bind(this),
       '!mine': this.cmdMine.bind(this),
       '!jump': this.cmdJump.bind(this),
       '!sneak': this.cmdSneak.bind(this)
@@ -329,6 +331,9 @@ export class BotInstance {
 
           this.log('success', `进入世界 (版本: ${this.bot.version})`, '✓');
 
+          // 恢复之前开启的模式
+          this.restoreModes();
+
           // 自动给机器人 OP 权限（通过翼龙面板）
           if (this.status.autoOp && this.status.pterodactyl && !this.hasAutoOpped) {
             this.autoOpSelf();
@@ -495,6 +500,46 @@ export class BotInstance {
     }
   }
 
+  /**
+   * 恢复之前开启的模式（重连后调用）
+   */
+  restoreModes() {
+    if (!this.bot || !this.behaviors) return;
+
+    // 稍微延迟一下，确保机器人完全初始化
+    setTimeout(() => {
+      if (this.modes.aiView) {
+        this.behaviors.aiView.start();
+        this.log('info', 'AI 视角已恢复', '👁️');
+      }
+
+      if (this.modes.patrol) {
+        if (this.spawnPosition) {
+          this.behaviors.patrol.centerPos = this.spawnPosition.clone();
+        }
+        this.behaviors.patrol.start();
+        this.log('info', '巡逻模式已恢复', '🚶');
+      }
+
+      if (this.modes.autoAttack) {
+        this.behaviors.attack.start();
+        this.log('info', '自动攻击已恢复', '⚔️');
+      }
+
+      if (this.modes.invincible) {
+        this.bot.chat(`/effect give ${this.bot.username} resistance 999999 255 true`);
+        this.bot.chat(`/effect give ${this.bot.username} regeneration 999999 5 true`);
+        this.bot.chat(`/effect give ${this.bot.username} fire_resistance 999999 1 true`);
+        this.log('info', '无敌模式已恢复', '🛡️');
+      }
+
+      if (this.modes.autoChat) {
+        this.startAutoChat();
+        this.log('info', '自动喊话已恢复', '💬');
+      }
+    }, 2000);
+  }
+
   setMode(mode, enabled) {
     if (mode in this.modes) {
       this.modes[mode] = enabled;
@@ -528,6 +573,20 @@ export class BotInstance {
         } else {
           this.behaviors.patrol.stop();
           this.log('info', '巡逻模式已关闭', '🚶');
+        }
+      }
+      // 无敌模式 - 使用游戏命令
+      if (mode === 'invincible' && this.bot) {
+        if (enabled) {
+          // 给予抗性提升255级（几乎无敌）+ 生命恢复
+          this.bot.chat(`/effect give ${this.bot.username} resistance 999999 255 true`);
+          this.bot.chat(`/effect give ${this.bot.username} regeneration 999999 5 true`);
+          this.bot.chat(`/effect give ${this.bot.username} fire_resistance 999999 1 true`);
+          this.log('info', '无敌模式已开启', '🛡️');
+        } else {
+          // 清除效果
+          this.bot.chat(`/effect clear ${this.bot.username}`);
+          this.log('info', '无敌模式已关闭', '🛡️');
         }
       }
       // 保存模式设置到配置
@@ -765,6 +824,7 @@ export class BotInstance {
       '!pos - 位置',
       '!attack [hostile/all] - 自动攻击',
       '!patrol - 随机巡逻',
+      '!god - 无敌模式',
       '!mine - 自动挖矿',
       '!jump - 跳跃',
       '!sneak - 蹲下/站起',
@@ -854,6 +914,24 @@ export class BotInstance {
       this.modes.patrol = true;
       this.bot.chat(result.message);
     }
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+  }
+
+  cmdGod() {
+    if (!this.bot) return;
+
+    if (this.modes.invincible) {
+      this.bot.chat(`/effect clear ${this.bot.username}`);
+      this.modes.invincible = false;
+      this.bot.chat('无敌模式已关闭');
+    } else {
+      this.bot.chat(`/effect give ${this.bot.username} resistance 999999 255 true`);
+      this.bot.chat(`/effect give ${this.bot.username} regeneration 999999 5 true`);
+      this.bot.chat(`/effect give ${this.bot.username} fire_resistance 999999 1 true`);
+      this.modes.invincible = true;
+      this.bot.chat('无敌模式已开启');
+    }
+    this.saveConfig();
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
   }
 
