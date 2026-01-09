@@ -167,6 +167,7 @@ export class PatrolBehavior {
     this.patrolInterval = null;
     this.radius = 12;
     this.onGoalReachedBound = null;
+    this.onPathStopBound = null;
   }
 
   start() {
@@ -184,7 +185,7 @@ export class PatrolBehavior {
       }
     }
 
-    // 监听到达目标（和 Pathfinder PRO 一样只监听 goal_reached）
+    // 监听到达目标
     this.onGoalReachedBound = () => {
       this.isMoving = false;
       if (this.log && this.active) {
@@ -193,15 +194,20 @@ export class PatrolBehavior {
     };
     this.bot.on('goal_reached', this.onGoalReachedBound);
 
-    // 每 8 秒检查一次，70% 概率移动（和 Pathfinder PRO 完全一样）
+    // 监听路径停止（包括无法到达的情况）
+    this.onPathStopBound = () => {
+      this.isMoving = false;
+    };
+    this.bot.on('path_stop', this.onPathStopBound);
+
+    // 每 5 秒检查一次，如果不在移动就开始移动
     this.patrolInterval = setInterval(() => {
       if (!this.active || !this.bot?.entity) return;
 
-      // 和 Pathfinder PRO 一样：!isMoving && Math.random() > 0.7
-      if (!this.isMoving && Math.random() > 0.7) {
+      if (!this.isMoving) {
         this.doMove();
       }
-    }, 8000);
+    }, 5000);
 
     // 立即开始第一次移动
     this.doMove();
@@ -239,6 +245,11 @@ export class PatrolBehavior {
     if (this.bot && this.onGoalReachedBound) {
       this.bot.removeListener('goal_reached', this.onGoalReachedBound);
       this.onGoalReachedBound = null;
+    }
+
+    if (this.bot && this.onPathStopBound) {
+      this.bot.removeListener('path_stop', this.onPathStopBound);
+      this.onPathStopBound = null;
     }
   }
 
