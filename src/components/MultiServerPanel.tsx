@@ -419,8 +419,12 @@ export function MultiServerPanel() {
                                   {server.serverHost}:{server.serverPort}
                                 </span>
                               )}
-                              {/* 面板状态 */}
-                              {server.panelServerState ? (
+                              {/* TCP 在线时只显示在线状态，否则显示面板状态 */}
+                              {server.tcpOnline ? (
+                                <span className="text-green-400">
+                                  在线 {server.tcpLatency ? `(${server.tcpLatency}ms)` : ""}
+                                </span>
+                              ) : server.panelServerState ? (
                                 <span className={
                                   server.panelServerState === "running" ? "text-green-500" :
                                   server.panelServerState === "starting" ? "text-yellow-500" :
@@ -432,15 +436,10 @@ export function MultiServerPanel() {
                                    server.panelServerState === "stopping" ? "停止中" :
                                    server.panelServerState === "offline" ? "已停止" :
                                    server.panelServerState}
+                                  {server.tcpOnline === false && " (TCP 离线)"}
                                 </span>
                               ) : (
                                 <span className="text-gray-400">未连接面板</span>
-                              )}
-                              {/* TCP ping 状态 */}
-                              {server.tcpOnline !== null && (
-                                <span className={`ml-2 ${server.tcpOnline ? "text-green-400" : "text-red-400"}`}>
-                                  | TCP: {server.tcpOnline ? `在线 ${server.tcpLatency ? `(${server.tcpLatency}ms)` : ""}` : "离线"}
-                                </span>
                               )}
                               {/* 资源使用 */}
                               {server.panelServerStats && server.panelServerState === "running" && (
