@@ -1,4 +1,5 @@
 import axios from 'axios';
+import net from 'net';
 
 /**
  * Panel-only server instance (no Minecraft bot)
@@ -27,7 +28,13 @@ export class PanelInstance {
       serverName: config.name || `Panel ${id}`,
       pterodactyl: config.pterodactyl || null,
       panelServerState: null, // 'running', 'starting', 'stopping', 'offline'
-      panelServerStats: null  // CPU, memory usage etc.
+      panelServerStats: null, // CPU, memory usage etc.
+      // 服务器地址信息（从面板获取）
+      serverHost: null,
+      serverPort: null,
+      // TCP ping 结果
+      tcpOnline: null, // true/false/null(未检测)
+      tcpLatency: null // 延迟毫秒
     };
   }
 
@@ -62,8 +69,8 @@ export class PanelInstance {
   getStatus() {
     return {
       ...this.status,
-      host: '',
-      port: 0,
+      host: this.status.serverHost || '',
+      port: this.status.serverPort || 0,
       name: this.config.name || this.status.serverName,
       modes: {},
       autoChat: null,
@@ -91,6 +98,9 @@ export class PanelInstance {
     this.log('info', '正在连接翼龙面板...', '🔌');
 
     try {
+      // 先获取服务器分配的地址
+      await this.fetchServerAllocation();
+      // 再获取服务器状态
       await this.fetchServerStatus();
       this.status.connected = true;
       this.log('success', '面板连接成功', '✅');
@@ -141,6 +151,77 @@ export class PanelInstance {
   }
 
   /**
+   * 获取服务器分配的地址和端口
+   */
+  async fetchServerAllocation() {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      throw new Error('面板未配置');
+    }
+
+    const url = `${panel.url}/api/client/servers/${panel.serverId}`;
+
+    const response = await axios.get(url, {
+      headers: {
+        'Authorization': `Bearer ${panel.apiKey}`,
+        'Accept': 'application/json'
+      },
+      timeout: 10000
+    });
+
+    const data = response.data.attributes;
+    const relationships = data.relationships;
+
+    // 获取主分配（primary allocation）
+    if (relationships?.allocations?.data) {
+      const allocations = relationships.allocations.data;
+      // 找到默认分配或第一个分配
+      const primaryAlloc = allocations.find(a => a.attributes.is_default) || allocations[0];
+      if (primaryAlloc) {
+        const alloc = primaryAlloc.attributes;
+        this.status.serverHost = alloc.ip_alias || alloc.ip;
+        this.status.serverPort = alloc.port;
+        this.log('info', `服务器地址: ${this.status.serverHost}:${this.status.serverPort}`, '🌐');
+      }
+    }
+
+    return {
+      host: this.status.serverHost,
+      port: this.status.serverPort
+    };
+  }
+
+  /**
+   * TCP ping 检测服务器端口是否在线
+   */
+  tcpPing(host, port, timeout = 5000) {
+    return new Promise((resolve) => {
+      const startTime = Date.now();
+      const socket = new net.Socket();
+
+      socket.setTimeout(timeout);
+
+      socket.on('connect', () => {
+        const latency = Date.now() - startTime;
+        socket.destroy();
+        resolve({ online: true, latency });
+      });
+
+      socket.on('timeout', () => {
+        socket.destroy();
+        resolve({ online: false, latency: null });
+      });
+
+      socket.on('error', () => {
+        socket.destroy();
+        resolve({ online: false, latency: null });
+      });
+
+      socket.connect(port, host);
+    });
+  }
+
+  /**
    * 获取服务器状态
    */
   async fetchServerStatus() {
@@ -169,6 +250,21 @@ export class PanelInstance {
       networkTx: data.resources?.network_tx_bytes || 0,
       uptime: data.resources?.uptime || 0
     };
+
+    // 如果面板显示服务器正在运行，使用 TCP ping 验证真实在线状态
+    if (data.current_state === 'running' && this.status.serverHost && this.status.serverPort) {
+      const pingResult = await this.tcpPing(this.status.serverHost, this.status.serverPort);
+      this.status.tcpOnline = pingResult.online;
+      this.status.tcpLatency = pingResult.latency;
+
+      if (!pingResult.online) {
+        this.log('warning', `TCP 检测: 端口 ${this.status.serverPort} 无响应`, '⚠');
+      }
+    } else {
+      // 服务器未运行，不进行 TCP ping
+      this.status.tcpOnline = false;
+      this.status.tcpLatency = null;
+    }
 
     if (this.onStatusChange) {
       this.onStatusChange(this.id, this.getStatus());

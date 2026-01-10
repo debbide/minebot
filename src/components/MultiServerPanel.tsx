@@ -64,6 +64,11 @@ interface ServerConfig {
     diskBytes: number;
     uptime: number;
   };
+  // TCP ping 状态（从面板API获取的地址）
+  serverHost?: string;
+  serverPort?: number;
+  tcpOnline?: boolean | null;
+  tcpLatency?: number | null;
 }
 
 export function MultiServerPanel() {
@@ -393,7 +398,8 @@ export function MultiServerPanel() {
                         <div
                           className={`w-2 h-2 rounded-full ${
                             server.connected ? "bg-green-500" :
-                            server.type === "panel" && server.panelServerState === "running" ? "bg-green-500" :
+                            server.type === "panel" && server.tcpOnline ? "bg-green-500" :
+                            server.type === "panel" && server.panelServerState === "running" ? "bg-yellow-500" :
                             "bg-gray-400"
                           }`}
                         />
@@ -407,6 +413,13 @@ export function MultiServerPanel() {
                           {server.type === "panel" ? (
                             /* 纯面板服务器信息 */
                             <div className="text-sm text-muted-foreground">
+                              {/* 服务器地址（从面板API获取） */}
+                              {server.serverHost && server.serverPort && (
+                                <span className="text-blue-400 mr-2">
+                                  {server.serverHost}:{server.serverPort}
+                                </span>
+                              )}
+                              {/* 面板状态 */}
                               {server.panelServerState ? (
                                 <span className={
                                   server.panelServerState === "running" ? "text-green-500" :
@@ -423,6 +436,13 @@ export function MultiServerPanel() {
                               ) : (
                                 <span className="text-gray-400">未连接面板</span>
                               )}
+                              {/* TCP ping 状态 */}
+                              {server.panelServerState === "running" && server.tcpOnline !== null && (
+                                <span className={`ml-2 ${server.tcpOnline ? "text-green-400" : "text-red-400"}`}>
+                                  | TCP: {server.tcpOnline ? `在线 ${server.tcpLatency ? `(${server.tcpLatency}ms)` : ""}` : "离线"}
+                                </span>
+                              )}
+                              {/* 资源使用 */}
                               {server.panelServerStats && server.panelServerState === "running" && (
                                 <span className="ml-2">
                                   | CPU: {server.panelServerStats.cpuPercent.toFixed(1)}%
@@ -451,8 +471,19 @@ export function MultiServerPanel() {
                       </div>
                       <div className="flex items-center gap-2">
                         {server.type === "panel" ? (
-                          <Badge variant={server.panelServerState === "running" ? "default" : "outline"}>
-                            {server.panelServerState === "running" ? "运行中" : "已停止"}
+                          <Badge
+                            variant={server.tcpOnline ? "default" : server.panelServerState === "running" ? "secondary" : "outline"}
+                            className={server.tcpOnline ? "bg-green-600" : server.panelServerState === "running" && !server.tcpOnline ? "bg-yellow-600 text-white" : ""}
+                          >
+                            {server.tcpOnline
+                              ? "TCP 在线"
+                              : server.panelServerState === "running"
+                                ? "运行中"
+                                : server.panelServerState === "starting"
+                                  ? "启动中"
+                                  : server.panelServerState === "stopping"
+                                    ? "停止中"
+                                    : "已停止"}
                           </Badge>
                         ) : (
                           <Badge variant={server.connected ? "default" : "outline"}>

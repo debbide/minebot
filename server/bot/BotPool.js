@@ -146,11 +146,16 @@ export class BotPool {
         name: b.status.serverName,
         type: b.status.type || 'minecraft',
         connected: b.status.connected,
-        serverAddress: b.status.serverAddress,
+        serverAddress: b.status.serverAddress || (b.status.serverHost ? `${b.status.serverHost}:${b.status.serverPort}` : ''),
         username: b.status.username,
         // 面板服务器状态
         panelServerState: b.status.panelServerState || null,
-        panelServerStats: b.status.panelServerStats || null
+        panelServerStats: b.status.panelServerStats || null,
+        // TCP ping 状态（仅面板服务器）
+        tcpOnline: b.status.tcpOnline ?? null,
+        tcpLatency: b.status.tcpLatency ?? null,
+        serverHost: b.status.serverHost || null,
+        serverPort: b.status.serverPort || null
       }))
     };
   }
