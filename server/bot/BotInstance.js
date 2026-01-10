@@ -208,60 +208,54 @@ export class BotInstance {
   }
 
   /**
-   * 重连逻辑 - 完全照抄 Pathfinder PRO
+   * 重连逻辑 - 完全清理后重连
    */
   attemptRepair(reason = '断开') {
     if (this.destroyed || this.reconnecting) return;
 
     this.reconnecting = true;
     this.status.connected = false;
-    this.log('warning', `连接${reason}，10秒后重连...`, '🔄');
+    this.log('warning', `连接${reason}，5秒后重连...`, '🔄');
 
-    // 清理旧实例
-    if (this.bot) {
-      try {
-        this.bot.removeAllListeners();
-        this.bot.end();
-      } catch (e) {}
-      this.bot = null;
-    }
-    if (this.behaviors) {
-      this.behaviors.stopAll();
-      this.behaviors = null;
-    }
-    if (this.activityMonitorInterval) {
-      clearInterval(this.activityMonitorInterval);
-      this.activityMonitorInterval = null;
-    }
-    if (this.autoChatInterval) {
-      clearInterval(this.autoChatInterval);
-      this.autoChatInterval = null;
-    }
+    // 完全清理旧实例（与 disconnect 类似但不设置 destroyed）
+    this.cleanup();
 
-    // 10秒后重新连接
-    setTimeout(() => {
+    // 5秒后重新连接（比之前的10秒更快）
+    this.reconnectTimeout = setTimeout(async () => {
       if (this.destroyed) return;
       this.reconnecting = false;
-      this.connect().catch(err => {
-        this.log('error', `重连失败: ${err.message}`, '✗');
-      });
-    }, 10000);
+
+      try {
+        await this.connect();
+        this.log('success', '重连成功', '✅');
+      } catch (err) {
+        this.log('error', `重连失败: ${err.message}，将在10秒后再次尝试...`, '✗');
+        // 如果重连失败，再次尝试
+        if (!this.destroyed) {
+          this.reconnectTimeout = setTimeout(() => {
+            if (!this.destroyed && !this.reconnecting) {
+              this.attemptRepair('重连失败');
+            }
+          }, 10000);
+        }
+      }
+    }, 5000);
   }
 
   async connect() {
+    // 如果已连接且正常，不重复连接
     if (this.bot && this.status.connected) {
       this.log('warning', '已有活动连接', '⚠');
       return;
     }
 
-    // 确保旧连接已清理
+    // 完全清理旧连接（使用 cleanup 确保彻底）
     if (this.bot) {
-      try {
-        this.bot.removeAllListeners();
-        this.bot.end();
-      } catch (e) {}
-      this.bot = null;
+      this.cleanup();
     }
+
+    // 等待一小段时间确保旧连接完全关闭
+    await new Promise(r => setTimeout(r, 500));
 
     const host = this.config.host;
     const port = this.config.port || 25565;
