@@ -143,6 +143,7 @@ export class BotInstance {
       host: this.config.host,
       port: this.config.port,
       name: this.config.name || this.status.serverName,
+      username: this.status.username || this.config.username,
       modes: this.modes,
       autoChat: this.autoChatConfig,
       behaviors: this.behaviors?.getStatus() || null

@@ -380,8 +380,17 @@ app.put('/api/bots/:id', async (req, res) => {
     // Update in bot manager
     const bot = botManager.bots.get(id);
     if (bot) {
-      if (name !== undefined) bot.status.serverName = name;
-      if (username !== undefined) bot.config.username = username;
+      if (name !== undefined) {
+        bot.status.serverName = name;
+        bot.config.name = name;
+      }
+      if (username !== undefined) {
+        bot.config.username = username;
+        // 只有未连接时才更新 status.username，连接后会自动设置
+        if (!bot.status.connected) {
+          bot.status.username = username;
+        }
+      }
       if (host !== undefined) bot.config.host = host;
       if (port !== undefined) bot.config.port = parseInt(port) || 25565;
     }
