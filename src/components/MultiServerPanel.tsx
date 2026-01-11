@@ -295,7 +295,7 @@ export function MultiServerPanel() {
         </CardHeader>
         <CardContent>
           {/* 服务器网格 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {serverList.map((server: ServerConfig) => (
               <div
                 key={server.id}
@@ -396,7 +396,7 @@ export function MultiServerPanel() {
 
             {/* 添加服务器卡片 */}
             {addingServer ? (
-              <div className="p-4 rounded-lg border bg-muted/30 col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4">
+              <div className="p-4 rounded-lg border bg-muted/30 col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5">
                 <div className="space-y-4">
                   {/* 类型选择 */}
                   <div className="flex gap-2">
