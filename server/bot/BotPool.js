@@ -26,17 +26,24 @@ export class BotPool {
     const servers = this.configManager.getServers();
     if (servers && servers.length > 0) {
       console.log(`正在加载 ${servers.length} 个已保存的服务器配置...`);
+
+      // 先创建所有实例
       for (const serverConfig of servers) {
-        // 根据类型创建不同的实例
         const instance = this.createInstance(serverConfig);
         this.bots.set(serverConfig.id, instance);
         console.log(`已加载服务器: ${serverConfig.name || serverConfig.id} (${serverConfig.type || 'minecraft'})`);
+      }
 
-        // 面板服务器自动连接（开始状态检查）
+      // 然后并行连接所有面板服务器（不阻塞）
+      for (const serverConfig of servers) {
         if (serverConfig.type === 'panel') {
-          instance.connect().catch(err => {
-            console.log(`面板服务器 ${serverConfig.name || serverConfig.id} 连接失败: ${err.message}`);
-          });
+          const instance = this.bots.get(serverConfig.id);
+          // 使用 setTimeout 确保不阻塞主线程
+          setTimeout(() => {
+            instance.connect().catch(err => {
+              console.log(`面板服务器 ${serverConfig.name || serverConfig.id} 连接失败: ${err.message}`);
+            });
+          }, 0);
         }
       }
     }
