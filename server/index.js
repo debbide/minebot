@@ -405,6 +405,63 @@ app.put('/api/bots/:id', async (req, res) => {
   }
 });
 
+// 切换服务器类型（机器人 <-> 仅面板）
+app.post('/api/bots/:id/switch-type', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const { type } = req.body; // 'minecraft' or 'panel'
+
+    if (!['minecraft', 'panel'].includes(type)) {
+      return res.status(400).json({ success: false, error: '无效的类型，只能是 minecraft 或 panel' });
+    }
+
+    const bot = botManager.bots.get(id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: '服务器不存在' });
+    }
+
+    const currentType = bot.status.type || 'minecraft';
+    if (currentType === type) {
+      return res.json({ success: true, message: '类型未改变' });
+    }
+
+    // 获取当前配置
+    const serverConfig = configManager.getServer(id);
+    if (!serverConfig) {
+      return res.status(404).json({ success: false, error: '服务器配置不存在' });
+    }
+
+    // 断开/停止当前实例
+    if (bot.disconnect) {
+      bot.disconnect();
+    }
+    if (bot.cleanup) {
+      bot.cleanup();
+    }
+
+    // 更新配置
+    const updatedConfig = configManager.updateServer(id, { type });
+
+    // 删除旧实例
+    botManager.bots.delete(id);
+
+    // 创建新实例
+    const newInstance = botManager.createInstance({ ...serverConfig, ...updatedConfig, id });
+    botManager.bots.set(id, newInstance);
+
+    // 如果是面板类型，自动连接
+    if (type === 'panel') {
+      newInstance.connect().catch(err => {
+        console.log(`切换后连接失败: ${err.message}`);
+      });
+    }
+
+    res.json({ success: true, message: `已切换为 ${type === 'panel' ? '仅面板管理' : '机器人'} 模式`, type });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Connect all servers from config
 app.post('/api/bots/connect-all', async (req, res) => {
   try {

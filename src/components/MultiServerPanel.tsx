@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Server, Plus, Trash2, Power, PowerOff, RefreshCw, Loader2, Pencil, X, Check, Terminal, ChevronDown, Trash, MonitorCog } from "lucide-react";
+import { Server, Plus, Trash2, Power, PowerOff, RefreshCw, Loader2, Pencil, X, Check, Terminal, ChevronDown, Trash, MonitorCog, Bot, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -236,6 +236,26 @@ export function MultiServerPanel() {
     try {
       await api.disconnectAll();
       toast({ title: "成功", description: "已断开所有连接" });
+      fetchServers();
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSwitchType = async (id: string, currentType: string) => {
+    const newType = currentType === "panel" ? "minecraft" : "panel";
+    const confirmMsg = newType === "panel"
+      ? "切换为仅面板模式后，机器人将断开连接。确定吗？"
+      : "切换为机器人模式后，需要手动连接。确定吗？";
+
+    if (!confirm(confirmMsg)) return;
+
+    setLoading(true);
+    try {
+      const result = await api.switchServerType(id, newType);
+      toast({ title: "成功", description: result.message });
       fetchServers();
     } catch (error) {
       toast({ title: "错误", description: String(error), variant: "destructive" });
@@ -506,6 +526,15 @@ export function MultiServerPanel() {
                           title="编辑配置"
                         >
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleSwitchType(server.id, server.type || "minecraft")}
+                          disabled={loading}
+                          title={server.type === "panel" ? "切换为机器人模式" : "切换为仅面板模式"}
+                        >
+                          {server.type === "panel" ? <Bot className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
                         </Button>
                         {server.type !== "panel" && (
                           <Button

@@ -328,6 +328,13 @@ class ApiService {
     return this.request(`/api/bots/${id}/restart`, { method: 'POST' });
   }
 
+  async switchServerType(id: string, type: 'minecraft' | 'panel'): Promise<{ success: boolean; message: string; type: string }> {
+    return this.request(`/api/bots/${id}/switch-type`, {
+      method: 'POST',
+      body: JSON.stringify({ type }),
+    });
+  }
+
   // Behavior Control
   async setBehavior(id: string, behavior: string, enabled: boolean, options?: Record<string, unknown>): Promise<{ success: boolean; message: string; status: BotStatus }> {
     return this.request(`/api/bots/${id}/behavior`, {
