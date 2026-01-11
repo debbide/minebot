@@ -17,7 +17,8 @@ import {
   Power,
   PowerOff,
   Zap,
-  Shield
+  Shield,
+  FolderOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { FileManager } from "./FileManager";
 
 interface BotControlPanelProps {
   botId: string;
@@ -118,6 +120,7 @@ export function BotControlPanel({
   const [panelUrl, setPanelUrl] = useState(pterodactyl?.url || "");
   const [panelApiKey, setPanelApiKey] = useState(pterodactyl?.apiKey || "");
   const [panelServerId, setPanelServerId] = useState(pterodactyl?.serverId || "");
+  const [fileManagerOpen, setFileManagerOpen] = useState(false);
 
   // 打开设置对话框时获取最新配置
   const handleOpenSettings = async () => {
@@ -358,6 +361,27 @@ export function BotControlPanel({
             {loading === "power-restart" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
             <span className="text-xs">重启</span>
           </Button>
+          {/* 文件管理按钮 */}
+          <Dialog open={fileManagerOpen} onOpenChange={setFileManagerOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                title="文件管理"
+                disabled={!pterodactyl?.url}
+              >
+                <FolderOpen className="h-4 w-4 mr-1" />
+                <span className="text-xs">文件</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-5xl h-[85vh] p-0">
+              <FileManager
+                serverId={botId}
+                serverName={botName}
+                onClose={() => setFileManagerOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
           {/* 设置按钮 */}
           <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
             <DialogTrigger asChild>
@@ -459,6 +483,24 @@ export function BotControlPanel({
               <span className="text-xs">喊话</span>
             </Button>
           </>
+        )}
+        {/* 文件管理按钮 - 需要翼龙面板配置 */}
+        {pterodactyl?.url && (
+          <Dialog open={fileManagerOpen} onOpenChange={setFileManagerOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" title="文件管理">
+                <FolderOpen className="h-4 w-4 mr-1" />
+                <span className="text-xs">文件</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-5xl h-[85vh] p-0">
+              <FileManager
+                serverId={botId}
+                serverName={botName}
+                onClose={() => setFileManagerOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
         )}
         {/* 设置按钮始终可见 */}
         <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>

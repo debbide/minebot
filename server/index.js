@@ -783,6 +783,199 @@ app.delete('/api/renewals/:id/logs', (req, res) => {
   }
 });
 
+// ==================== 文件管理 API ====================
+
+// 列出目录文件
+app.get('/api/bots/:id/files', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const directory = req.query.directory || '/';
+    const result = await bot.listFiles(directory);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 获取文件内容
+app.get('/api/bots/:id/files/contents', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const file = req.query.file;
+    if (!file) {
+      return res.status(400).json({ success: false, error: '缺少 file 参数' });
+    }
+    const result = await bot.getFileContents(file);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 写入文件内容
+app.post('/api/bots/:id/files/write', express.text({ limit: '50mb' }), async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const file = req.query.file;
+    if (!file) {
+      return res.status(400).json({ success: false, error: '缺少 file 参数' });
+    }
+    const result = await bot.writeFile(file, req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 获取下载链接
+app.get('/api/bots/:id/files/download', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const file = req.query.file;
+    if (!file) {
+      return res.status(400).json({ success: false, error: '缺少 file 参数' });
+    }
+    const result = await bot.getDownloadUrl(file);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 获取上传链接
+app.get('/api/bots/:id/files/upload', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const result = await bot.getUploadUrl();
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 创建文件夹
+app.post('/api/bots/:id/files/folder', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { root, name } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, error: '缺少 name 参数' });
+    }
+    const result = await bot.createFolder(root || '/', name);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 删除文件
+app.post('/api/bots/:id/files/delete', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { root, files } = req.body;
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ success: false, error: '缺少 files 参数' });
+    }
+    const result = await bot.deleteFiles(root || '/', files);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 重命名文件
+app.post('/api/bots/:id/files/rename', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { root, from, to } = req.body;
+    if (!from || !to) {
+      return res.status(400).json({ success: false, error: '缺少 from 或 to 参数' });
+    }
+    const result = await bot.renameFile(root || '/', from, to);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 复制文件
+app.post('/api/bots/:id/files/copy', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { location } = req.body;
+    if (!location) {
+      return res.status(400).json({ success: false, error: '缺少 location 参数' });
+    }
+    const result = await bot.copyFile(location);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 压缩文件
+app.post('/api/bots/:id/files/compress', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { root, files } = req.body;
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ success: false, error: '缺少 files 参数' });
+    }
+    const result = await bot.compressFiles(root || '/', files);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// 解压文件
+app.post('/api/bots/:id/files/decompress', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { root, file } = req.body;
+    if (!file) {
+      return res.status(400).json({ success: false, error: '缺少 file 参数' });
+    }
+    const result = await bot.decompressFile(root || '/', file);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Serve frontend for all other routes
 app.get('*', (req, res) => {
   res.sendFile(join(__dirname, '../dist/index.html'));

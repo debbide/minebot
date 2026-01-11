@@ -116,6 +116,18 @@ export interface RenewalResult {
   timestamp: string;
 }
 
+export interface FileInfo {
+  name: string;
+  mode: string;
+  size: number;
+  isFile: boolean;
+  isSymlink: boolean;
+  isEditable: boolean;
+  mimetype: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
 class ApiService {
   private baseUrl: string;
 
@@ -469,6 +481,85 @@ class ApiService {
 
   async clearRenewalLogs(id: string): Promise<{ success: boolean }> {
     return this.request(`/api/renewals/${id}/logs`, { method: 'DELETE' });
+  }
+
+  // ==================== 文件管理 API ====================
+
+  async listFiles(id: string, directory: string = '/'): Promise<{ success: boolean; files?: FileInfo[]; directory?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files?directory=${encodeURIComponent(directory)}`);
+  }
+
+  async getFileContents(id: string, file: string): Promise<{ success: boolean; content?: string; file?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/contents?file=${encodeURIComponent(file)}`);
+  }
+
+  async writeFile(id: string, file: string, content: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const token = getToken();
+    const response = await fetch(`${this.baseUrl}/api/bots/${id}/files/write?file=${encodeURIComponent(file)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: content
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async getDownloadUrl(id: string, file: string): Promise<{ success: boolean; url?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/download?file=${encodeURIComponent(file)}`);
+  }
+
+  async getUploadUrl(id: string): Promise<{ success: boolean; url?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/upload`);
+  }
+
+  async createFolder(id: string, root: string, name: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/folder`, {
+      method: 'POST',
+      body: JSON.stringify({ root, name }),
+    });
+  }
+
+  async deleteFiles(id: string, root: string, files: string[]): Promise<{ success: boolean; message?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/delete`, {
+      method: 'POST',
+      body: JSON.stringify({ root, files }),
+    });
+  }
+
+  async renameFile(id: string, root: string, from: string, to: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/rename`, {
+      method: 'POST',
+      body: JSON.stringify({ root, from, to }),
+    });
+  }
+
+  async copyFile(id: string, location: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/copy`, {
+      method: 'POST',
+      body: JSON.stringify({ location }),
+    });
+  }
+
+  async compressFiles(id: string, root: string, files: string[]): Promise<{ success: boolean; archive?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/compress`, {
+      method: 'POST',
+      body: JSON.stringify({ root, files }),
+    });
+  }
+
+  async decompressFile(id: string, root: string, file: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/decompress`, {
+      method: 'POST',
+      body: JSON.stringify({ root, file }),
+    });
   }
 }
 

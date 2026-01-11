@@ -807,6 +807,356 @@ export class BotInstance {
     }
   }
 
+  // ==================== 文件管理 API ====================
+
+  /**
+   * 列出目录文件
+   * @param {string} directory - 目录路径，默认为根目录
+   */
+  async listFiles(directory = '/') {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/list`;
+      const response = await axios.get(url, {
+        params: { directory },
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Accept': 'application/json'
+        },
+        timeout: 15000
+      });
+
+      const files = response.data.data.map(item => ({
+        name: item.attributes.name,
+        mode: item.attributes.mode,
+        size: item.attributes.size,
+        isFile: item.attributes.is_file,
+        isSymlink: item.attributes.is_symlink,
+        isEditable: item.attributes.is_editable,
+        mimetype: item.attributes.mimetype,
+        createdAt: item.attributes.created_at,
+        modifiedAt: item.attributes.modified_at
+      }));
+
+      return { success: true, files, directory };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `列出文件失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 获取文件内容
+   * @param {string} file - 文件路径
+   */
+  async getFileContents(file) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/contents`;
+      const response = await axios.get(url, {
+        params: { file },
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Accept': 'application/json'
+        },
+        timeout: 30000
+      });
+
+      return { success: true, content: response.data, file };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `读取文件失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 写入文件内容
+   * @param {string} file - 文件路径
+   * @param {string} content - 文件内容
+   */
+  async writeFile(file, content) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/write`;
+      await axios.post(url, content, {
+        params: { file },
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Content-Type': 'text/plain',
+          'Accept': 'application/json'
+        },
+        timeout: 30000
+      });
+
+      this.log('success', `文件已保存: ${file}`, '💾');
+      return { success: true, message: '文件已保存' };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `保存文件失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 获取文件下载链接
+   * @param {string} file - 文件路径
+   */
+  async getDownloadUrl(file) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/download`;
+      const response = await axios.get(url, {
+        params: { file },
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Accept': 'application/json'
+        },
+        timeout: 15000
+      });
+
+      return { success: true, url: response.data.attributes.url };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `获取下载链接失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 获取上传链接
+   */
+  async getUploadUrl() {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/upload`;
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Accept': 'application/json'
+        },
+        timeout: 15000
+      });
+
+      return { success: true, url: response.data.attributes.url };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `获取上传链接失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 创建文件夹
+   * @param {string} root - 父目录
+   * @param {string} name - 文件夹名称
+   */
+  async createFolder(root, name) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/create-folder`;
+      await axios.post(url, { root, name }, {
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 15000
+      });
+
+      this.log('success', `文件夹已创建: ${root}${name}`, '📁');
+      return { success: true, message: '文件夹已创建' };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `创建文件夹失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 删除文件/文件夹
+   * @param {string} root - 目录
+   * @param {string[]} files - 要删除的文件名列表
+   */
+  async deleteFiles(root, files) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/delete`;
+      await axios.post(url, { root, files }, {
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 30000
+      });
+
+      this.log('success', `已删除 ${files.length} 个文件`, '🗑️');
+      return { success: true, message: `已删除 ${files.length} 个文件` };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `删除文件失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 重命名文件/文件夹
+   * @param {string} root - 目录
+   * @param {string} from - 原名称
+   * @param {string} to - 新名称
+   */
+  async renameFile(root, from, to) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/rename`;
+      await axios.put(url, {
+        root,
+        files: [{ from, to }]
+      }, {
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 15000
+      });
+
+      this.log('success', `已重命名: ${from} -> ${to}`, '✏️');
+      return { success: true, message: '重命名成功' };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `重命名失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 复制文件
+   * @param {string} location - 文件路径
+   */
+  async copyFile(location) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/copy`;
+      await axios.post(url, { location }, {
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 30000
+      });
+
+      this.log('success', `已复制: ${location}`, '📋');
+      return { success: true, message: '复制成功' };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `复制失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 压缩文件
+   * @param {string} root - 目录
+   * @param {string[]} files - 要压缩的文件列表
+   */
+  async compressFiles(root, files) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/compress`;
+      const response = await axios.post(url, { root, files }, {
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 120000
+      });
+
+      const archiveName = response.data.attributes.name;
+      this.log('success', `已压缩为: ${archiveName}`, '📦');
+      return { success: true, archive: archiveName };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `压缩失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
+  /**
+   * 解压文件
+   * @param {string} root - 目录
+   * @param {string} file - 压缩包名称
+   */
+  async decompressFile(root, file) {
+    const panel = this.status.pterodactyl;
+    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
+      return { success: false, error: '翼龙面板未配置' };
+    }
+
+    try {
+      const url = `${panel.url}/api/client/servers/${panel.serverId}/files/decompress`;
+      await axios.post(url, { root, file }, {
+        headers: {
+          'Authorization': `Bearer ${panel.apiKey}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        timeout: 120000
+      });
+
+      this.log('success', `已解压: ${file}`, '📂');
+      return { success: true, message: '解压成功' };
+    } catch (error) {
+      const errMsg = error.response?.data?.errors?.[0]?.detail || error.message;
+      this.log('error', `解压失败: ${errMsg}`, '❌');
+      return { success: false, error: errMsg };
+    }
+  }
+
   async handleCommand(username, message) {
     const parts = message.trim().split(' ');
     const cmd = parts[0].toLowerCase();
