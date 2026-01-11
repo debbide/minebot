@@ -57,7 +57,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { api, FileInfo } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
@@ -595,7 +594,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
         </div>
 
         {/* 文件列表 */}
-        <ScrollArea className="flex-1 min-h-0 border rounded-lg">
+        <div className="flex-1 min-h-0 border rounded-lg overflow-auto">
           <div className="min-w-[500px]">
             {/* 表头 */}
             <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b text-sm font-medium sticky top-0">
@@ -708,7 +707,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
               ))
             )}
           </div>
-        </ScrollArea>
+        </div>
       </CardContent>
 
       {/* 新建文件夹对话框 */}
