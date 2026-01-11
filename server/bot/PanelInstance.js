@@ -74,11 +74,13 @@ export class PanelInstance {
   }
 
   getStatus() {
+    const name = this.config.name || this.status.serverName;
     return {
       ...this.status,
+      serverName: name, // 确保 serverName 与 name 一致
       host: this.status.serverHost || '',
       port: this.status.serverPort || 0,
-      name: this.config.name || this.status.serverName,
+      name: name,
       modes: {},
       autoChat: null,
       behaviors: null,
