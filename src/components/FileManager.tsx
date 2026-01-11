@@ -300,11 +300,41 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
   const handleDownload = async (file: FileInfo) => {
     try {
       const filePath = currentPath === "/" ? `/${file.name}` : `${currentPath}/${file.name}`;
-      const result = await api.getDownloadUrl(serverId, filePath);
-      if (result.success && result.url) {
-        window.open(result.url, "_blank");
+
+      // 先检查文件访问类型
+      const uploadInfo = await api.getUploadUrl(serverId);
+
+      if (uploadInfo.type === 'sftp') {
+        // SFTP 模式：直接下载
+        const token = localStorage.getItem('token');
+        const downloadUrl = `/api/bots/${serverId}/files/download?file=${encodeURIComponent(filePath)}`;
+        const response = await fetch(downloadUrl, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ error: '下载失败' }));
+          throw new Error(error.error || '下载失败');
+        }
+
+        // 创建下载链接
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
       } else {
-        toast({ title: "下载失败", description: result.error, variant: "destructive" });
+        // 翼龙面板模式：获取下载 URL
+        const result = await api.getDownloadUrl(serverId, filePath);
+        if (result.success && result.url) {
+          window.open(result.url, "_blank");
+        } else {
+          toast({ title: "下载失败", description: result.error, variant: "destructive" });
+        }
       }
     } catch (error) {
       toast({
@@ -380,16 +410,22 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
         throw new Error(result.error || "无法获取上传信息");
       }
 
+      const token = localStorage.getItem('token');
+
       // 上传文件
       for (const file of Array.from(fileList)) {
         if (result.type === 'sftp') {
           // SFTP 模式：直接上传到后端
           const uploadUrl = `${result.endpoint}?directory=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`;
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/octet-stream',
+          };
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
           const response = await fetch(uploadUrl, {
             method: "POST",
-            headers: {
-              'Content-Type': 'application/octet-stream',
-            },
+            headers,
             body: file,
           });
 
