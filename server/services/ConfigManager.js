@@ -296,4 +296,28 @@ export class ConfigManager {
     this.saveConfig();
     return true;
   }
+
+  reorderServers(orderedIds) {
+    if (!this.config.servers || !Array.isArray(orderedIds)) return false;
+
+    const serverMap = new Map(this.config.servers.map(s => [s.id, s]));
+    const reordered = [];
+
+    for (const id of orderedIds) {
+      const server = serverMap.get(id);
+      if (server) {
+        reordered.push(server);
+        serverMap.delete(id);
+      }
+    }
+
+    // 添加任何未在 orderedIds 中的服务器到末尾
+    for (const server of serverMap.values()) {
+      reordered.push(server);
+    }
+
+    this.config.servers = reordered;
+    this.saveConfig();
+    return true;
+  }
 }

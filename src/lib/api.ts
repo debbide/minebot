@@ -304,6 +304,13 @@ class ApiService {
     return this.request(`/api/bots/${id}`, { method: 'DELETE' });
   }
 
+  async reorderServers(orderedIds: string[]): Promise<{ success: boolean }> {
+    return this.request('/api/bots/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ orderedIds }),
+    });
+  }
+
   async updateServer(id: string, updates: {
     name?: string;
     username?: string;

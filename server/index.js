@@ -351,6 +351,20 @@ app.delete('/api/bots/:id', (req, res) => {
   }
 });
 
+// Reorder servers
+app.post('/api/bots/reorder', (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+    if (!Array.isArray(orderedIds)) {
+      return res.status(400).json({ success: false, error: 'orderedIds must be an array' });
+    }
+    const success = configManager.reorderServers(orderedIds);
+    res.json({ success });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Update server config (name, username, host, port)
 app.put('/api/bots/:id', async (req, res) => {
   try {

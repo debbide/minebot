@@ -232,7 +232,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
     try {
       const result = await api.createFolder(serverId, currentPath, newFolderName);
       if (result.success) {
-        toast({ title: "创建成功", description: `文件夹 "${newFolderName}" 已创建` });
+        toast({ title: "创建成功", description: `文件夹 "${newFolderName}" 已创建`, variant: "success" });
         loadFiles();
       } else {
         toast({ title: "创建失败", description: result.error, variant: "destructive" });
@@ -255,7 +255,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
     try {
       const result = await api.deleteFiles(serverId, currentPath, Array.from(selectedFiles));
       if (result.success) {
-        toast({ title: "删除成功", description: result.message });
+        toast({ title: "删除成功", description: result.message, variant: "success" });
         loadFiles();
       } else {
         toast({ title: "删除失败", description: result.error, variant: "destructive" });
@@ -278,7 +278,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
     try {
       const result = await api.renameFile(serverId, currentPath, renameTarget.name, newName);
       if (result.success) {
-        toast({ title: "重命名成功" });
+        toast({ title: "重命名成功", variant: "success" });
         loadFiles();
       } else {
         toast({ title: "重命名失败", description: result.error, variant: "destructive" });
@@ -381,7 +381,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
     try {
       const result = await api.writeFile(serverId, editingFile, fileContent);
       if (result.success) {
-        toast({ title: "保存成功" });
+        toast({ title: "保存成功", variant: "success" });
         setOriginalContent(fileContent);
       } else {
         toast({ title: "保存失败", description: result.error, variant: "destructive" });
@@ -453,7 +453,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
         }
       }
 
-      toast({ title: "上传成功", description: `已上传 ${fileList.length} 个文件` });
+      toast({ title: "上传成功", description: `已上传 ${fileList.length} 个文件`, variant: "success" });
       loadFiles();
     } catch (error) {
       toast({
@@ -473,7 +473,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
     try {
       const result = await api.copyFile(serverId, location);
       if (result.success) {
-        toast({ title: "复制成功" });
+        toast({ title: "复制成功", variant: "success" });
         loadFiles();
       } else {
         toast({ title: "复制失败", description: result.error, variant: "destructive" });
@@ -493,7 +493,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
     try {
       const result = await api.compressFiles(serverId, currentPath, Array.from(selectedFiles));
       if (result.success) {
-        toast({ title: "压缩成功", description: `已创建 ${result.archive}` });
+        toast({ title: "压缩成功", description: `已创建 ${result.archive}`, variant: "success" });
         loadFiles();
       } else {
         toast({ title: "压缩失败", description: result.error, variant: "destructive" });
@@ -514,7 +514,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
     try {
       const result = await api.decompressFile(serverId, currentPath, file.name);
       if (result.success) {
-        toast({ title: "解压成功" });
+        toast({ title: "解压成功", variant: "success" });
         loadFiles();
       } else {
         toast({ title: "解压失败", description: result.error, variant: "destructive" });
