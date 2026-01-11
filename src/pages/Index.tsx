@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { Header } from "@/components/Header";
 import { MultiServerPanel } from "@/components/MultiServerPanel";
 import { RenewalPanel } from "@/components/RenewalPanel";
 import { useWebSocket } from "@/hooks/useBot";
-import { Server, Wifi, WifiOff, Users, Box } from "lucide-react";
+import { Server, Wifi, WifiOff, Users, Box, RefreshCw } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const Index = () => {
   const { status, connected } = useWebSocket();
+  const [activeTab, setActiveTab] = useState("servers");
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,18 +76,27 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Main Content - Two Columns */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Left Column - Server Management */}
-          <div className="lg:col-span-1">
-            <MultiServerPanel />
-          </div>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="servers" className="gap-2">
+              <Server className="h-4 w-4" />
+              服务器
+            </TabsTrigger>
+            <TabsTrigger value="renewal" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              自动续期
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Right Column - Renewal */}
-          <div className="lg:col-span-1">
+          <TabsContent value="servers" className="mt-0">
+            <MultiServerPanel />
+          </TabsContent>
+
+          <TabsContent value="renewal" className="mt-0">
             <RenewalPanel />
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Footer */}
