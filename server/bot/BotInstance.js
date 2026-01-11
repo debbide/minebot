@@ -550,6 +550,7 @@ export class BotInstance {
         this.bot.chat(`/effect give ${this.bot.username} resistance 999999 255 true`);
         this.bot.chat(`/effect give ${this.bot.username} regeneration 999999 5 true`);
         this.bot.chat(`/effect give ${this.bot.username} fire_resistance 999999 1 true`);
+        this.bot.chat(`/effect give ${this.bot.username} water_breathing 999999 1 true`);
         this.log('info', '无敌模式已恢复', '🛡️');
       }
 
@@ -598,10 +599,11 @@ export class BotInstance {
       // 无敌模式 - 使用游戏命令
       if (mode === 'invincible' && this.bot) {
         if (enabled) {
-          // 给予抗性提升255级（几乎无敌）+ 生命恢复
+          // 给予抗性提升255级（几乎无敌）+ 生命恢复 + 水下呼吸
           this.bot.chat(`/effect give ${this.bot.username} resistance 999999 255 true`);
           this.bot.chat(`/effect give ${this.bot.username} regeneration 999999 5 true`);
           this.bot.chat(`/effect give ${this.bot.username} fire_resistance 999999 1 true`);
+          this.bot.chat(`/effect give ${this.bot.username} water_breathing 999999 1 true`);
           this.log('info', '无敌模式已开启', '🛡️');
         } else {
           // 清除效果
@@ -1298,6 +1300,7 @@ export class BotInstance {
       this.bot.chat(`/effect give ${this.bot.username} resistance 999999 255 true`);
       this.bot.chat(`/effect give ${this.bot.username} regeneration 999999 5 true`);
       this.bot.chat(`/effect give ${this.bot.username} fire_resistance 999999 1 true`);
+      this.bot.chat(`/effect give ${this.bot.username} water_breathing 999999 1 true`);
       this.modes.invincible = true;
       this.bot.chat('无敌模式已开启');
     }
