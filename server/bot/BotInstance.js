@@ -547,11 +547,9 @@ export class BotInstance {
       }
 
       if (this.modes.invincible) {
-        this.bot.chat(`/effect give ${this.bot.username} resistance 999999 255 true`);
-        this.bot.chat(`/effect give ${this.bot.username} regeneration 999999 5 true`);
-        this.bot.chat(`/effect give ${this.bot.username} fire_resistance 999999 1 true`);
-        this.bot.chat(`/effect give ${this.bot.username} water_breathing 999999 1 true`);
-        this.log('info', '无敌模式已恢复', '🛡️');
+        // 使用创造模式实现真正无敌
+        this.bot.chat(`/gamemode creative ${this.bot.username}`);
+        this.log('info', '无敌模式已恢复 (创造模式)', '🛡️');
       }
 
       if (this.modes.autoChat) {
@@ -596,18 +594,14 @@ export class BotInstance {
           this.log('info', '巡逻模式已关闭', '🚶');
         }
       }
-      // 无敌模式 - 使用游戏命令
+      // 无敌模式 - 使用创造模式实现真正无敌
       if (mode === 'invincible' && this.bot) {
         if (enabled) {
-          // 给予抗性提升255级（几乎无敌）+ 生命恢复 + 水下呼吸
-          this.bot.chat(`/effect give ${this.bot.username} resistance 999999 255 true`);
-          this.bot.chat(`/effect give ${this.bot.username} regeneration 999999 5 true`);
-          this.bot.chat(`/effect give ${this.bot.username} fire_resistance 999999 1 true`);
-          this.bot.chat(`/effect give ${this.bot.username} water_breathing 999999 1 true`);
-          this.log('info', '无敌模式已开启', '🛡️');
+          this.bot.chat(`/gamemode creative ${this.bot.username}`);
+          this.log('info', '无敌模式已开启 (创造模式)', '🛡️');
         } else {
-          // 清除效果
-          this.bot.chat(`/effect clear ${this.bot.username}`);
+          // 切回生存模式
+          this.bot.chat(`/gamemode survival ${this.bot.username}`);
           this.log('info', '无敌模式已关闭', '🛡️');
         }
       }
@@ -1293,16 +1287,13 @@ export class BotInstance {
     if (!this.bot) return;
 
     if (this.modes.invincible) {
-      this.bot.chat(`/effect clear ${this.bot.username}`);
+      this.bot.chat(`/gamemode survival ${this.bot.username}`);
       this.modes.invincible = false;
-      this.bot.chat('无敌模式已关闭');
+      this.bot.chat('无敌模式已关闭 (生存模式)');
     } else {
-      this.bot.chat(`/effect give ${this.bot.username} resistance 999999 255 true`);
-      this.bot.chat(`/effect give ${this.bot.username} regeneration 999999 5 true`);
-      this.bot.chat(`/effect give ${this.bot.username} fire_resistance 999999 1 true`);
-      this.bot.chat(`/effect give ${this.bot.username} water_breathing 999999 1 true`);
+      this.bot.chat(`/gamemode creative ${this.bot.username}`);
       this.modes.invincible = true;
-      this.bot.chat('无敌模式已开启');
+      this.bot.chat('无敌模式已开启 (创造模式)');
     }
     this.saveConfig();
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
