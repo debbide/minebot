@@ -5,6 +5,7 @@
 
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import proxyChain from 'proxy-chain';
 
 // 使用 stealth 插件绑过检测
 puppeteer.use(StealthPlugin());
@@ -20,6 +21,7 @@ export class RenewalService {
     this.globalLogs = []; // 全局日志
     this.maxLogsPerRenewal = 50;
     this.maxGlobalLogs = 100;
+    this.anonymizedProxies = new Map(); // 匿名代理映射 (原始URL -> 本地URL)
 
     // 启动时加载已保存的续期配置
     this.loadSavedRenewals();
@@ -256,12 +258,33 @@ export class RenewalService {
 
   /**
    * 获取或启动浏览器实例
-   * @param {string} proxyUrl - 可选的代理地址，如 socks5://127.0.0.1:1080
+   * @param {string} proxyUrl - 可选的代理地址，如 socks5://127.0.0.1:1080 或带认证的 socks5://user:pass@host:port
    */
   async getBrowser(proxyUrl = null) {
+    let actualProxyUrl = proxyUrl;
+
+    // 如果代理包含认证信息 (user:pass@host)，创建本地匿名代理
+    if (proxyUrl && proxyUrl.includes('@')) {
+      // 检查是否已经有该代理的匿名映射
+      if (this.anonymizedProxies.has(proxyUrl)) {
+        actualProxyUrl = this.anonymizedProxies.get(proxyUrl);
+        this.log('info', `复用已有匿名代理: ${actualProxyUrl}`);
+      } else {
+        try {
+          this.log('info', `创建匿名代理 (原始: ${proxyUrl.replace(/:[^:@]+@/, ':***@')})...`);
+          actualProxyUrl = await proxyChain.anonymizeProxy(proxyUrl);
+          this.anonymizedProxies.set(proxyUrl, actualProxyUrl);
+          this.log('info', `匿名代理创建成功: ${actualProxyUrl}`);
+        } catch (error) {
+          this.log('error', `创建匿名代理失败: ${error.message}`);
+          throw new Error(`代理认证转换失败: ${error.message}`);
+        }
+      }
+    }
+
     // 如果指定了代理，每次都创建新的浏览器实例
-    if (proxyUrl) {
-      this.log('info', `启动无头浏览器 (代理: ${proxyUrl})...`);
+    if (actualProxyUrl) {
+      this.log('info', `启动无头浏览器 (代理: ${actualProxyUrl})...`);
       const args = [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -269,7 +292,7 @@ export class RenewalService {
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
         '--window-size=1920,1080',
-        `--proxy-server=${proxyUrl}`
+        `--proxy-server=${actualProxyUrl}`
       ];
       return await puppeteer.launch({
         headless: 'new',
@@ -304,6 +327,17 @@ export class RenewalService {
       this.browser = null;
       this.log('info', '关闭无头浏览器');
     }
+
+    // 清理所有匿名代理
+    for (const [originalUrl, anonymizedUrl] of this.anonymizedProxies) {
+      try {
+        await proxyChain.closeAnonymizedProxy(anonymizedUrl, true);
+        this.log('info', `关闭匿名代理: ${anonymizedUrl}`);
+      } catch (error) {
+        // 忽略关闭错误
+      }
+    }
+    this.anonymizedProxies.clear();
   }
 
   /**

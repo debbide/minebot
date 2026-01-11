@@ -21,6 +21,7 @@
     "mineflayer": "^4.33.0",
     "mineflayer-pathfinder": "^2.4.5",
     "openai": "^4.20.0",
+    "proxy-chain": "^2.7.0",
     "puppeteer": "^23.0.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
