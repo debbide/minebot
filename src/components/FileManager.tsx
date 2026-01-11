@@ -519,7 +519,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col gap-3 overflow-hidden">
+      <CardContent className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
         {/* 工具栏 */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1">
@@ -595,7 +595,7 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
         </div>
 
         {/* 文件列表 */}
-        <ScrollArea className="flex-1 border rounded-lg">
+        <ScrollArea className="flex-1 min-h-0 border rounded-lg">
           <div className="min-w-[500px]">
             {/* 表头 */}
             <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b text-sm font-medium sticky top-0">
