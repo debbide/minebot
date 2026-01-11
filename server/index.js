@@ -392,6 +392,11 @@ app.put('/api/bots/:id', async (req, res) => {
       }
       if (host !== undefined) bot.config.host = host;
       if (port !== undefined) bot.config.port = parseInt(port) || 25565;
+
+      // 对于纯面板服务器，如果 host/port 更新了，刷新状态检查
+      if ((host !== undefined || port !== undefined) && bot.refreshStatusCheck) {
+        bot.refreshStatusCheck();
+      }
     }
 
     res.json({ success: true, config: updatedConfig });
