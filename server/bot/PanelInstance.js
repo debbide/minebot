@@ -932,7 +932,11 @@ export class PanelInstance {
     const connectOptions = {
       host: sftp.host,
       port: sftp.port || 22,
-      username: sftp.username
+      username: sftp.username,
+      readyTimeout: 10000,
+      retries: 2,
+      retry_factor: 2,
+      retry_minTimeout: 2000
     };
 
     if (sftp.privateKey) {
@@ -943,18 +947,35 @@ export class PanelInstance {
       throw new Error('SFTP 需要密码或私钥');
     }
 
-    await client.connect(connectOptions);
-    return client;
+    try {
+      await client.connect(connectOptions);
+      return client;
+    } catch (error) {
+      this.log('error', `SFTP 连接失败: ${sftp.host}:${sftp.port} - ${error.message}`, '❌');
+      throw error;
+    }
   }
 
   /**
    * 获取 SFTP 完整路径
    */
   getSftpFullPath(relativePath) {
-    const basePath = this.status.sftp?.basePath || '/';
-    let fullPath = relativePath.startsWith('/') ? relativePath : `${basePath}/${relativePath}`;
-    fullPath = fullPath.replace(/\/+/g, '/');
-    return fullPath;
+    const basePath = (this.status.sftp?.basePath || '/').replace(/\/+$/, '') || '/';
+
+    // 规范化相对路径
+    let cleanPath = (relativePath || '/').replace(/\/+/g, '/');
+
+    // 如果相对路径是根目录或空，直接返回 basePath
+    if (cleanPath === '/' || cleanPath === '') {
+      return basePath;
+    }
+
+    // 移除开头的斜杠，因为我们要拼接到 basePath
+    cleanPath = cleanPath.replace(/^\/+/, '');
+
+    // 拼接路径
+    const fullPath = basePath === '/' ? `/${cleanPath}` : `${basePath}/${cleanPath}`;
+    return fullPath.replace(/\/+/g, '/');
   }
 
   /**
@@ -965,6 +986,8 @@ export class PanelInstance {
     try {
       client = await this.getSftpClient();
       const fullPath = this.getSftpFullPath(directory);
+      this.log('info', `SFTP 列出目录: ${fullPath}`, '📂');
+
       const list = await client.list(fullPath);
 
       const files = list.map(item => ({
@@ -975,8 +998,8 @@ export class PanelInstance {
         isSymlink: item.type === 'l',
         isEditable: item.type === '-' && item.size < 10 * 1024 * 1024,
         mimetype: this.getMimeType(item.name),
-        createdAt: item.accessTime ? new Date(item.accessTime).toISOString() : null,
-        modifiedAt: item.modifyTime ? new Date(item.modifyTime).toISOString() : null
+        createdAt: item.accessTime ? new Date(item.accessTime * 1000).toISOString() : null,
+        modifiedAt: item.modifyTime ? new Date(item.modifyTime * 1000).toISOString() : null
       }));
 
       return { success: true, files, directory };
@@ -984,7 +1007,13 @@ export class PanelInstance {
       this.log('error', `SFTP 列出文件失败: ${error.message}`, '❌');
       return { success: false, error: error.message };
     } finally {
-      if (client) await client.end();
+      if (client) {
+        try {
+          await client.end();
+        } catch (e) {
+          // 忽略关闭连接时的错误
+        }
+      }
     }
   }
 
@@ -996,6 +1025,8 @@ export class PanelInstance {
     try {
       client = await this.getSftpClient();
       const fullPath = this.getSftpFullPath(file);
+      this.log('info', `SFTP 读取文件: ${fullPath}`, '📄');
+
       const content = await client.get(fullPath);
 
       return { success: true, content: content.toString('utf-8'), file };
@@ -1003,7 +1034,13 @@ export class PanelInstance {
       this.log('error', `SFTP 读取文件失败: ${error.message}`, '❌');
       return { success: false, error: error.message };
     } finally {
-      if (client) await client.end();
+      if (client) {
+        try {
+          await client.end();
+        } catch (e) {
+          // 忽略关闭连接时的错误
+        }
+      }
     }
   }
 
@@ -1015,6 +1052,8 @@ export class PanelInstance {
     try {
       client = await this.getSftpClient();
       const fullPath = this.getSftpFullPath(file);
+      this.log('info', `SFTP 写入文件: ${fullPath}`, '📝');
+
       await client.put(Buffer.from(content, 'utf-8'), fullPath);
 
       this.log('success', `SFTP 文件已保存: ${file}`, '💾');
@@ -1023,7 +1062,13 @@ export class PanelInstance {
       this.log('error', `SFTP 保存文件失败: ${error.message}`, '❌');
       return { success: false, error: error.message };
     } finally {
-      if (client) await client.end();
+      if (client) {
+        try {
+          await client.end();
+        } catch (e) {
+          // 忽略关闭连接时的错误
+        }
+      }
     }
   }
 
@@ -1035,6 +1080,8 @@ export class PanelInstance {
     try {
       client = await this.getSftpClient();
       const fullPath = this.getSftpFullPath(`${root}/${name}`);
+      this.log('info', `SFTP 创建文件夹: ${fullPath}`, '📁');
+
       await client.mkdir(fullPath, true);
 
       this.log('success', `SFTP 文件夹已创建: ${root}${name}`, '📁');
@@ -1043,7 +1090,13 @@ export class PanelInstance {
       this.log('error', `SFTP 创建文件夹失败: ${error.message}`, '❌');
       return { success: false, error: error.message };
     } finally {
-      if (client) await client.end();
+      if (client) {
+        try {
+          await client.end();
+        } catch (e) {
+          // 忽略关闭连接时的错误
+        }
+      }
     }
   }
 
@@ -1059,6 +1112,7 @@ export class PanelInstance {
       for (const fileName of files) {
         const fullPath = this.getSftpFullPath(`${root}/${fileName}`);
         try {
+          this.log('info', `SFTP 删除: ${fullPath}`, '🗑️');
           const stat = await client.stat(fullPath);
           if (stat.isDirectory) {
             await client.rmdir(fullPath, true);
@@ -1077,7 +1131,13 @@ export class PanelInstance {
       this.log('error', `SFTP 删除文件失败: ${error.message}`, '❌');
       return { success: false, error: error.message };
     } finally {
-      if (client) await client.end();
+      if (client) {
+        try {
+          await client.end();
+        } catch (e) {
+          // 忽略关闭连接时的错误
+        }
+      }
     }
   }
 
@@ -1090,6 +1150,8 @@ export class PanelInstance {
       client = await this.getSftpClient();
       const fromPath = this.getSftpFullPath(`${root}/${from}`);
       const toPath = this.getSftpFullPath(`${root}/${to}`);
+      this.log('info', `SFTP 重命名: ${fromPath} -> ${toPath}`, '✏️');
+
       await client.rename(fromPath, toPath);
 
       this.log('success', `SFTP 已重命名: ${from} -> ${to}`, '✏️');
@@ -1098,7 +1160,13 @@ export class PanelInstance {
       this.log('error', `SFTP 重命名失败: ${error.message}`, '❌');
       return { success: false, error: error.message };
     } finally {
-      if (client) await client.end();
+      if (client) {
+        try {
+          await client.end();
+        } catch (e) {
+          // 忽略关闭连接时的错误
+        }
+      }
     }
   }
 
@@ -1120,6 +1188,8 @@ export class PanelInstance {
       const copyName = `${baseName} copy${extension}`;
       const copyPath = this.getSftpFullPath(`${dir}${copyName}`);
 
+      this.log('info', `SFTP 复制: ${fullPath} -> ${copyPath}`, '📋');
+
       const content = await client.get(fullPath);
       await client.put(content, copyPath);
 
@@ -1129,7 +1199,13 @@ export class PanelInstance {
       this.log('error', `SFTP 复制失败: ${error.message}`, '❌');
       return { success: false, error: error.message };
     } finally {
-      if (client) await client.end();
+      if (client) {
+        try {
+          await client.end();
+        } catch (e) {
+          // 忽略关闭连接时的错误
+        }
+      }
     }
   }
 
@@ -1141,6 +1217,8 @@ export class PanelInstance {
     try {
       client = await this.getSftpClient();
       const fullPath = this.getSftpFullPath(file);
+      this.log('info', `SFTP 下载: ${fullPath}`, '📥');
+
       const content = await client.get(fullPath);
 
       return { success: true, content, file };
@@ -1148,7 +1226,13 @@ export class PanelInstance {
       this.log('error', `SFTP 下载文件失败: ${error.message}`, '❌');
       return { success: false, error: error.message };
     } finally {
-      if (client) await client.end();
+      if (client) {
+        try {
+          await client.end();
+        } catch (e) {
+          // 忽略关闭连接时的错误
+        }
+      }
     }
   }
 
@@ -1160,6 +1244,8 @@ export class PanelInstance {
     try {
       client = await this.getSftpClient();
       const fullPath = this.getSftpFullPath(`${directory}/${fileName}`);
+      this.log('info', `SFTP 上传: ${fullPath}`, '📤');
+
       await client.put(content, fullPath);
 
       this.log('success', `SFTP 文件已上传: ${fileName}`, '📤');
@@ -1168,7 +1254,13 @@ export class PanelInstance {
       this.log('error', `SFTP 上传文件失败: ${error.message}`, '❌');
       return { success: false, error: error.message };
     } finally {
-      if (client) await client.end();
+      if (client) {
+        try {
+          await client.end();
+        } catch (e) {
+          // 忽略关闭连接时的错误
+        }
+      }
     }
   }
 
