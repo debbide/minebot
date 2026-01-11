@@ -1049,11 +1049,12 @@ export class PanelInstance {
       const basePath = this.status.sftp?.basePath;
 
       if (directory === '/' || directory === '' || directory === '.') {
-        // 根目录：优先使用 basePath，否则使用 cwd
+        // 根目录：优先使用 basePath
         if (basePath && basePath !== '/') {
           fullPath = basePath;
         } else {
-          fullPath = cwd || '/';
+          // 翼龙 SFTP 返回 cwd='/' 但实际需要用 '.' 列出当前目录
+          fullPath = '.';
         }
       } else {
         fullPath = this.getSftpFullPath(directory);
@@ -1062,6 +1063,7 @@ export class PanelInstance {
       this.log('info', `SFTP 列出目录: ${fullPath}`, '📂');
 
       const list = await client.list(fullPath);
+      console.log('[SFTP Debug] list result:', JSON.stringify(list, null, 2));
       this.log('info', `SFTP 找到 ${list.length} 个文件`, '📂');
 
       const files = list.map(item => ({
