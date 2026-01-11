@@ -533,32 +533,58 @@ export class BotInstance {
 
     // 稍微延迟一下，确保机器人完全初始化
     setTimeout(() => {
-      if (this.modes.aiView) {
-        this.behaviors.aiView.start();
-        this.log('info', 'AI 视角已恢复', '👁️');
-      }
-
-      if (this.modes.patrol) {
-        if (this.spawnPosition) {
-          this.behaviors.patrol.centerPos = this.spawnPosition.clone();
+      try {
+        if (this.modes.aiView) {
+          this.behaviors.aiView.start();
+          this.log('info', 'AI 视角已恢复', '👁️');
         }
-        this.behaviors.patrol.start();
-        this.log('info', '巡逻模式已恢复', '🚶');
+      } catch (e) {
+        this.log('warning', `AI 视角恢复失败: ${e.message}`, '⚠️');
       }
 
-      if (this.modes.autoAttack) {
-        this.behaviors.attack.start();
-        this.log('info', '自动攻击已恢复', '⚔️');
+      try {
+        if (this.modes.patrol) {
+          if (this.spawnPosition) {
+            this.behaviors.patrol.centerPos = this.spawnPosition.clone();
+          }
+          const result = this.behaviors.patrol.start();
+          if (result.success) {
+            this.log('info', '巡逻模式已恢复', '🚶');
+          } else {
+            this.log('warning', `巡逻模式恢复失败: ${result.message}`, '⚠️');
+            this.modes.patrol = false;
+          }
+        }
+      } catch (e) {
+        this.log('warning', `巡逻模式恢复失败: ${e.message}`, '⚠️');
+        this.modes.patrol = false;
       }
 
-      if (this.modes.invincible) {
-        // 使用面板控制台发送创造模式命令（确保有权限）
-        this.applyInvincibleMode();
+      try {
+        if (this.modes.autoAttack) {
+          this.behaviors.attack.start();
+          this.log('info', '自动攻击已恢复', '⚔️');
+        }
+      } catch (e) {
+        this.log('warning', `自动攻击恢复失败: ${e.message}`, '⚠️');
       }
 
-      if (this.modes.autoChat) {
-        this.startAutoChat();
-        this.log('info', '自动喊话已恢复', '💬');
+      try {
+        if (this.modes.invincible) {
+          // 使用面板控制台发送创造模式命令（确保有权限）
+          this.applyInvincibleMode();
+        }
+      } catch (e) {
+        this.log('warning', `无敌模式恢复失败: ${e.message}`, '⚠️');
+      }
+
+      try {
+        if (this.modes.autoChat) {
+          this.startAutoChat();
+          this.log('info', '自动喊话已恢复', '💬');
+        }
+      } catch (e) {
+        this.log('warning', `自动喊话恢复失败: ${e.message}`, '⚠️');
       }
     }, 2000);
   }

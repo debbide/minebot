@@ -175,15 +175,29 @@ export class PatrolBehavior {
     // 先清理旧的监听器（防止重复绑定）
     this.cleanup();
 
+    // 检查 bot 是否准备好
+    if (!this.bot?.entity) {
+      if (this.log) {
+        this.log('warning', '巡逻启动失败: 机器人未就绪', '⚠️');
+      }
+      return { success: false, message: '机器人未就绪' };
+    }
+
     this.active = true;
     this.isMoving = false;
 
     // 记录当前位置作为中心点（和 Pathfinder PRO 一样）
-    if (this.bot?.entity) {
+    try {
       this.centerPos = this.bot.entity.position.clone();
       if (this.log) {
         this.log('info', `巡逻中心点: X:${Math.floor(this.centerPos.x)} Y:${Math.floor(this.centerPos.y)} Z:${Math.floor(this.centerPos.z)}`, '📍');
       }
+    } catch (e) {
+      if (this.log) {
+        this.log('warning', `巡逻启动失败: ${e.message}`, '⚠️');
+      }
+      this.active = false;
+      return { success: false, message: e.message };
     }
 
     // 监听到达目标
@@ -227,7 +241,14 @@ export class PatrolBehavior {
 
   doMove() {
     if (!this.active || !this.bot?.entity || this.isMoving) return;
-    if (!this.centerPos) return;
+    if (!this.centerPos) {
+      // 尝试重新获取中心点
+      try {
+        this.centerPos = this.bot.entity.position.clone();
+      } catch (e) {
+        return;
+      }
+    }
 
     this.isMoving = true;
 
