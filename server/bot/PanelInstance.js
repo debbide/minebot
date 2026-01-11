@@ -508,23 +508,32 @@ export class PanelInstance {
    * 设置翼龙面板配置
    */
   setPterodactylConfig(config) {
-    this.status.pterodactyl = {
-      url: (config.url || '').replace(/\/$/, ''),
-      apiKey: config.apiKey || '',
-      serverId: config.serverId || ''
-    };
-    this.log('info', '翼龙面板配置已更新', '🔑');
+    // 如果所有字段都为空，清除配置
+    const url = (config.url || '').replace(/\/$/, '');
+    const apiKey = config.apiKey || '';
+    const serverId = config.serverId || '';
+
+    if (!url && !apiKey && !serverId) {
+      this.status.pterodactyl = null;
+      this.log('info', '翼龙面板配置已清除', '🔑');
+    } else {
+      this.status.pterodactyl = { url, apiKey, serverId };
+      this.log('info', '翼龙面板配置已更新', '🔑');
+    }
 
     // 保存配置
     if (this.configManager) {
       this.configManager.updateServer(this.id, {
-        pterodactyl: this.status.pterodactyl
+        pterodactyl: this.status.pterodactyl || {}
       });
     }
 
     if (this.onStatusChange) {
       this.onStatusChange(this.id, this.getStatus());
     }
+
+    // 刷新状态检查（切换到 TCP ping 或面板 API）
+    this.refreshStatusCheck();
 
     return this.status.pterodactyl;
   }
