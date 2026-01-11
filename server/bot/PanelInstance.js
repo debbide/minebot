@@ -106,6 +106,8 @@ export class PanelInstance {
    * 连接到面板（开始状态检查）
    */
   async connect() {
+    console.log(`[${this.id}] PanelInstance.connect() 开始`);
+
     // 检查是否有任何可用的配置（翼龙面板或手动IP/端口）
     const hasPanelConfig = this.isPanelConfigured();
     const pingHost = this.config.host || this.status.serverHost;
@@ -116,6 +118,7 @@ export class PanelInstance {
       this.log('warning', '未配置翼龙面板或服务器地址', '⚠');
       // 即使没有配置也启动状态检查，以便后续配置更新时能自动开始
       this.startStatusCheck();
+      console.log(`[${this.id}] PanelInstance.connect() 结束 (无配置)`);
       return;
     }
 
@@ -151,6 +154,8 @@ export class PanelInstance {
 
     // 开始定期检查状态
     this.startStatusCheck();
+
+    console.log(`[${this.id}] PanelInstance.connect() 结束`);
 
     if (this.onStatusChange) {
       this.onStatusChange(this.id, this.getStatus());
