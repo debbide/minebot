@@ -11,12 +11,57 @@ import { BotManager } from './bot/BotPool.js';
 import { AIService } from './services/AIService.js';
 import { ConfigManager } from './services/ConfigManager.js';
 import { AuthService } from './services/AuthService.js';
+import { AuditService } from './services/AuditService.js';
 import { RenewalService } from './services/RenewalService.js';
 import { SystemService } from './services/SystemService.js';
 
 dotenv.config();
 
-// 捕获未处理的异常，防止进程崩溃
+// Log masking utility to prevent sensitive data leakage
+function maskSensitiveData(text) {
+  if (typeof text !== 'string') return text;
+
+  return text
+    // Mask API keys
+    .replace(/apiKey[=:\s]+[^\s,}]+/gi, 'apiKey=***')
+    .replace(/api_key[=:\s]+[^\s,}]+/gi, 'api_key=***')
+    .replace(/apikey[=:\s]+[^\s,}]+/gi, 'apikey=***')
+    // Mask passwords
+    .replace(/password[=:\s]+[^\s,}]+/gi, 'password=***')
+    .replace(/passwd[=:\s]+[^\s,}]+/gi, 'passwd=***')
+    // Mask JWT tokens and Bearer tokens
+    .replace(/Bearer\s+[^\s,}]+/gi, 'Bearer ***')
+    .replace(/token[=:\s]+[^\s,}]+/gi, 'token=***')
+    // Mask SSH keys
+    .replace(/privateKey[=:\s]+[^\s,}]+/gi, 'privateKey=***')
+    .replace(/private_key[=:\s]+[^\s,}]+/gi, 'private_key=***')
+    // Mask URLs with credentials
+    .replace(/https?:\/\/[^:]+:[^@]+@/gi, 'https://***:***@')
+    // Mask Pterodactyl URLs
+    .replace(/(ptero[a-z]*url|panel[a-z]*url)[=:\s]+[^\s,}]+/gi, '$1=***');
+}
+
+// Override console methods to mask sensitive data
+const originalLog = console.log;
+const originalError = console.error;
+const originalWarn = console.warn;
+
+console.log = function(...args) {
+  const maskedArgs = args.map(arg => maskSensitiveData(String(arg)));
+  originalLog.apply(console, maskedArgs);
+};
+
+console.error = function(...args) {
+  const maskedArgs = args.map(arg => maskSensitiveData(String(arg)));
+  originalError.apply(console, maskedArgs);
+};
+
+console.warn = function(...args) {
+  const maskedArgs = args.map(arg => maskSensitiveData(String(arg)));
+  originalWarn.apply(console, maskedArgs);
+};
+
+// Capture uncaught exceptions, prevent process crash
 process.on('uncaughtException', (err) => {
   console.error('[进程] 未捕获的异常:', err.message);
   // 对于 PartialReadError 等非致命错误，不退出进程
@@ -41,11 +86,22 @@ const wss = new WebSocketServer({ server });
 app.use(cors());
 app.use(express.json());
 
+// Security headers middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;");
+  next();
+});
+
 // Initialize services
 const configManager = new ConfigManager();
 const authService = new AuthService(configManager);
 const aiService = new AIService(configManager);
 const systemService = new SystemService();
+const auditService = new AuditService();
 const botManager = new BotManager(configManager, aiService, broadcast);
 
 // Auth routes (before auth middleware)
@@ -64,6 +120,8 @@ app.post('/api/auth/login', (req, res) => {
 
   if (result.valid) {
     const token = authService.generateToken(username);
+    // Log successful login
+    auditService.loginSuccess(username, clientIp);
     return res.json({
       success: true,
       token,
@@ -74,12 +132,16 @@ app.post('/api/auth/login', (req, res) => {
 
   // Handle rate limiting and authentication errors
   if (result.rateLimited) {
+    // Log rate limited attempt
+    auditService.loginFailed(username, 'rate_limited', clientIp);
     return res.status(429).json({
       error: result.message,
       code: 'RATE_LIMITED'
     });
   }
 
+  // Log failed authentication attempt
+  auditService.loginFailed(username, 'invalid_credentials', clientIp);
   res.status(401).json({
     error: result.message || 'Invalid username or password',
     code: 'INVALID_AUTH'
@@ -131,6 +193,9 @@ app.post('/api/auth/change-password', (req, res) => {
   if (!updateResult.success) {
     return res.status(400).json({ error: updateResult.message });
   }
+
+  // Log password change
+  auditService.passwordChanged(currentUser, clientIp);
 
   res.json({
     success: true,
