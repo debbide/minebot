@@ -4257,6 +4257,41 @@ const HTML = `<!DOCTYPE html>
       opacity: 0.8;
     }
 
+    /* 卡片底部操作区 */
+    .card-footer {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(94, 234, 212, 0.1);
+    }
+
+    .card-action-btn {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid rgba(94, 234, 212, 0.3);
+      background: transparent;
+      color: var(--primary);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .card-action-btn:hover {
+      background: rgba(94, 234, 212, 0.1);
+      border-color: var(--primary);
+    }
+
+    .card-action-btn:active {
+      transform: scale(0.95);
+    }
+
     /* Modal */
     .modal {
       position: fixed;
@@ -4492,6 +4527,10 @@ const HTML = `<!DOCTYPE html>
                   </div>
                 \` : '<div style="color:var(--danger);font-weight:500">未连接</div>'}
                 \${b.modes ? \`<div class="server-info-modes">\${Object.entries(b.modes).filter(([k,v])=>v).map(([k])=>({aiView:'👁️',patrol:'🚶',autoAttack:'⚔️',invincible:'🛡️',autoChat:'💬',mining:'⛏️'}[k]||'')).join(' ')}</div>\` : ''}
+              </div>
+              <div class="card-footer">
+                <button class="card-action-btn" onclick="openServerFiles('\${b.id}');event.stopPropagation()">📁 文件</button>
+                <button class="card-action-btn" onclick="showServerDetail('\${b.id}');event.stopPropagation()">⚙️ 详情</button>
               </div>
             </div>
           \`).join('') || '<p style="color:var(--muted)">${_d('5pqC5peg5pyN5Yqh5Zmo77yM54K55Ye75LiK5pa55oyJ6ZKu5re75Yqg')}</p>'}
@@ -6342,6 +6381,29 @@ const HTML = `<!DOCTYPE html>
       try {
         await api('/bots/' + selectedBot.id + '/files/write?path=' + encodeURIComponent(path), 'POST', document.getElementById('file-content').value);
         toast('已保存');
+      } catch (e) { toast(e.message, 'error'); }
+    };
+
+    window.openServerFiles = async (botId) => {
+      try {
+        const bot = botsData[botId];
+        if (!bot) { toast('服务器不存在', 'error'); return; }
+
+        selectedBot = bot;
+        const modal = document.getElementById('modal');
+        modal.innerHTML = \`
+          <div class="modal-content">
+            <div class="modal-header">
+              <h3>📁 \${bot.name} - 文件管理</h3>
+              <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div id="file-browser" style="padding:0 24px 24px;max-height:60vh;overflow-y:auto">
+              <div style="color:var(--muted);text-align:center;padding:40px 20px">加载中...</div>
+            </div>
+          </div>
+        \`;
+        modal.classList.add('open');
+        await loadFiles('/');
       } catch (e) { toast(e.message, 'error'); }
     };
 
