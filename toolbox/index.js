@@ -4454,9 +4454,295 @@ const HTML = `<!DOCTYPE html>
         white-space: nowrap;
       }
     }
+
+    /* ===== 登录页面样式 ===== */
+    .login-page {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background: linear-gradient(135deg, #0f172a 0%, #1a2a4e 100%);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-page.active {
+      display: flex;
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 400px;
+      padding: 0 20px;
+    }
+
+    .login-card {
+      background: rgba(42, 58, 66, 0.8);
+      border: 1px solid rgba(94, 234, 212, 0.2);
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+    }
+
+    .login-card h1 {
+      text-align: center;
+      color: var(--text);
+      margin-bottom: 30px;
+      font-size: 24px;
+      margin-top: 0;
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .login-form .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .login-form label {
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .login-form input {
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(94, 234, 212, 0.2);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .login-form input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 10px rgba(94, 234, 212, 0.3);
+    }
+
+    .login-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .login-actions .btn {
+      flex: 1;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .login-error {
+      padding: 12px;
+      background: rgba(239, 68, 68, 0.1);
+      border-left: 3px solid #ef4444;
+      color: #ef4444;
+      border-radius: 4px;
+      font-size: 14px;
+      display: none;
+      margin-bottom: 16px;
+    }
+
+    .login-error.show {
+      display: block;
+    }
+
+    .login-footer {
+      text-align: center;
+      margin-top: 20px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* ===== 密码管理样式 ===== */
+    .security-settings {
+      display: none;
+    }
+
+    .security-settings.active {
+      display: block;
+    }
+
+    .settings-section h2 {
+      color: var(--primary);
+      margin-bottom: 20px;
+      font-size: 18px;
+      border-bottom: 1px solid rgba(94, 234, 212, 0.1);
+      padding-bottom: 10px;
+    }
+
+    .settings-section .card {
+      margin-bottom: 20px;
+    }
+
+    .settings-section h3 {
+      color: var(--text);
+      font-size: 16px;
+      margin-bottom: 16px;
+      margin-top: 0;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid rgba(94, 234, 212, 0.2);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 14px;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .form-group input:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 10px rgba(94, 234, 212, 0.3);
+    }
+
+    .password-strength {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      display: none;
+    }
+
+    .password-strength.show {
+      display: block;
+    }
+
+    .password-strength.weak {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+    }
+
+    .password-strength.fair {
+      background: rgba(245, 166, 35, 0.1);
+      color: #f5a623;
+    }
+
+    .password-strength.good {
+      background: rgba(34, 197, 94, 0.1);
+      color: #22c55e;
+    }
+
+    .password-strength.strong {
+      background: rgba(94, 234, 212, 0.1);
+      color: var(--primary);
+    }
+
+    .session-info {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 12px;
+      background: rgba(94, 234, 212, 0.05);
+      border-radius: 6px;
+      border-left: 2px solid var(--primary);
+    }
+
+    .session-info p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .session-info .label {
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .password-requirements {
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(94, 234, 212, 0.05);
+      border-radius: 6px;
+      border-left: 2px solid var(--primary);
+    }
+
+    .password-requirements h4 {
+      color: var(--primary);
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .password-requirements ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .password-requirements li {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 4px;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .password-requirements li:before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--primary);
+    }
   </style>
 </head>
 <body>
+  <!-- 登录页面 -->
+  <div class="login-page" id="loginPage">
+    <div class="login-container">
+      <div class="login-card">
+        <h1>🎮 MineBot 工具箱</h1>
+        <form class="login-form" onsubmit="handleLogin(event)">
+          <div id="loginError" class="login-error"></div>
+          <div class="form-group">
+            <label for="loginUsername">用户名</label>
+            <input type="text" id="loginUsername" required autocomplete="username" placeholder="输入用户名">
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">密码</label>
+            <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="输入密码">
+          </div>
+          <div class="login-actions">
+            <button type="submit" class="btn btn-primary">登 录</button>
+          </div>
+        </form>
+        <div class="login-footer">
+          <p>首次登录? 请使用管理员凭证</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主应用容器 -->
   <div class="container" id="app"></div>
 
   <script>
@@ -4790,6 +5076,201 @@ const HTML = `<!DOCTYPE html>
         renderTools();
       } catch (e) {
         toast(e.message, 'error');
+      }
+    };
+
+    // ===== 登录和认证函数 =====
+
+    const handleLogin = async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errorEl = document.getElementById('loginError');
+
+      if (!username || !password) {
+        errorEl.textContent = '请输入用户名和密码';
+        errorEl.classList.add('show');
+        return;
+      }
+
+      try {
+        errorEl.classList.remove('show');
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          errorEl.textContent = data.error || '登录失败，请重试';
+          if (data.code === 'RATE_LIMITED') {
+            errorEl.textContent = '登录尝试过多，请稍后再试';
+          }
+          errorEl.classList.add('show');
+          return;
+        }
+
+        // 登录成功
+        token = data.token;
+        localStorage.setItem('token', token);
+        document.getElementById('loginPage').classList.remove('active');
+        document.getElementById('app').style.display = 'block';
+        render();
+      } catch (err) {
+        errorEl.textContent = '网络错误: ' + err.message;
+        errorEl.classList.add('show');
+      }
+    };
+
+    const handleLogout = async () => {
+      if (!confirm('确定要登出吗?')) return;
+
+      try {
+        await api('/auth/logout', 'POST');
+      } catch (e) {
+        // 忽略错误，继续登出
+      }
+
+      token = '';
+      localStorage.removeItem('token');
+      document.getElementById('app').innerHTML = '';
+      document.getElementById('loginPage').classList.add('active');
+      document.getElementById('loginUsername').value = '';
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginError').classList.remove('show');
+    };
+
+    // ===== 密码强度检查 =====
+    const checkPasswordStrength = (password) => {
+      const reasons = [];
+      let score = 0;
+
+      if (password.length < 8) {
+        reasons.push('至少8个字符');
+      } else {
+        score++;
+      }
+
+      if (!/[a-z]/.test(password) || !/[A-Z]/.test(password)) {
+        reasons.push('大小写混合');
+      } else {
+        score++;
+      }
+
+      if (!/\d/.test(password)) {
+        reasons.push('包含数字');
+      } else {
+        score++;
+      }
+
+      if (!/[!@#$%^&*_\-+=\[\]{};:'",.<>?/\\|`~]/.test(password)) {
+        reasons.push('特殊字符 (!@#$%^&*)');
+      } else {
+        score++;
+      }
+
+      return {
+        valid: reasons.length === 0,
+        score: Math.min(4, score),
+        reasons
+      };
+    };
+
+    const updatePasswordStrengthDisplay = () => {
+      const password = document.getElementById('newPassword')?.value || '';
+      const strengthEl = document.getElementById('passwordStrength');
+
+      if (!strengthEl) return;
+
+      if (!password) {
+        strengthEl.classList.remove('show');
+        return;
+      }
+
+      const strength = checkPasswordStrength(password);
+      strengthEl.classList.add('show');
+      strengthEl.className = 'password-strength show';
+
+      const levels = ['weak', 'fair', 'good', 'strong'];
+      if (strength.score > 0) {
+        strengthEl.classList.add(levels[strength.score - 1]);
+      }
+
+      if (strength.valid) {
+        strengthEl.innerHTML = '✓ 密码强度: 强';
+      } else {
+        strengthEl.innerHTML = '✗ 密码强度: ' + ['弱', '一般', '中等', '强'][strength.score] + '<br>' +
+          '缺少: ' + strength.reasons.join(', ');
+      }
+    };
+
+    // ===== 密码管理函数 =====
+    const handleChangePassword = async (e) => {
+      e.preventDefault();
+      const currentPassword = document.getElementById('currentPassword')?.value;
+      const newPassword = document.getElementById('newPassword')?.value;
+      const confirmPassword = document.getElementById('confirmPassword')?.value;
+
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        toast('请填写所有字段', 'error');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        toast('新密码不匹配', 'error');
+        return;
+      }
+
+      const strength = checkPasswordStrength(newPassword);
+      if (!strength.valid) {
+        toast('密码强度不足: ' + strength.reasons.join(', '), 'error');
+        return;
+      }
+
+      try {
+        const res = await api('/auth/change-password', 'POST', {
+          currentPassword,
+          newPassword,
+          confirmPassword
+        });
+        toast('✓ 密码修改成功，请重新登录', 'success');
+        setTimeout(() => handleLogout(), 2000);
+      } catch (err) {
+        toast('❌ ' + err.message, 'error');
+      }
+    };
+
+    // ===== 初始化 =====
+    const initAuth = async () => {
+      if (!token) {
+        document.getElementById('loginPage').classList.add('active');
+        document.getElementById('app').style.display = 'none';
+        return;
+      }
+
+      // 验证token
+      try {
+        const res = await fetch('/api/auth/check', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+
+        if (!data.authenticated) {
+          token = '';
+          localStorage.removeItem('token');
+          document.getElementById('loginPage').classList.add('active');
+          document.getElementById('app').style.display = 'none';
+        } else {
+          document.getElementById('loginPage').classList.remove('active');
+          document.getElementById('app').style.display = 'block';
+        }
+      } catch (err) {
+        token = '';
+        localStorage.removeItem('token');
+        document.getElementById('loginPage').classList.add('active');
+        document.getElementById('app').style.display = 'none';
       }
     };
 
@@ -5620,6 +6101,57 @@ const HTML = `<!DOCTYPE html>
       } catch (e) {}
 
       content.innerHTML = \`
+        <!-- 安全设置 -->
+        <div class="security-settings active">
+          <h2>🔒 安全设置</h2>
+
+          <!-- 修改密码 -->
+          <div class="card">
+            <h3>修改密码</h3>
+            <form onsubmit="handleChangePassword(event)">
+              <div class="form-group">
+                <label for="currentPassword">当前密码</label>
+                <input type="password" id="currentPassword" required placeholder="输入当前密码">
+              </div>
+              <div class="form-group">
+                <label for="newPassword">新密码</label>
+                <input type="password" id="newPassword" required placeholder="输入新密码" oninput="updatePasswordStrengthDisplay()">
+                <div id="passwordStrength" class="password-strength"></div>
+              </div>
+              <div class="form-group">
+                <label for="confirmPassword">确认新密码</label>
+                <input type="password" id="confirmPassword" required placeholder="再次输入新密码">
+              </div>
+              <button type="submit" class="btn btn-primary">更新密码</button>
+            </form>
+          </div>
+
+          <!-- 密码要求 -->
+          <div class="card">
+            <h3>密码要求</h3>
+            <div class="password-requirements">
+              <h4>密码必须满足以下条件:</h4>
+              <ul>
+                <li>最少 8 个字符</li>
+                <li>包含大小写字母</li>
+                <li>包含数字</li>
+                <li>包含特殊字符 (!@#$%^&*)</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- 会话信息 -->
+          <div class="card">
+            <h3>会话管理</h3>
+            <div class="session-info">
+              <p><span class="label">当前用户:</span> admin</p>
+              <p><span class="label">会话过期:</span> 24小时</p>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="handleLogout()">登 出</button>
+          </div>
+        </div>
+
+        <!-- 日志设置 -->
         <div class="card">
           <div class="card-header">
             <div class="card-title">日志设置</div>
@@ -6434,7 +6966,8 @@ const HTML = `<!DOCTYPE html>
 
     const escapeHtml = (s) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-    render();
+    // 页面加载时初始化认证
+    initAuth();
   </script>
 </body>
 </html>`;
