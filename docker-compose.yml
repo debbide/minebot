@@ -21,6 +21,14 @@ services:
       - minebot-data:/app/server/data
     networks:
       - minebot-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/auth/check"]
       interval: 30s
