@@ -4020,7 +4020,7 @@ const HTML = `<!DOCTYPE html>
     .card {
       background: rgba(42, 58, 66, 0.5);
       border-radius: 12px;
-      padding: 20px;
+      padding: 24px;
       margin-bottom: 16px;
       border: 1px solid rgba(94, 234, 212, 0.2);
       box-shadow: var(--shadow-card);
@@ -4050,6 +4050,15 @@ const HTML = `<!DOCTYPE html>
 
     .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .card-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+
+    /* 卡片内容间距优化 */
+    .card > div:not(.card-header):not(.card::before) {
+      margin-top: 12px;
+    }
+
+    .card-header + * {
+      margin-top: 12px;
+    }
 
     /* Status dots */
     .dot {
@@ -4128,14 +4137,22 @@ const HTML = `<!DOCTYPE html>
     .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
 
     /* Forms */
-    .form-group { margin-bottom: 12px; }
-    .form-group label { display: block; margin-bottom: 4px; font-size: 14px; color: var(--muted); }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; font-size: 14px; color: var(--muted); font-weight: 500; }
     .form-group input, .form-group textarea, .form-group select {
       width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px;
       background: var(--bg); color: var(--text); font-size: 14px;
+      transition: all 0.2s ease;
     }
+
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.1);
+    }
+
     .form-group textarea { min-height: 80px; font-family: monospace; resize: vertical; }
-    .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+    .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 
     /* Grid */
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
@@ -4143,8 +4160,38 @@ const HTML = `<!DOCTYPE html>
     /* Server card */
     .server-card { cursor: pointer; transition: border-color 0.2s; }
     .server-card:hover { border-color: var(--primary); }
-    .server-info { font-size: 13px; color: var(--muted); margin-top: 8px; }
-    .server-info code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+    .server-info {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .server-info code {
+      background: rgba(15, 23, 42, 0.8);
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      border-left: 2px solid var(--primary);
+      display: block;
+      word-break: break-all;
+    }
+
+    .server-info-stats {
+      display: flex;
+      gap: 12px;
+      font-size: 12px;
+      flex-wrap: wrap;
+    }
+
+    .server-info-modes {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--primary);
+    }
 
     /* Modal */
     .modal {
@@ -4250,7 +4297,11 @@ const HTML = `<!DOCTYPE html>
       }
 
       .card {
-        padding: 16px;
+        padding: 20px;
+        margin-bottom: 12px;
+      }
+
+      .form-group {
         margin-bottom: 12px;
       }
 
