@@ -286,15 +286,22 @@ export class BotPool {
   }
 
   /**
-   * Restart specific server
+   * Restart specific server - 使用自动刷新重连逻辑
    */
   async restart(id = 'default') {
     const bot = this.bots.get(id);
     if (bot) {
-      bot.disconnect();
-      await new Promise(r => setTimeout(r, 2000));
-      await bot.connect();
-      return bot.getStatus();
+      // 如果有 autoRefreshReconnect 方法，直接使用
+      if (typeof bot.autoRefreshReconnect === 'function') {
+        bot.autoRefreshReconnect();
+        return { message: '正在自动刷新重连...', status: bot.getStatus() };
+      } else {
+        // 兼容旧方法
+        bot.disconnect();
+        await new Promise(r => setTimeout(r, 1000));
+        await bot.connect();
+        return { message: '重连完成', status: bot.getStatus() };
+      }
     }
     throw new Error(`Bot ${id} not found`);
   }

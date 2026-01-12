@@ -204,48 +204,52 @@ export class BotInstance {
     }
 
     this.activityMonitorInterval = setInterval(() => {
-      if (Date.now() - this.lastActivity > 300000) {
-        this.log('warning', 'Bot 可能卡死，尝试重连...', '⏱️');
-        this.attemptRepair('卡死');
+      // 1分钟无活动就自动刷新重连
+      if (Date.now() - this.lastActivity > 60000) {
+        this.log('warning', 'Bot 无响应，自动刷新...', '⏱️');
+        this.autoRefreshReconnect();
       }
-    }, 30000);
+    }, 10000); // 每10秒检查一次
   }
 
   /**
-   * 重连逻辑 - 完全清理后重连
+   * 自动刷新重连 - 模拟面板刷新按钮的逻辑
    */
-  attemptRepair(reason = '断开') {
-    if (this.destroyed || this.reconnecting) return;
+  autoRefreshReconnect() {
+    if (this.destroyed) return;
 
-    this.reconnecting = true;
-    this.status.connected = false;
-    // 重置活动时间，避免重连期间再次触发卡死检测
-    this.lastActivity = Date.now();
-    this.log('warning', `连接${reason}，5秒后重连...`, '🔄');
-
-    // 完全清理旧实例（与 disconnect 类似但不设置 destroyed）
-    this.cleanup();
-
-    // 5秒后重新连接（比之前的10秒更快）
-    this.reconnectTimeout = setTimeout(async () => {
+    this.log('warning', '检测到异常，自动刷新重连...', '🔄');
+    
+    // 直接使用面板刷新的逻辑：断开 -> 等待 -> 重连
+    this.softDisconnect(); // 使用软断开，不设置 destroyed
+    
+    setTimeout(async () => {
       if (this.destroyed) return;
-      this.reconnecting = false;
-
       try {
         await this.connect();
-        this.log('success', '重连成功', '✅');
+        this.log('success', '自动刷新重连成功', '✅');
       } catch (err) {
-        this.log('error', `重连失败: ${err.message}，将在10秒后再次尝试...`, '✗');
-        // 如果重连失败，再次尝试
-        if (!this.destroyed) {
-          this.reconnectTimeout = setTimeout(() => {
-            if (!this.destroyed && !this.reconnecting) {
-              this.attemptRepair('重连失败');
-            }
-          }, 10000);
-        }
+        this.log('error', `自动刷新重连失败: ${err.message}`, '✗');
+        // 如果还是失败，3秒后再试一次
+        setTimeout(() => {
+          if (!this.destroyed) {
+            this.autoRefreshReconnect();
+          }
+        }, 3000);
       }
-    }, 5000);
+    }, 1000);
+  }
+
+  /**
+   * 软断开 - 用于自动重连，不设置 destroyed 标志
+   */
+  softDisconnect() {
+    this.reconnecting = true;
+    this.status.connected = false;
+    this.cleanup();
+    this.log('info', '正在刷新连接...', '🔄');
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+    this.reconnecting = false;
   }
 
   async connect() {
@@ -260,8 +264,8 @@ export class BotInstance {
       this.cleanup();
     }
 
-    // 等待一小段时间确保旧连接完全关闭
-    await new Promise(r => setTimeout(r, 500));
+    // 缩短等待时间
+    await new Promise(r => setTimeout(r, 200));
 
     const host = this.config.host;
     const port = this.config.port || 25565;
@@ -279,20 +283,19 @@ export class BotInstance {
           username,
           version: version || undefined,
           auth: 'offline',
-          connectTimeout: 30000,
-          // 增加 keepalive 检查间隔，避免因网络波动被踢
-          checkTimeoutInterval: 60000
+          connectTimeout: 15000, // 缩短连接超时到15秒
+          checkTimeoutInterval: 30000 // 缩短心跳检查到30秒
         };
 
         this.bot = mineflayer.createBot(botOptions);
 
         this.connectionTimeout = setTimeout(() => {
           if (this.bot && !this.status.connected) {
-            this.log('error', '连接超时', '❌');
-            this.scheduleReconnect();
+            this.log('error', '连接超时，自动刷新重连', '❌');
+            this.autoRefreshReconnect();
             reject(new Error('Connection timeout'));
           }
-        }, 30000);
+        }, 15000); // 15秒超时
 
         this.bot.loadPlugin(pathfinder);
 
@@ -421,38 +424,33 @@ export class BotInstance {
 
         this.bot.on('error', (err) => {
           this.log('error', `错误: ${err.message}`, '✗');
-          // 如果正在重连或已销毁，不再触发重连
-          if (!this.reconnecting && !this.destroyed) {
-            this.attemptRepair('错误');
-          }
+          // 任何错误都自动刷新重连
+          this.autoRefreshReconnect();
         });
 
         this.bot.on('kicked', (reason) => {
           this.log('error', `被踢出: ${reason}`, '👢');
           this.status.connected = false;
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
-          // 如果正在重连或已销毁，不再触发重连
-          if (!this.reconnecting && !this.destroyed) {
-            this.attemptRepair('被踢');
-          }
+          // 被踢出立即自动刷新重连
+          this.autoRefreshReconnect();
         });
 
         this.bot.on('end', () => {
-          // 如果正在重连或已销毁，不再触发重连
-          if (this.reconnecting || this.destroyed) {
-            this.log('info', '连接已关闭', '🔌');
-            return;
-          }
           this.log('warning', '连接断开', '🔌');
           this.status.connected = false;
           this.bot = null;
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
-          this.attemptRepair('断开');
+          // 连接断开自动刷新重连，除非是主动断开
+          if (!this.destroyed) {
+            this.autoRefreshReconnect();
+          }
         });
 
       } catch (error) {
         this.log('error', `连接失败: ${error.message}`, '✗');
-        this.attemptRepair('连接失败');
+        // 连接失败也自动刷新重连
+        this.autoRefreshReconnect();
         reject(error);
       }
     });
