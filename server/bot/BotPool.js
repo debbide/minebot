@@ -1,5 +1,40 @@
 import { BotInstance } from './BotInstance.js';
 import { PanelInstance } from './PanelInstance.js';
+import os from 'os';
+import fs from 'fs';
+
+/**
+ * 获取内存状态 - 支持容器环境
+ */
+function getMemoryStatus() {
+  const used = process.memoryUsage().rss;
+  let total = os.totalmem();
+
+  // 尝试识别容器内存限制
+  if (process.env.SERVER_MEMORY) {
+    total = parseInt(process.env.SERVER_MEMORY) * 1024 * 1024;
+  } else {
+    try {
+      // Linux cgroup v1
+      if (fs.existsSync('/sys/fs/cgroup/memory/memory.limit_in_bytes')) {
+        const limit = parseInt(fs.readFileSync('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'utf8').trim());
+        if (limit < 9223372036854771712) total = limit;
+      }
+      // Linux cgroup v2
+      else if (fs.existsSync('/sys/fs/cgroup/memory.max')) {
+        const limit = fs.readFileSync('/sys/fs/cgroup/memory.max', 'utf8').trim();
+        if (limit !== 'max') total = parseInt(limit);
+      }
+    } catch (e) {}
+  }
+
+  const percent = ((used / total) * 100).toFixed(1);
+  return {
+    used: (used / 1024 / 1024).toFixed(1),
+    total: (total / 1024 / 1024).toFixed(0),
+    percent
+  };
+}
 
 /**
  * Manages multiple bot instances across different servers
@@ -11,12 +46,50 @@ export class BotPool {
     this.broadcast = broadcast;
     this.bots = new Map(); // id -> BotInstance
     this.logs = [];
-    this.maxLogs = 200;
+    this.maxLogs = 100; // 减少日志数量
 
     this.setupProcessHandlers();
+    this.startMemoryMonitor();
 
     // 启动时加载已保存的服务器配置
     this.loadSavedServers();
+  }
+
+  /**
+   * 内存监控 - 80%告警，90%清理缓存
+   */
+  startMemoryMonitor() {
+    setInterval(() => {
+      const status = getMemoryStatus();
+      const percent = parseFloat(status.percent);
+
+      if (percent >= 80) {
+        console.warn(`[内存警告] 使用率 ${status.percent}% (${status.used}/${status.total} MB)`);
+        
+        // 清理协议缓存
+        BotInstance.clearCache();
+        
+        // 紧急修剪日志
+        this.logs = this.logs.slice(-20);
+        this.bots.forEach(bot => {
+          if (bot.logs && bot.logs.length > 20) {
+            bot.logs = bot.logs.slice(-20);
+          }
+        });
+
+        // 90%以上考虑重启
+        if (percent >= 90) {
+          console.error(`[内存危险] 使用率 ${status.percent}%，建议重启服务`);
+        }
+      }
+    }, 30000); // 每30秒检查
+  }
+
+  /**
+   * 获取内存状态 - 供API使用
+   */
+  getMemoryStatus() {
+    return getMemoryStatus();
   }
 
   /**

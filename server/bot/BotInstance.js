@@ -5,6 +5,9 @@ import { BehaviorManager } from './behaviors/index.js';
 import axios from 'axios';
 import SftpClient from 'ssh2-sftp-client';
 
+// 协议数据缓存，内存紧张时清空
+const mcDataCache = new Map();
+
 /**
  * Single bot instance for one server connection
  */
@@ -20,7 +23,7 @@ export class BotInstance {
 
     this.bot = null;
     this.behaviors = null;
-    this.reconnecting = false;
+    this.isRepairing = false; // 防止重复重连
     this.connectionTimeout = null;
     this.reconnectTimeout = null;
     this.activityMonitorInterval = null;
@@ -30,10 +33,11 @@ export class BotInstance {
     this.destroyed = false;
     this.spawnPosition = null; // 记录出生点用于巡逻
     this.hasAutoOpped = false; // 是否已自动给予OP权限
+    this.reconnectAttempts = 0; // 重连次数
 
     // 每个机器人独立的日志
     this.logs = [];
-    this.maxLogs = 100;
+    this.maxLogs = 50; // 减少日志数量节省内存
 
     this.status = {
       id: this.id,
@@ -205,52 +209,72 @@ export class BotInstance {
     }
 
     this.activityMonitorInterval = setInterval(() => {
-      // 1分钟无活动就自动刷新重连
-      if (Date.now() - this.lastActivity > 60000) {
-        this.log('warning', 'Bot 无响应，自动刷新...', '⏱️');
-        this.autoRefreshReconnect();
+      // 2分钟无活动才触发重连，避免频繁重连
+      if (Date.now() - this.lastActivity > 120000) {
+        this.log('warning', 'Bot 无响应超过2分钟，尝试重连...', '⏱️');
+        this.attemptRepair('无响应');
       }
-    }, 10000); // 每10秒检查一次
+    }, 30000); // 每30秒检查一次
   }
 
   /**
-   * 自动刷新重连 - 模拟面板刷新按钮的逻辑
+   * 尝试修复连接 - 防止重复重连，固定间隔
    */
-  autoRefreshReconnect() {
-    if (this.destroyed) return;
-
-    this.log('warning', '检测到异常，自动刷新重连...', '🔄');
+  attemptRepair(reason) {
+    // 防止重复重连
+    if (this.destroyed || this.isRepairing) {
+      return;
+    }
     
-    // 直接使用面板刷新的逻辑：断开 -> 等待 -> 重连
-    this.softDisconnect(); // 使用软断开，不设置 destroyed
+    this.isRepairing = true;
+    this.status.connected = false;
+    this.reconnectAttempts++;
     
-    setTimeout(async () => {
-      if (this.destroyed) return;
+    this.log('warning', `连接异常 (${reason})，${10}秒后重连 (第${this.reconnectAttempts}次)...`, '🔄');
+    
+    // 彻底清理旧连接
+    this.cleanup();
+    
+    if (this.onStatusChange) {
+      this.onStatusChange(this.id, this.getStatus());
+    }
+    
+    // 固定10秒后重连，不要立即重试
+    this.reconnectTimeout = setTimeout(async () => {
+      if (this.destroyed) {
+        this.isRepairing = false;
+        return;
+      }
+      
       try {
         await this.connect();
-        this.log('success', '自动刷新重连成功', '✅');
+        this.log('success', '重连成功', '✅');
+        this.reconnectAttempts = 0;
       } catch (err) {
-        this.log('error', `自动刷新重连失败: ${err.message}`, '✗');
-        // 如果还是失败，3秒后再试一次
-        setTimeout(() => {
-          if (!this.destroyed) {
-            this.autoRefreshReconnect();
-          }
-        }, 3000);
+        this.log('error', `重连失败: ${err.message}`, '✗');
+        // 失败后继续尝试，但间隔会更长
       }
-    }, 1000);
+      
+      this.isRepairing = false;
+    }, 10000);
   }
 
   /**
-   * 软断开 - 用于自动重连，不设置 destroyed 标志
+   * 软断开 - 用于手动刷新，不设置 destroyed 标志
    */
   softDisconnect() {
-    this.reconnecting = true;
     this.status.connected = false;
     this.cleanup();
     this.log('info', '正在刷新连接...', '🔄');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
-    this.reconnecting = false;
+  }
+
+  /**
+   * 清理内存缓存 - 内存紧张时调用
+   */
+  static clearCache() {
+    mcDataCache.clear();
+    console.log('[内存优化] 已清理协议数据缓存');
   }
 
   async connect() {
@@ -299,9 +323,9 @@ export class BotInstance {
 
         this.connectionTimeout = setTimeout(() => {
           if (this.bot && !this.status.connected) {
-            this.log('error', '连接超时，自动刷新重连', '❌');
-            this.autoRefreshReconnect();
+            this.log('error', '连接超时', '❌');
             reject(new Error('Connection timeout'));
+            this.attemptRepair('连接超时');
           }
         }, 15000); // 15秒超时
 
@@ -310,7 +334,7 @@ export class BotInstance {
         this.bot.on('login', () => {
           this.log('success', `登录成功 (${username})`, '✅');
           clearTimeout(this.connectionTimeout);
-          this.reconnecting = false;
+          this.isRepairing = false;
           this.reconnectAttempts = 0;
           this.updateActivity();
           this.startActivityMonitor();
@@ -432,16 +456,16 @@ export class BotInstance {
 
         this.bot.on('error', (err) => {
           this.log('error', `错误: ${err.message}`, '✗');
-          // 任何错误都自动刷新重连
-          this.autoRefreshReconnect();
+          // 使用防重复重连
+          this.attemptRepair(err.message);
         });
 
         this.bot.on('kicked', (reason) => {
           this.log('error', `被踢出: ${reason}`, '👢');
           this.status.connected = false;
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
-          // 被踢出立即自动刷新重连
-          this.autoRefreshReconnect();
+          // 被踢出后重连
+          this.attemptRepair('被踢出');
         });
 
         this.bot.on('end', () => {
@@ -449,16 +473,16 @@ export class BotInstance {
           this.status.connected = false;
           this.bot = null;
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
-          // 连接断开自动刷新重连，除非是主动断开
+          // 连接断开自动重连，除非是主动断开
           if (!this.destroyed) {
-            this.autoRefreshReconnect();
+            this.attemptRepair('连接断开');
           }
         });
 
       } catch (error) {
         this.log('error', `连接失败: ${error.message}`, '✗');
-        // 连接失败也自动刷新重连
-        this.autoRefreshReconnect();
+        // 连接失败使用防重复重连
+        this.attemptRepair(error.message);
         reject(error);
       }
     });
@@ -466,11 +490,14 @@ export class BotInstance {
 
   disconnect() {
     this.destroyed = true;
-    this.reconnecting = true;
+    this.isRepairing = false;
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     this.cleanup();
     this.log('info', '已断开', '🔌');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
-    this.reconnecting = false;
   }
 
   startAutoChat() {
