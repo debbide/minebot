@@ -75,9 +75,9 @@ export class PanelInstance {
 
   getStatus() {
     const name = this.config.name || this.status.serverName;
-    // 优先使用配置中的 host/port，如果没有则使用从面板获取的
-    const host = this.config.host || this.status.serverHost || '';
-    const port = this.config.port || this.status.serverPort || 0;
+    // 只使用手动配置的地址
+    const host = this.config.host || '';
+    const port = this.config.port || 0;
     return {
       ...this.status,
       serverName: name, // 确保 serverName 与 name 一致
@@ -108,8 +108,8 @@ export class PanelInstance {
   async connect() {
     // 检查是否有任何可用的配置（翼龙面板或手动IP/端口）
     const hasPanelConfig = this.isPanelConfigured();
-    const pingHost = this.config.host || this.status.serverHost;
-    const pingPort = this.config.port || this.status.serverPort;
+    const pingHost = this.config.host;
+    const pingPort = this.config.port;
     const hasAddress = pingHost && pingPort;
 
     if (!hasPanelConfig && !hasAddress) {
@@ -210,9 +210,9 @@ export class PanelInstance {
    */
   async refreshStatusCheck() {
     const hasPanelConfig = this.isPanelConfigured();
-    // 检查是否有任何可用的地址（config 或之前从面板获取的）
-    const pingHost = this.config.host || this.status.serverHost;
-    const pingPort = this.config.port || this.status.serverPort;
+    // 只使用手动配置的地址
+    const pingHost = this.config.host;
+    const pingPort = this.config.port;
     const hasAddress = pingHost && pingPort;
 
     if (!hasPanelConfig && !hasAddress) {
@@ -253,9 +253,9 @@ export class PanelInstance {
    * 只执行 TCP ping（没有翼龙面板配置时使用）
    */
   async doTcpPingOnly() {
-    // 优先使用用户配置的 IP/端口，否则使用之前从面板获取的
-    const pingHost = this.config.host || this.status.serverHost;
-    const pingPort = this.config.port || this.status.serverPort;
+    // 只使用手动配置的地址，API获取的是管理地址不一定能ping
+    const pingHost = this.config.host;
+    const pingPort = this.config.port;
 
     if (pingHost && pingPort) {
       const pingResult = await this.tcpPing(pingHost, pingPort);
@@ -386,9 +386,9 @@ export class PanelInstance {
       uptime: data.resources?.uptime || 0
     };
 
-    // 优先使用用户配置的 IP/端口，否则使用从面板获取的
-    const pingHost = this.config.host || this.status.serverHost;
-    const pingPort = this.config.port || this.status.serverPort;
+    // TCP ping 只使用手动配置的地址
+    const pingHost = this.config.host;
+    const pingPort = this.config.port;
 
     // 只要有地址就执行 TCP ping，不依赖面板状态
     if (pingHost && pingPort) {
