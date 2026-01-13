@@ -261,6 +261,16 @@ export class AuthService {
       return this.getDefaultCredentials();
     }
 
+    // 兼容旧版明文密码格式 - 自动迁移到哈希格式
+    if (typeof config.auth.password === 'string') {
+      console.log('🔄 Migrating plaintext password to hashed format...');
+      const { hash, salt } = hashPassword(config.auth.password);
+      config.auth.password = { hash, salt };
+      // 保存迁移后的配置
+      this.configManager.updateConfig({ auth: config.auth });
+      console.log('✅ Password migration complete');
+    }
+
     return config.auth;
   }
 
