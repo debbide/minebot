@@ -124,29 +124,35 @@
 
 @layer components {
   .glass {
-    @apply backdrop-blur-xl border border-border/50;
+    @apply backdrop-blur-xl border;
+    border-color: hsla(220, 13%, 91%, 0.5);
     background-color: hsla(220, 20%, 98%, 0.6);
   }
 
   .dark .glass {
+    border-color: hsla(220, 15%, 18%, 0.5);
     background-color: hsla(224, 25%, 6%, 0.6);
   }
 
   .glass-card {
-    @apply backdrop-blur-lg border border-border/50 shadow-sm hover:shadow-md transition-all duration-300;
+    @apply backdrop-blur-lg border shadow-sm hover:shadow-md transition-all duration-300;
+    border-color: hsla(220, 13%, 91%, 0.5);
     background-color: hsla(0, 0%, 100%, 0.6);
   }
 
   .dark .glass-card {
+    border-color: hsla(220, 15%, 18%, 0.5);
     background-color: hsla(224, 20%, 9%, 0.6);
   }
 
   .glass-header {
-    @apply sticky top-0 z-50 w-full border-b border-border/40 backdrop-blur-xl;
+    @apply sticky top-0 z-50 w-full border-b backdrop-blur-xl;
+    border-color: hsla(220, 13%, 91%, 0.4);
     background-color: hsla(220, 20%, 98%, 0.8);
   }
 
   .dark .glass-header {
+    border-color: hsla(220, 15%, 18%, 0.4);
     background-color: hsla(224, 25%, 5%, 0.8);
   }
 }
