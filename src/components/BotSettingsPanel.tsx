@@ -363,7 +363,7 @@ export function BotSettingsPanel({
                             variant="default"
                             onClick={() => handlePowerSignal('start')}
                             disabled={loading?.startsWith('power-') || !panelUrl}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-600 hover:bg-green-700 btn-glow"
                         >
                             {loading === "power-start" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Power className="h-4 w-4 mr-1" />}
                             开机
@@ -372,7 +372,7 @@ export function BotSettingsPanel({
                             variant="default"
                             onClick={() => handlePowerSignal('stop')}
                             disabled={loading?.startsWith('power-') || !panelUrl}
-                            className="bg-yellow-600 hover:bg-yellow-700"
+                            className="bg-yellow-600 hover:bg-yellow-700 btn-glow"
                         >
                             {loading === "power-stop" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <PowerOff className="h-4 w-4 mr-1" />}
                             关机
@@ -381,7 +381,7 @@ export function BotSettingsPanel({
                             variant="default"
                             onClick={() => handlePowerSignal('restart')}
                             disabled={loading?.startsWith('power-') || !panelUrl}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            className="bg-blue-600 hover:bg-blue-700 btn-glow"
                         >
                             {loading === "power-restart" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
                             重启
