@@ -24,6 +24,7 @@ import {
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { BotControlPanel } from "./BotControlPanel";
+import { BotSettingsPanel } from "./BotSettingsPanel";
 
 interface LogEntry {
   id: number;
@@ -226,9 +227,9 @@ export function ServerDetailDialog({
             <SheetTitle className="flex items-center gap-3 text-xl">
               <div
                 className={`w-3 h-3 rounded-full shadow-lg ${server.connected ? "bg-emerald-500 shadow-emerald-500/50" :
-                    isPanel && server.tcpOnline ? "bg-emerald-500 shadow-emerald-500/50" :
-                      isPanel && server.panelServerState === "running" ? "bg-yellow-500 shadow-yellow-500/50" :
-                        "bg-muted-foreground/30"
+                  isPanel && server.tcpOnline ? "bg-emerald-500 shadow-emerald-500/50" :
+                    isPanel && server.panelServerState === "running" ? "bg-yellow-500 shadow-yellow-500/50" :
+                      "bg-muted-foreground/30"
                   }`}
               />
               {server.name || server.id}
@@ -362,69 +363,79 @@ export function ServerDetailDialog({
             </TabsContent>
 
             {/* 配置编辑 */}
-            <TabsContent value="settings" className="mt-0 animate-in slide-in-from-bottom-2 duration-300">
-              <div className="space-y-6">
-                {editing ? (
-                  <div className="space-y-6 p-6 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
-                    <div className="grid gap-6">
-                      <div className="space-y-2">
-                        <Label>服务器名称</Label>
-                        <Input
-                          value={editForm.name}
-                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                          placeholder="My Server"
-                          className="bg-background/50"
-                        />
-                      </div>
+            <TabsContent value="settings" className="mt-0 animate-in slide-in-from-bottom-2 duration-300 h-full overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+              <div className="space-y-8 pb-10">
+                {/* 基本信息编辑 */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium">基本信息</h3>
+                    {!editing && (
+                      <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        编辑
+                      </Button>
+                    )}
+                  </div>
 
-                      {!isPanel && (
+                  {editing ? (
+                    <div className="space-y-6 p-6 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+                      <div className="grid gap-6">
                         <div className="space-y-2">
-                          <Label>机器人用户名</Label>
+                          <Label>服务器名称</Label>
                           <Input
-                            value={editForm.username}
-                            onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                            placeholder="Bot Name"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            placeholder="My Server"
                             className="bg-background/50"
                           />
                         </div>
-                      )}
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="col-span-2 space-y-2">
-                        <Label>主机地址</Label>
-                        <Input
-                          value={editForm.host}
-                          onChange={(e) => setEditForm({ ...editForm, host: e.target.value })}
-                          placeholder="mc.example.com"
-                          className="bg-background/50 font-mono"
-                        />
+                        {!isPanel && (
+                          <div className="space-y-2">
+                            <Label>机器人用户名</Label>
+                            <Input
+                              value={editForm.username}
+                              onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                              placeholder="Bot Name"
+                              className="bg-background/50"
+                            />
+                          </div>
+                        )}
                       </div>
-                      <div className="space-y-2">
-                        <Label>端口</Label>
-                        <Input
-                          value={editForm.port}
-                          onChange={(e) => setEditForm({ ...editForm, port: e.target.value })}
-                          placeholder="25565"
-                          className="bg-background/50 font-mono"
-                        />
-                      </div>
-                    </div>
 
-                    <div className="flex gap-3 justify-end pt-2">
-                      <Button variant="ghost" onClick={() => setEditing(false)} disabled={loading}>
-                        取消
-                      </Button>
-                      <Button onClick={handleSave} disabled={loading}>
-                        {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        保存配置
-                      </Button>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2 space-y-2">
+                          <Label>主机地址</Label>
+                          <Input
+                            value={editForm.host}
+                            onChange={(e) => setEditForm({ ...editForm, host: e.target.value })}
+                            placeholder="mc.example.com"
+                            className="bg-background/50 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>端口</Label>
+                          <Input
+                            value={editForm.port}
+                            onChange={(e) => setEditForm({ ...editForm, port: e.target.value })}
+                            placeholder="25565"
+                            className="bg-background/50 font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 justify-end pt-2">
+                        <Button variant="ghost" onClick={() => setEditing(false)} disabled={loading}>
+                          取消
+                        </Button>
+                        <Button onClick={handleSave} disabled={loading}>
+                          {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          保存基本信息
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    <div className="p-6 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
-                      <h3 className="text-lg font-medium mb-4">基本信息</h3>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
                       <dl className="grid grid-cols-1 gap-y-4 text-sm">
                         <div className="grid grid-cols-3">
                           <dt className="text-muted-foreground">显示名称</dt>
@@ -446,13 +457,24 @@ export function ServerDetailDialog({
                         </div>
                       </dl>
                     </div>
+                  )}
+                </div>
 
-                    <Button variant="outline" className="w-full" onClick={() => setEditing(true)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      修改配置信息
-                    </Button>
+                {/* 高级功能设置 */}
+                <div className="space-y-4 pt-4 border-t border-border/50">
+                  <h3 className="text-lg font-medium">高级功能</h3>
+                  <div className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm">
+                    <BotSettingsPanel
+                      botId={server.id}
+                      restartTimer={server.restartTimer}
+                      autoChat={server.autoChat}
+                      pterodactyl={server.pterodactyl}
+                      sftp={server.sftp}
+                      fileAccessType={server.fileAccessType}
+                      onUpdate={onUpdate}
+                    />
                   </div>
-                )}
+                </div>
               </div>
             </TabsContent>
 
@@ -477,10 +499,10 @@ export function ServerDetailDialog({
                       <div
                         key={log.id}
                         className={`flex items-start gap-3 py-0.5 ${log.type === "error" ? "text-red-400" :
-                            log.type === "warning" ? "text-yellow-400" :
-                              log.type === "success" ? "text-emerald-400" :
-                                log.type === "chat" ? "text-purple-400" :
-                                  "text-zinc-400"
+                          log.type === "warning" ? "text-yellow-400" :
+                            log.type === "success" ? "text-emerald-400" :
+                              log.type === "chat" ? "text-purple-400" :
+                                "text-zinc-400"
                           }`}
                       >
                         <span className="shrink-0 opacity-40 select-none w-[70px] text-[10px] mt-[1px] font-sans text-right">
