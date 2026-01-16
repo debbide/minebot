@@ -451,7 +451,7 @@ export function BotControlPanel({
                 <span className="text-xs">设置</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>面板服务器设置</DialogTitle>
                 <DialogDescription>配置翼龙面板或 SFTP 连接信息</DialogDescription>
@@ -665,7 +665,7 @@ export function BotControlPanel({
               <span className="text-xs">设置</span>
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>服务器设置</DialogTitle>
               <DialogDescription>配置此服务器的独立设置</DialogDescription>
@@ -982,96 +982,96 @@ export function BotControlPanel({
 
           {/* 行为控制折叠面板 */}
           <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="w-full justify-between">
-            <span className="text-xs">更多控制</span>
-            <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-3 pt-3">
-        <div className="flex gap-2">
-          <Select value={followTarget} onValueChange={setFollowTarget}>
-            <SelectTrigger className="flex-1 h-8 text-xs">
-              <SelectValue placeholder="选择玩家" />
-            </SelectTrigger>
-            <SelectContent>
-              {players.filter(p => p !== botName).map(player => (
-                <SelectItem key={player} value={player}>{player}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            variant={modes.follow ? "destructive" : "outline"}
-            onClick={() => handleBehavior("follow", !modes.follow, { target: followTarget })}
-            disabled={loading !== null || (!modes.follow && !followTarget)}
-          >
-            {loading === "follow" ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-          </Button>
-        </div>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between">
+                <span className="text-xs">更多控制</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 pt-3">
+              <div className="flex gap-2">
+                <Select value={followTarget} onValueChange={setFollowTarget}>
+                  <SelectTrigger className="flex-1 h-8 text-xs">
+                    <SelectValue placeholder="选择玩家" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {players.filter(p => p !== botName).map(player => (
+                      <SelectItem key={player} value={player}>{player}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant={modes.follow ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("follow", !modes.follow, { target: followTarget })}
+                  disabled={loading !== null || (!modes.follow && !followTarget)}
+                >
+                  {loading === "follow" ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                </Button>
+              </div>
 
-        {/* 攻击控制 */}
-        <div className="flex gap-2">
-          <Select value={attackMode} onValueChange={setAttackMode}>
-            <SelectTrigger className="flex-1 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="hostile">敌对生物</SelectItem>
-              <SelectItem value="all">所有生物</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            variant={modes.autoAttack ? "destructive" : "outline"}
-            onClick={() => handleBehavior("attack", !modes.autoAttack, { mode: attackMode })}
-            disabled={loading !== null}
-          >
-            {loading === "attack" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sword className="h-4 w-4" />}
-          </Button>
-        </div>
+              {/* 攻击控制 */}
+              <div className="flex gap-2">
+                <Select value={attackMode} onValueChange={setAttackMode}>
+                  <SelectTrigger className="flex-1 h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hostile">敌对生物</SelectItem>
+                    <SelectItem value="all">所有生物</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant={modes.autoAttack ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("attack", !modes.autoAttack, { mode: attackMode })}
+                  disabled={loading !== null}
+                >
+                  {loading === "attack" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sword className="h-4 w-4" />}
+                </Button>
+              </div>
 
-        {/* 其他行为按钮 */}
-        <div className="grid grid-cols-4 gap-2">
-          <Button
-            size="sm"
-            variant={modes.patrol ? "destructive" : "outline"}
-            onClick={() => handleBehavior("patrol", !modes.patrol)}
-            disabled={loading !== null}
-            title="巡逻"
-          >
-            {loading === "patrol" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
-          </Button>
-          <Button
-            size="sm"
-            variant={modes.mining ? "destructive" : "outline"}
-            onClick={() => handleBehavior("mining", !modes.mining)}
-            disabled={loading !== null}
-            title="挖矿"
-          >
-            {loading === "mining" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pickaxe className="h-4 w-4" />}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleAction("jump")}
-            disabled={loading !== null}
-            title="跳跃"
-          >
-            {loading === "jump" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={handleStopAll}
-            disabled={loading !== null}
-            title="停止所有"
-          >
-            {loading === "stop" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
-          </Button>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+              {/* 其他行为按钮 */}
+              <div className="grid grid-cols-4 gap-2">
+                <Button
+                  size="sm"
+                  variant={modes.patrol ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("patrol", !modes.patrol)}
+                  disabled={loading !== null}
+                  title="巡逻"
+                >
+                  {loading === "patrol" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Navigation className="h-4 w-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={modes.mining ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("mining", !modes.mining)}
+                  disabled={loading !== null}
+                  title="挖矿"
+                >
+                  {loading === "mining" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pickaxe className="h-4 w-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleAction("jump")}
+                  disabled={loading !== null}
+                  title="跳跃"
+                >
+                  {loading === "jump" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={handleStopAll}
+                  disabled={loading !== null}
+                  title="停止所有"
+                >
+                  {loading === "stop" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
+                </Button>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </>
       )}
     </div>
