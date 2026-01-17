@@ -448,7 +448,8 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
             body: formData,
           });
 
-          if (!response.ok) {
+          // 翼龙面板上传成功返回 204 No Content
+          if (!response.ok && response.status !== 204) {
             throw new Error(`上传失败: ${response.statusText}`);
           }
         }
