@@ -104,9 +104,9 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 # Expose port
 EXPOSE 3000
 
-# Health check - use simple /health endpoint
+# Health check - use root path
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD node -e "const http = require('http'); http.get('http://127.0.0.1:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"
+    CMD node -e "const http = require('http'); http.get('http://127.0.0.1:3000/', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"
 
 # Start the server (use docker restart policy instead of PM2 for ARM compatibility)
 WORKDIR /app/server
