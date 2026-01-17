@@ -458,11 +458,23 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
       toast({ title: "上传成功", description: `已上传 ${fileList.length} 个文件`, variant: "success" });
       loadFiles();
     } catch (error) {
-      toast({
-        title: "上传失败",
-        description: error instanceof Error ? error.message : "未知错误",
-        variant: "destructive",
-      });
+      // 翼龙面板可能因为 CORS/CSP 问题报错，但上传实际成功
+      // 刷新文件列表检查是否真的失败
+      loadFiles();
+      const errorMsg = error instanceof Error ? error.message : "未知错误";
+      if (errorMsg === "Failed to fetch") {
+        toast({
+          title: "上传可能成功",
+          description: "请检查文件列表确认",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "上传失败",
+          description: errorMsg,
+          variant: "destructive",
+        });
+      }
     } finally {
       setUploading(false);
       e.target.value = "";
