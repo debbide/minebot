@@ -537,7 +537,7 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
   const hasChanges = fileContent !== originalContent;
 
   return (
-    <Card className="w-full h-full flex flex-col border-0 shadow-none">
+    <Card className={`w-full border-0 shadow-none ${compact ? '' : 'h-full flex flex-col'}`}>
       {!compact && (
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -557,7 +557,7 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
         </CardHeader>
       )}
 
-      <CardContent className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+      <CardContent className={`flex flex-col gap-3 ${compact ? 'p-0' : 'flex-1 min-h-0 overflow-hidden'}`}>
         {/* 工具栏 */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1">
