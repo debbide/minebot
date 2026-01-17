@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { WebSocketProvider } from "@/contexts/WebSocketContext";
+import { FileManagerProvider } from "@/contexts/FileManagerContext";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
@@ -29,7 +30,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  return <WebSocketProvider>{children}</WebSocketProvider>;
+  return (
+    <WebSocketProvider>
+      <FileManagerProvider>
+        {children}
+      </FileManagerProvider>
+    </WebSocketProvider>
+  );
 }
 
 // Public route wrapper (redirect to home if already logged in)
