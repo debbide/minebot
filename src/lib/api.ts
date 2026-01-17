@@ -182,6 +182,11 @@ class ApiService {
     return this.request<BotStatus>('/api/status');
   }
 
+  // System memory status
+  async getMemoryStatus(): Promise<{ used: string; total: string; percent: string }> {
+    return this.request('/api/system/memory');
+  }
+
   // Config
   async getConfig(): Promise<Config> {
     return this.request<Config>('/api/config');

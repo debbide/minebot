@@ -1,5 +1,7 @@
-import { Server, Wifi, WifiOff, Users, Box } from "lucide-react";
+import { Server, Wifi, WifiOff, Users, HardDrive } from "lucide-react";
 import { StatusCard } from "./StatusCard";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 interface StatsOverviewProps {
     status: any;
@@ -7,6 +9,33 @@ interface StatsOverviewProps {
 }
 
 export function StatsOverview({ status, connected }: StatsOverviewProps) {
+    const [memory, setMemory] = useState<{ used: string; total: string; percent: string } | null>(null);
+
+    // 获取内存状态
+    useEffect(() => {
+        const fetchMemory = async () => {
+            try {
+                const data = await api.getMemoryStatus();
+                setMemory(data);
+            } catch (error) {
+                console.error('获取内存状态失败:', error);
+            }
+        };
+
+        fetchMemory();
+        const interval = setInterval(fetchMemory, 30000); // 每30秒刷新
+        return () => clearInterval(interval);
+    }, []);
+
+    // 计算所有服务器的总玩家数
+    const totalPlayers = status?.botList?.reduce((sum: number, bot: any) => {
+        return sum + (bot.players?.length || 0);
+    }, 0) || status?.players?.length || 0;
+
+    // 内存状态颜色
+    const memoryPercent = memory ? parseFloat(memory.percent) : 0;
+    const memoryStatus = memoryPercent >= 80 ? "error" : memoryPercent >= 60 ? "warning" : "online";
+
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {/* Connection Status */}
@@ -29,23 +58,23 @@ export function StatsOverview({ status, connected }: StatsOverviewProps) {
                 className="delay-200 animate-in slide-in-from-bottom"
             />
 
-            {/* Server Info */}
+            {/* Memory Status */}
             <StatusCard
-                title="目标服务器"
-                value={status?.serverAddress || '-'}
-                description="正在运行的目标服"
-                icon={Box}
-                status="warning"
+                title="内存监测"
+                value={memory ? `${memory.percent}%` : '-'}
+                description={memory ? `${memory.used} / ${memory.total} MB` : "获取中..."}
+                icon={HardDrive}
+                status={memoryStatus}
                 className="delay-300 animate-in slide-in-from-bottom"
             />
 
-            {/* Player Count */}
+            {/* Total Player Count */}
             <StatusCard
                 title="在线玩家"
-                value={`${status?.players?.length || 0} 人`}
-                description="服务器当前在线人数"
+                value={`${totalPlayers} 人`}
+                description="所有服务器总人数"
                 icon={Users}
-                status="warning"
+                status={totalPlayers > 0 ? "online" : "warning"}
                 className="delay-400 animate-in slide-in-from-bottom"
             />
         </div>

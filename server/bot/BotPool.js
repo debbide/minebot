@@ -228,6 +228,7 @@ export class BotPool {
         connected: b.status.connected,
         serverAddress: b.status.serverAddress || (b.status.serverHost ? `${b.status.serverHost}:${b.status.serverPort}` : ''),
         username: b.status.username,
+        players: b.status.players || [],
         // 面板服务器状态
         panelServerState: b.status.panelServerState || null,
         panelServerStats: b.status.panelServerStats || null,
