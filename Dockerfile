@@ -104,9 +104,9 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 # Expose port
 EXPOSE 3000
 
-# Health check - use /api/auth/check which doesn't require auth
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/auth/check || exit 1
+# Health check - use node for reliability
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD node -e "const http = require('http'); http.get('http://127.0.0.1:3000/api/auth/check', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1));"
 
 # Start the server (use docker restart policy instead of PM2 for ARM compatibility)
 WORKDIR /app/server
