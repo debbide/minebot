@@ -65,9 +65,10 @@ interface FileManagerProps {
   serverId: string;
   serverName: string;
   onClose?: () => void;
+  compact?: boolean; // 标签页模式，不显示头部
 }
 
-export function FileManager({ serverId, serverName, onClose }: FileManagerProps) {
+export function FileManager({ serverId, serverName, onClose, compact = false }: FileManagerProps) {
   const [currentPath, setCurrentPath] = useState("/");
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -536,23 +537,25 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
   const hasChanges = fileContent !== originalContent;
 
   return (
-    <Card className="w-full h-full flex flex-col">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Folder className="h-5 w-5" />
-              文件管理
-            </CardTitle>
-            <CardDescription>{serverName}</CardDescription>
+    <Card className="w-full h-full flex flex-col border-0 shadow-none">
+      {!compact && (
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Folder className="h-5 w-5" />
+                文件管理
+              </CardTitle>
+              <CardDescription>{serverName}</CardDescription>
+            </div>
+            {onClose && (
+              <Button variant="ghost" size="icon" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </CardHeader>
+        </CardHeader>
+      )}
 
       <CardContent className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
         {/* 工具栏 */}
@@ -657,9 +660,8 @@ export function FileManager({ serverId, serverName, onClose }: FileManagerProps)
               files.map((file) => (
                 <div
                   key={file.name}
-                  className={`flex items-center gap-2 px-3 py-2 hover:bg-muted/50 border-b last:border-0 ${
-                    selectedFiles.has(file.name) ? "bg-muted/30" : ""
-                  }`}
+                  className={`flex items-center gap-2 px-3 py-2 hover:bg-muted/50 border-b last:border-0 ${selectedFiles.has(file.name) ? "bg-muted/30" : ""
+                    }`}
                 >
                   <Checkbox
                     checked={selectedFiles.has(file.name)}

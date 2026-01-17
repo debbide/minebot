@@ -537,6 +537,7 @@ export function ServerDetailDialog({
                   <FileManager
                     serverId={server.id}
                     serverName={server.name || server.id}
+                    compact
                   />
                 </div>
               </TabsContent>
