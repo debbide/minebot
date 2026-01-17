@@ -538,15 +538,15 @@ export function ServerDetailDialog({
               </div>
             </TabsContent>
 
-            {/* 文件管理 */}
-            {(server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
-              <TabsContent value="files" className="mt-0 animate-in slide-in-from-bottom-2 duration-300">
+            {/* 文件管理 - 不使用 TabsContent，直接条件渲染 */}
+            {activeTab === 'files' && (server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
+              <div className="animate-in slide-in-from-bottom-2 duration-300">
                 <FileManager
                   serverId={server.id}
                   serverName={server.name || server.id}
                   compact
                 />
-              </TabsContent>
+              </div>
             )}
           </div>
         </Tabs>
