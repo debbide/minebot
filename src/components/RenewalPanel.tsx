@@ -667,8 +667,8 @@ export function RenewalPanel() {
                   <div
                     key={log.id}
                     className={`break-all ${log.type === 'error' ? 'text-red-500' :
-                        log.type === 'success' ? 'text-green-500' :
-                          'text-muted-foreground'
+                      log.type === 'success' ? 'text-green-500' :
+                        'text-muted-foreground'
                       }`}
                   >
                     <span className="text-muted-foreground whitespace-nowrap">[{log.timestamp}]</span>
@@ -816,8 +816,8 @@ export function RenewalPanel() {
                           <div
                             key={log.id}
                             className={`${log.type === 'error' ? 'text-red-500' :
-                                log.type === 'success' ? 'text-green-500' :
-                                  'text-muted-foreground'
+                              log.type === 'success' ? 'text-green-500' :
+                                'text-muted-foreground'
                               }`}
                           >
                             <span className="opacity-60">[{log.timestamp}]</span> {log.message}
