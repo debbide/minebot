@@ -354,288 +354,288 @@ export function RenewalPanel() {
                 日志
               </Button>
               <Dialog open={dialogOpen} onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) {
-                setFormData(defaultFormData);
-                setEditingId(null);
-              }
-            }}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="h-7 px-2">
-                  <Plus className="h-3 w-3 mr-1" />
-                  添加
-                </Button>
-              </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 gap-0">
-              <DialogHeader className="p-6 pb-2">
-                <DialogTitle>{editingId ? "编辑续期" : "添加续期"}</DialogTitle>
-                <DialogDescription>
-                  配置自动续期请求，保持服务器运行
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-                {/* 基本信息 */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>名称</Label>
-                    <Input
-                      placeholder="我的服务器"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>续期间隔</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="number"
-                        min="0"
-                        value={formData.intervalHours}
-                        onChange={(e) => setFormData({ ...formData, intervalHours: parseInt(e.target.value) || 0 })}
-                        className="w-16"
-                      />
-                      <span className="flex items-center text-sm text-muted-foreground">时</span>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="59"
-                        value={formData.intervalMinutes}
-                        onChange={(e) => setFormData({ ...formData, intervalMinutes: parseInt(e.target.value) || 0 })}
-                        className="w-16"
-                      />
-                      <span className="flex items-center text-sm text-muted-foreground">分</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 续期模式选择 */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Settings2 className="h-4 w-4" />
-                    续期模式
-                  </Label>
-                  <Select
-                    value={formData.mode}
-                    onValueChange={(v) => setFormData({ ...formData, mode: v as RenewalMode })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="browserClick">
-                        <div className="flex items-center gap-2">
-                          <MousePointer2 className="h-4 w-4" />
-                          浏览器自动点击（推荐）
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="autoLoginHttp">
-                        <div className="flex items-center gap-2">
-                          <Key className="h-4 w-4" />
-                          自动登录 + HTTP 请求
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="http">
-                        <div className="flex items-center gap-2">
-                          <Cloud className="h-4 w-4" />
-                          纯 HTTP 请求
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {formData.mode === "browserClick" && "使用无头浏览器自动登录并点击续期按钮，最稳定可靠"}
-                    {formData.mode === "autoLoginHttp" && "自动登录获取 Cookie，然后发送 HTTP 请求"}
-                    {formData.mode === "http" && "直接发送 HTTP 请求，需要手动配置 Cookie"}
-                  </p>
-                </div>
-
-                {/* 续期 URL / 续期页面 URL */}
-                <div className="space-y-2">
-                  <Label>
-                    {formData.mode === "browserClick" ? "服务器页面 URL *" : "续期 URL *"}
-                  </Label>
-                  <Input
-                    placeholder={formData.mode === "browserClick"
-                      ? "https://dash.zampto.net/server?id=2574"
-                      : "https://panel.example.com/api/renew"}
-                    value={formData.url}
-                    onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  />
-                  {formData.mode === "browserClick" && (
-                    <p className="text-xs text-muted-foreground">
-                      登录后将导航到此页面，然后点击续期按钮
-                    </p>
-                  )}
-                </div>
-
-                {/* 登录配置（autoLoginHttp 和 browserClick 模式） */}
-                {(formData.mode === "autoLoginHttp" || formData.mode === "browserClick") && (
-                  <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
-                    <Label className="flex items-center gap-2 text-sm font-medium">
-                      <User className="h-4 w-4" />
-                      登录配置
-                    </Label>
-                    <div className="space-y-2">
-                      <Label className="text-xs">登录页面 URL *</Label>
-                      <Input
-                        placeholder="https://auth.example.com/sign-in"
-                        value={formData.loginUrl}
-                        onChange={(e) => setFormData({ ...formData, loginUrl: e.target.value })}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
+                setDialogOpen(open);
+                if (!open) {
+                  setFormData(defaultFormData);
+                  setEditingId(null);
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="h-7 px-2">
+                    <Plus className="h-3 w-3 mr-1" />
+                    添加
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 gap-0">
+                  <DialogHeader className="p-6 pb-2 shrink-0">
+                    <DialogTitle>{editingId ? "编辑续期" : "添加续期"}</DialogTitle>
+                    <DialogDescription>
+                      配置自动续期请求，保持服务器运行
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4 space-y-4">
+                    {/* 基本信息 */}
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-xs">账号 *</Label>
+                        <Label>名称</Label>
                         <Input
-                          placeholder="your@email.com"
-                          value={formData.panelUsername}
-                          onChange={(e) => setFormData({ ...formData, panelUsername: e.target.value })}
+                          placeholder="我的服务器"
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-xs">密码 *</Label>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          value={formData.panelPassword}
-                          onChange={(e) => setFormData({ ...formData, panelPassword: e.target.value })}
-                        />
+                        <Label>续期间隔</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={formData.intervalHours}
+                            onChange={(e) => setFormData({ ...formData, intervalHours: parseInt(e.target.value) || 0 })}
+                            className="w-16"
+                          />
+                          <span className="flex items-center text-sm text-muted-foreground">时</span>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="59"
+                            value={formData.intervalMinutes}
+                            onChange={(e) => setFormData({ ...formData, intervalMinutes: parseInt(e.target.value) || 0 })}
+                            className="w-16"
+                          />
+                          <span className="flex items-center text-sm text-muted-foreground">分</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {/* 浏览器点击配置（browserClick 模式） */}
-                {formData.mode === "browserClick" && (
-                  <div className="space-y-3">
+                    {/* 续期模式选择 */}
                     <div className="space-y-2">
-                      <Label className="text-xs">续期按钮选择器（可选）</Label>
-                      <Input
-                        placeholder="留空自动查找 Renew/续期 按钮"
-                        value={formData.renewButtonSelector}
-                        onChange={(e) => setFormData({ ...formData, renewButtonSelector: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs">浏览器代理（可选）</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="socks5://127.0.0.1:1080"
-                          value={formData.browserProxy}
-                          onChange={(e) => setFormData({ ...formData, browserProxy: e.target.value })}
-                          className="flex-1"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={!formData.browserProxy || loading}
-                          onClick={async () => {
-                            if (!formData.browserProxy) return;
-                            setLoading(true);
-                            try {
-                              const result = await api.testProxy(formData.browserProxy);
-                              if (result.result.success) {
-                                toast({ title: "代理测试成功", description: result.result.message });
-                              } else {
-                                toast({ title: "代理测试失败", description: result.result.message, variant: "destructive" });
-                              }
-                            } catch (error) {
-                              toast({ title: "代理测试失败", description: String(error), variant: "destructive" });
-                            } finally {
-                              setLoading(false);
-                            }
-                          }}
-                        >
-                          {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <TestTube className="h-3 w-3" />}
-                          <span className="ml-1">测试</span>
-                        </Button>
-                      </div>
+                      <Label className="flex items-center gap-2">
+                        <Settings2 className="h-4 w-4" />
+                        续期模式
+                      </Label>
+                      <Select
+                        value={formData.mode}
+                        onValueChange={(v) => setFormData({ ...formData, mode: v as RenewalMode })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="browserClick">
+                            <div className="flex items-center gap-2">
+                              <MousePointer2 className="h-4 w-4" />
+                              浏览器自动点击（推荐）
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="autoLoginHttp">
+                            <div className="flex items-center gap-2">
+                              <Key className="h-4 w-4" />
+                              自动登录 + HTTP 请求
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="http">
+                            <div className="flex items-center gap-2">
+                              <Cloud className="h-4 w-4" />
+                              纯 HTTP 请求
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                       <p className="text-xs text-muted-foreground">
-                        支持 HTTP/HTTPS/SOCKS4/SOCKS5 代理，如需使用 hy2 请先配置本地代理客户端
+                        {formData.mode === "browserClick" && "使用无头浏览器自动登录并点击续期按钮，最稳定可靠"}
+                        {formData.mode === "autoLoginHttp" && "自动登录获取 Cookie，然后发送 HTTP 请求"}
+                        {formData.mode === "http" && "直接发送 HTTP 请求，需要手动配置 Cookie"}
                       </p>
                     </div>
-                  </div>
-                )}
 
-                {/* HTTP 模式配置 */}
-                {(formData.mode === "http" || formData.mode === "autoLoginHttp") && (
-                  <Collapsible>
-                    <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-                      <ChevronDown className="h-4 w-4" />
-                      HTTP 请求配置
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-3 pt-3">
-                      <div className="grid grid-cols-2 gap-4">
+                    {/* 续期 URL / 续期页面 URL */}
+                    <div className="space-y-2">
+                      <Label>
+                        {formData.mode === "browserClick" ? "服务器页面 URL *" : "续期 URL *"}
+                      </Label>
+                      <Input
+                        placeholder={formData.mode === "browserClick"
+                          ? "https://dash.zampto.net/server?id=2574"
+                          : "https://panel.example.com/api/renew"}
+                        value={formData.url}
+                        onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                      />
+                      {formData.mode === "browserClick" && (
+                        <p className="text-xs text-muted-foreground">
+                          登录后将导航到此页面，然后点击续期按钮
+                        </p>
+                      )}
+                    </div>
+
+                    {/* 登录配置（autoLoginHttp 和 browserClick 模式） */}
+                    {(formData.mode === "autoLoginHttp" || formData.mode === "browserClick") && (
+                      <div className="space-y-3 p-3 rounded-lg border bg-muted/30">
+                        <Label className="flex items-center gap-2 text-sm font-medium">
+                          <User className="h-4 w-4" />
+                          登录配置
+                        </Label>
                         <div className="space-y-2">
-                          <Label className="text-xs">请求方法</Label>
-                          <Select
-                            value={formData.method}
-                            onValueChange={(v) => setFormData({ ...formData, method: v as "GET" | "POST" })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="GET">GET</SelectItem>
-                              <SelectItem value="POST">POST</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs">CF 代理</Label>
-                            <Switch
-                              checked={formData.useProxy}
-                              onCheckedChange={(checked) => setFormData({ ...formData, useProxy: checked })}
-                            />
-                          </div>
-                          {formData.useProxy && (
-                            <Input
-                              placeholder="https://your-worker.workers.dev"
-                              value={formData.proxyUrl}
-                              onChange={(e) => setFormData({ ...formData, proxyUrl: e.target.value })}
-                            />
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">请求头 (JSON 格式)</Label>
-                        <Textarea
-                          placeholder={'{\n  "Cookie": "session=xxx"\n}'}
-                          value={formData.headers}
-                          onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
-                          rows={3}
-                          className="font-mono text-xs"
-                        />
-                      </div>
-                      {formData.method === "POST" && (
-                        <div className="space-y-2">
-                          <Label className="text-xs">请求体</Label>
-                          <Textarea
-                            placeholder='{"action": "renew"}'
-                            value={formData.body}
-                            onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                            rows={2}
-                            className="font-mono text-xs"
+                          <Label className="text-xs">登录页面 URL *</Label>
+                          <Input
+                            placeholder="https://auth.example.com/sign-in"
+                            value={formData.loginUrl}
+                            onChange={(e) => setFormData({ ...formData, loginUrl: e.target.value })}
                           />
                         </div>
-                      )}
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-              </div>
-              <DialogFooter className="p-6 pt-2">
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  取消
-                </Button>
-                <Button onClick={handleSubmit} disabled={loading}>
-                  {loading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-                  {editingId ? "保存" : "添加"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs">账号 *</Label>
+                            <Input
+                              placeholder="your@email.com"
+                              value={formData.panelUsername}
+                              onChange={(e) => setFormData({ ...formData, panelUsername: e.target.value })}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">密码 *</Label>
+                            <Input
+                              type="password"
+                              placeholder="••••••••"
+                              value={formData.panelPassword}
+                              onChange={(e) => setFormData({ ...formData, panelPassword: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 浏览器点击配置（browserClick 模式） */}
+                    {formData.mode === "browserClick" && (
+                      <div className="space-y-3">
+                        <div className="space-y-2">
+                          <Label className="text-xs">续期按钮选择器（可选）</Label>
+                          <Input
+                            placeholder="留空自动查找 Renew/续期 按钮"
+                            value={formData.renewButtonSelector}
+                            onChange={(e) => setFormData({ ...formData, renewButtonSelector: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">浏览器代理（可选）</Label>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="socks5://127.0.0.1:1080"
+                              value={formData.browserProxy}
+                              onChange={(e) => setFormData({ ...formData, browserProxy: e.target.value })}
+                              className="flex-1"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={!formData.browserProxy || loading}
+                              onClick={async () => {
+                                if (!formData.browserProxy) return;
+                                setLoading(true);
+                                try {
+                                  const result = await api.testProxy(formData.browserProxy);
+                                  if (result.result.success) {
+                                    toast({ title: "代理测试成功", description: result.result.message });
+                                  } else {
+                                    toast({ title: "代理测试失败", description: result.result.message, variant: "destructive" });
+                                  }
+                                } catch (error) {
+                                  toast({ title: "代理测试失败", description: String(error), variant: "destructive" });
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }}
+                            >
+                              {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <TestTube className="h-3 w-3" />}
+                              <span className="ml-1">测试</span>
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            支持 HTTP/HTTPS/SOCKS4/SOCKS5 代理，如需使用 hy2 请先配置本地代理客户端
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* HTTP 模式配置 */}
+                    {(formData.mode === "http" || formData.mode === "autoLoginHttp") && (
+                      <Collapsible>
+                        <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                          <ChevronDown className="h-4 w-4" />
+                          HTTP 请求配置
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-3 pt-3">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label className="text-xs">请求方法</Label>
+                              <Select
+                                value={formData.method}
+                                onValueChange={(v) => setFormData({ ...formData, method: v as "GET" | "POST" })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="GET">GET</SelectItem>
+                                  <SelectItem value="POST">POST</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Label className="text-xs">CF 代理</Label>
+                                <Switch
+                                  checked={formData.useProxy}
+                                  onCheckedChange={(checked) => setFormData({ ...formData, useProxy: checked })}
+                                />
+                              </div>
+                              {formData.useProxy && (
+                                <Input
+                                  placeholder="https://your-worker.workers.dev"
+                                  value={formData.proxyUrl}
+                                  onChange={(e) => setFormData({ ...formData, proxyUrl: e.target.value })}
+                                />
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs">请求头 (JSON 格式)</Label>
+                            <Textarea
+                              placeholder={'{\n  "Cookie": "session=xxx"\n}'}
+                              value={formData.headers}
+                              onChange={(e) => setFormData({ ...formData, headers: e.target.value })}
+                              rows={3}
+                              className="font-mono text-xs"
+                            />
+                          </div>
+                          {formData.method === "POST" && (
+                            <div className="space-y-2">
+                              <Label className="text-xs">请求体</Label>
+                              <Textarea
+                                placeholder='{"action": "renew"}'
+                                value={formData.body}
+                                onChange={(e) => setFormData({ ...formData, body: e.target.value })}
+                                rows={2}
+                                className="font-mono text-xs"
+                              />
+                            </div>
+                          )}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+                  </div>
+                  <DialogFooter className="p-6 pt-2">
+                    <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                      取消
+                    </Button>
+                    <Button onClick={handleSubmit} disabled={loading}>
+                      {loading && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                      {editingId ? "保存" : "添加"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
@@ -666,11 +666,10 @@ export function RenewalPanel() {
                 globalLogs.slice().reverse().map((log) => (
                   <div
                     key={log.id}
-                    className={`break-all ${
-                      log.type === 'error' ? 'text-red-500' :
-                      log.type === 'success' ? 'text-green-500' :
-                      'text-muted-foreground'
-                    }`}
+                    className={`break-all ${log.type === 'error' ? 'text-red-500' :
+                        log.type === 'success' ? 'text-green-500' :
+                          'text-muted-foreground'
+                      }`}
                   >
                     <span className="text-muted-foreground whitespace-nowrap">[{log.timestamp}]</span>
                     {log.renewalId && <span className="text-blue-500 whitespace-nowrap"> [{log.renewalId.substring(0, 15)}...]</span>}
@@ -696,9 +695,8 @@ export function RenewalPanel() {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <div
-                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                        renewal.running ? "bg-green-500 animate-pulse" : "bg-gray-400"
-                      }`}
+                      className={`w-2 h-2 rounded-full flex-shrink-0 ${renewal.running ? "bg-green-500 animate-pulse" : "bg-gray-400"
+                        }`}
                     />
                     <div className="min-w-0">
                       <div className="font-medium text-sm truncate">{renewal.name}</div>
@@ -750,9 +748,8 @@ export function RenewalPanel() {
                     <CollapsibleTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-7 w-7">
                         <ChevronDown
-                          className={`h-3.5 w-3.5 transition-transform ${
-                            expandedId === renewal.id ? "rotate-180" : ""
-                          }`}
+                          className={`h-3.5 w-3.5 transition-transform ${expandedId === renewal.id ? "rotate-180" : ""
+                            }`}
                         />
                       </Button>
                     </CollapsibleTrigger>
@@ -768,7 +765,7 @@ export function RenewalPanel() {
                       {(() => {
                         const mode = (renewal as any).mode ||
                           ((renewal as any).useBrowserClick && (renewal as any).autoLogin ? 'browserClick' :
-                           (renewal as any).autoLogin ? 'autoLoginHttp' : 'http');
+                            (renewal as any).autoLogin ? 'autoLoginHttp' : 'http');
                         return (
                           <>
                             {mode === 'browserClick' && <><MousePointer2 className="h-4 w-4" />浏览器点击</>}
@@ -818,11 +815,10 @@ export function RenewalPanel() {
                         renewalLogs[renewal.id].slice().reverse().map((log) => (
                           <div
                             key={log.id}
-                            className={`${
-                              log.type === 'error' ? 'text-red-500' :
-                              log.type === 'success' ? 'text-green-500' :
-                              'text-muted-foreground'
-                            }`}
+                            className={`${log.type === 'error' ? 'text-red-500' :
+                                log.type === 'success' ? 'text-green-500' :
+                                  'text-muted-foreground'
+                              }`}
                           >
                             <span className="opacity-60">[{log.timestamp}]</span> {log.message}
                           </div>
