@@ -625,7 +625,6 @@ export function RenewalPanel() {
                   </Collapsible>
                 )}
               </div>
-              </div >
               <DialogFooter className="p-6 pt-2">
                 <Button variant="outline" onClick={() => setDialogOpen(false)}>
                   取消
