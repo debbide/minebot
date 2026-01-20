@@ -1863,13 +1863,30 @@ export class RenewalService {
           // 检查是否存在未完成的验证弹窗
           // [修正] 移除 'Renew Server' 纯文本匹配，因为它可能是页面标题或按钮文字，导致永远无法跳出循环
           // 只匹配明确表示"正在进行"的状态
-          const isVerifying = content.includes('正在验证') ||
-            content.includes('checking your browser') ||
-            content.includes('Just a moment') ||
+          let isVerifying = false;
+          // 检查是否处于验证中
+          if (
+            content.includes('Verification required') ||
             content.includes('Verify you are human') ||
             content.includes('security verification') ||
-            (content.includes('Renew Server') && content.includes('Cancel')); // 只有当模态框出现（带Cancel按钮）时才算验证中
+            content.includes('challenges.cloudflare.com') ||
+            (content.includes('Renew Server') && content.includes('Cancel')) // 可能是模态框
+          ) {
+            isVerifying = true;
 
+            // 如果启用了验证码插件，交给插件处理，不再手动点击
+            if (this.useCaptcha && this.captchaKey) {
+              this.log('info', '检测到验证码，等待插件自动解决...', id);
+              // 我们仍然可以检查 iframe 是否存在来确认状态，但不要去点击
+              // 简单的等待
+              await this.delay(2000);
+            } else {
+              // 未启用插件，尝试手动处理
+              await this.handleTurnstile(page, id);
+            }
+          } else {
+            isVerifying = false;
+          }
           // 如果没有检测到正在验证，且也没有检测到 explicit success/error，我们假设交互可能已经结束
           if (!isVerifying) {
             this.log('info', '未检测到验证/加载状态 (如 "Verify you are human")，继续检查结果...', id);
