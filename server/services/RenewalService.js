@@ -1766,7 +1766,10 @@ export class RenewalService {
           this.log('info', `已保存成功截图: ${screenshotPath}`, id);
 
           // 将截图路径添加到结果中，以便前端可能显示 (可选)
-          result.screenshot = screenshotPath;
+          const screenshotFilename = path.basename(screenshotPath);
+          result.screenshotUrl = `/api/screenshots/${screenshotFilename}`;
+
+          this.log('info', `截图已就绪: ${result.screenshotUrl}`, id);
         } catch (e) {
           this.log('warning', `保存截图失败: ${e.message}`, id);
         }

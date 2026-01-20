@@ -838,6 +838,18 @@ export function RenewalPanel() {
                         </div>
                       </div>
                     )}
+                    {(renewal.lastResult as any)?.screenshotUrl && (
+                      <div className="col-span-2">
+                        <div className="text-xs text-muted-foreground mb-1">截图证据:</div>
+                        <a href={(renewal.lastResult as any).screenshotUrl} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={(renewal.lastResult as any).screenshotUrl}
+                            alt="Renewal Screenshot"
+                            className="max-h-32 rounded border hover:opacity-90 transition-opacity"
+                          />
+                        </a>
+                      </div>
+                    )}
                   </div>
                   {/* 单独的日志面板 */}
                   <div className="mt-3 p-2 rounded border bg-muted/30">

@@ -46,17 +46,17 @@ const originalLog = console.log;
 const originalError = console.error;
 const originalWarn = console.warn;
 
-console.log = function(...args) {
+console.log = function (...args) {
   const maskedArgs = args.map(arg => maskSensitiveData(String(arg)));
   originalLog.apply(console, maskedArgs);
 };
 
-console.error = function(...args) {
+console.error = function (...args) {
   const maskedArgs = args.map(arg => maskSensitiveData(String(arg)));
   originalError.apply(console, maskedArgs);
 };
 
-console.warn = function(...args) {
+console.warn = function (...args) {
   const maskedArgs = args.map(arg => maskSensitiveData(String(arg)));
   originalWarn.apply(console, maskedArgs);
 };
@@ -224,6 +224,8 @@ app.use('/api', (req, res, next) => {
 
 // Serve static files
 app.use(express.static(join(__dirname, '../dist')));
+// Serve screenshots
+app.use('/api/screenshots', express.static(join(process.cwd(), 'data', 'screenshots')));
 
 // WebSocket connections
 const clients = new Set();
