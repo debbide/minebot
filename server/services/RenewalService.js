@@ -2132,50 +2132,81 @@ export class RenewalService {
     try {
       this.log('info', '检查是否存在 Turnstile 验证...', id);
 
-      // 调试：打印所有 iframe
+      // 策略：通过 page.frames() 找到目标 Frame，然后找到其对应的 iframe 元素
       const frames = page.frames();
-      const frameUrls = frames.map(f => f.url());
-      if (frameUrls.some(u => u.includes('cloudflare') || u.includes('turnstile'))) {
-        this.log('info', `发现相关 iframe: ${frameUrls.filter(u => u.includes('cloudflare') || u.includes('turnstile')).join(', ')}`, id);
-      }
+      const targetFrame = frames.find(f => f.url().includes('challenges.cloudflare.com') || f.url().includes('turnstile'));
 
-      // 尝试1: 标准选择器
-      let iframeSelector = 'iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]';
-      let iframeElement = await page.$(iframeSelector);
+      let iframeElement = null;
 
-      // 尝试2: 深度遍历 Shadow DOM 查找
-      if (!iframeElement) {
-        this.log('info', '标准选择器未找到，尝试深度遍历 Shadow DOM...', id);
+      if (targetFrame) {
+        this.log('info', `找到 Turnstile Frame: ${targetFrame.url().substring(0, 50)}...`, id);
         try {
-          const handle = await page.evaluateHandle(() => {
-            function findIframe(root) {
-              // 1. 检查当前 root 下的 iframe
-              const iframes = root.querySelectorAll('iframe');
-              for (const iframe of iframes) {
-                if (iframe.src.includes('challenges.cloudflare.com') || iframe.src.includes('turnstile')) {
-                  return iframe;
-                }
-              }
+          // 找到父 Frame
+          const parentFrame = targetFrame.parentFrame();
+          if (parentFrame) {
+            // 在父 Frame 中查找 src 匹配的 iframe 标签
+            // 注意：src 可能不完全匹配（如 url 编码差异），使用 includes
+            iframeElement = await parentFrame.$(`iframe[src*="${targetFrame.url().split('?')[0]}"]`);
 
-              // 2. 遍历所有子元素的 shadowRoot
-              const items = root.querySelectorAll('*');
-              for (const item of items) {
-                if (item.shadowRoot) {
-                  const found = findIframe(item.shadowRoot);
-                  if (found) return found;
+            if (!iframeElement) {
+              // 尝试更宽泛的搜索，遍历父 frame 所有 iframe
+              const childFrames = await parentFrame.$$('iframe');
+              for (const cf of childFrames) {
+                const src = await parentFrame.evaluate(el => el.src, cf);
+                if (src && targetFrame.url().includes(src.split('?')[0])) {
+                  iframeElement = cf;
+                  break;
                 }
               }
-              return null;
             }
-            return findIframe(document);
-          });
-
-          if (handle.asElement()) {
-            iframeElement = handle.asElement();
-            this.log('info', '通过 Shadow DOM 深度搜索找到 iframe!', id);
+          } else {
+            // 说明 targetFrame 就是 main frame? 不太可能
+            this.log('warning', 'Turnstile Frame 没有父 Frame?', id);
           }
         } catch (e) {
-          this.log('warning', `Shadow DOM 搜索出错: ${e.message}`, id);
+          this.log('warning', `查找 Frame 对应元素失败: ${e.message}`, id);
+        }
+      }
+
+      if (!iframeElement) {
+        // 回退到之前的深度搜索逻辑 (作为兜底)
+        const iframeSelector = 'iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]';
+        iframeElement = await page.$(iframeSelector);
+
+        if (!iframeElement) {
+          // ... 原有的 Shadow DOM 搜索逻辑可以保留一部分，或简化 ...
+          this.log('info', '标准选择器未找到，尝试深度遍历 Shadow DOM...', id);
+          try {
+            const handle = await page.evaluateHandle(() => {
+              function findIframe(root) {
+                // 1. 检查当前 root 下的 iframe
+                const iframes = root.querySelectorAll('iframe');
+                for (const iframe of iframes) {
+                  if (iframe.src.includes('challenges.cloudflare.com') || iframe.src.includes('turnstile')) {
+                    return iframe;
+                  }
+                }
+
+                // 2. 遍历所有子元素的 shadowRoot
+                const items = root.querySelectorAll('*');
+                for (const item of items) {
+                  if (item.shadowRoot) {
+                    const found = findIframe(item.shadowRoot);
+                    if (found) return found;
+                  }
+                }
+                return null;
+              }
+              return findIframe(document);
+            });
+
+            if (handle.asElement()) {
+              iframeElement = handle.asElement();
+              this.log('info', '通过 Shadow DOM 深度搜索找到 iframe!', id);
+            }
+          } catch (e) {
+            this.log('warning', `Shadow DOM 搜索出错: ${e.message}`, id);
+          }
         }
       }
 
@@ -2190,15 +2221,19 @@ export class RenewalService {
         return;
       }
 
-      // 既然找到了 Element，就不需要再 wait 了，直接处理
+      // 既然找到了 Element，就直接处理
       this.log('info', '检测到 Turnstile 验证框，尝试自动点击...', id);
 
       // 获取 iframe 的位置和大小
       const boundingBox = await iframeElement.boundingBox();
       if (!boundingBox) {
-        this.log('warning', '无法获取 Turnstile 验证框位置', id);
+        this.log('warning', '无法获取 Turnstile 验证框位置 (boundingBox null)', id);
         return;
       }
+
+      // 注意：如果是在嵌套 iframe 中，boundingBox 是相对于 viewport 还是 parent frame?
+      // Puppeteer ElementHandle.boundingBox() 返回相对于 main frame viewport 的坐标 (通常)
+      // 如果它在 iframe 里，Puppeteer 会自动计算叠加坐标，除非跨域限制导致无法计算。
 
       // 计算中心点坐标
       const x = boundingBox.x + boundingBox.width / 2;
@@ -2215,15 +2250,21 @@ export class RenewalService {
         await this.delay(100 + Math.random() * 150);
         await page.mouse.up();
 
-        // 如果有 offset，尝试点击左侧复选框区域 (通常在左侧)
-        // 很多时候 Turnstile 是一个长条，checkbox 在左边
-        await this.delay(500);
-        const checkboxX = x - boundingBox.width / 2 + 30; // 假设左边距 30px
-        await page.mouse.move(checkboxX, y, { steps: 10 });
-        await this.delay(100);
-        await page.mouse.click(checkboxX, y);
+        // 尝试点击左侧 (checkbox 通常位置)
+        // 很多时候 Turnstile 是一个长条，checkbox 在左边，大概 30px 处
+        if (boundingBox.width > 100) {
+          await this.delay(500);
+          const checkboxX = boundingBox.x + 30;
+          const checkboxY = y;
+          await page.mouse.move(checkboxX, checkboxY, { steps: 10 });
+          await this.delay(100);
+          await page.mouse.down();
+          await this.delay(50);
+          await page.mouse.up();
+          this.log('info', '已尝试点击左侧 Checkbox 区域', id);
+        }
 
-        this.log('info', '点击动作已完成 (尝试了中心和左侧)，等待验证结果...', id);
+        this.log('info', '点击动作已完成，等待验证结果...', id);
 
 
         // 点击后等待一段时间，让验证生效
