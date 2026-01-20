@@ -1054,7 +1054,29 @@ export class RenewalService {
       // ========== 登录部分 - 复用 autoLoginAndGetCookies 的逻辑 ==========
       // 访问登录页面，等待 Cloudflare 5秒盾
       this.log('info', `访问登录页面: ${loginUrl}`, id);
-      await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+
+      // 增加重试逻辑，应对 net::ERR_NETWORK_CHANGED 等网络波动
+      let connectAttempts = 0;
+      const maxConnectAttempts = 3;
+
+      while (connectAttempts < maxConnectAttempts) {
+        try {
+          await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+          break; // 成功则跳出循环
+        } catch (e) {
+          connectAttempts++;
+          const isNetworkError = e.message.includes('ERR_NETWORK_CHANGED') ||
+            e.message.includes('ERR_CONNECTION_RESET') ||
+            e.message.includes('ERR_NAME_NOT_RESOLVED');
+
+          if (connectAttempts >= maxConnectAttempts) {
+            throw e; // 重试耗尽，抛出错误
+          }
+
+          this.log('warning', `访问页面失败 (${connectAttempts}/${maxConnectAttempts}): ${e.message}，3秒后重试...`, id);
+          await this.delay(3000);
+        }
+      }
 
       // 等待页面加载完成（可能需要通过 5 秒盾）
       await this.delay(3000);
