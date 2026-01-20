@@ -407,19 +407,28 @@ export class RenewalService {
       }
     }
 
-    // [配置] 加载本地自动化插件 (FreeGameHost 自动续期 - 包含 Turnstile 验证)
-    const extPath = 'e:\\ck\\docker\\freegamehost\\chrome-extension';
-
     const commonArgs = [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-accelerated-2d-canvas',
       '--disable-gpu',
-      '--window-size=1920,1080',
-      `--disable-extensions-except=${extPath}`,
-      `--load-extension=${extPath}`
+      '--window-size=1920,1080'
     ];
+
+    // [配置] 如果启用插件且提供了Key，加载 NopeCHA
+    // 原来的 FreeGameHost 插件路径: 'e:\\ck\\docker\\freegamehost\\chrome-extension'
+    // 新的 NopeCHA 插件路径: 'e:\\ck\\docker\\chromium_automation'
+
+    if (useExtension && extensionKey) {
+      // 尝试更新 Manifest
+      this.updateExtensionManifest(extensionKey);
+
+      const extPath = 'e:\\ck\\docker\\chromium_automation';
+      commonArgs.push(`--disable-extensions-except=${extPath}`);
+      commonArgs.push(`--load-extension=${extPath}`);
+      this.log('info', '已启用验证码破解插件');
+    }
 
     // 如果指定了代理，每次都创建新的浏览器实例
     if (actualProxyUrl) {
@@ -1036,10 +1045,31 @@ export class RenewalService {
   }
 
   /**
+   * 解析 Cookie 字符串为对象数组
+   */
+  parseCookieString(cookieString, domain) {
+    if (!cookieString) return [];
+    return cookieString.split(';').map(pair => {
+      const [name, ...valueParts] = pair.trim().split('=');
+      if (!name) return null;
+      return {
+        name: name.trim(),
+        value: valueParts.join('=').trim(),
+        domain: domain,
+        path: '/',
+      };
+    }).filter(c => c !== null);
+  }
+
+  /**
    * 使用浏览器点击续期按钮
    */
-  async browserClickRenew(renewal) {
+  async browserClickRenew(renewal, options = {}) {
     const { id, url, renewButtonSelector, loginUrl, panelUsername, panelPassword, browserProxy, closeBrowser, afkMode, clickWaitTime } = renewal;
+
+    // 获取 captcha 设置 (优先使用 option, 其次使用 renewal 配置)
+    const useCaptcha = options.captcha?.enabled ?? renewal.captcha?.enabled;
+    const captchaKey = options.captcha?.key || renewal.captcha?.key;
 
     if (!loginUrl || !panelUsername || !panelPassword) {
       throw new Error('浏览器点击续期需要配置登录URL、账号和密码');
@@ -1048,7 +1078,8 @@ export class RenewalService {
     this.log('info', `开始浏览器点击续期...${browserProxy ? ` (代理: ${browserProxy})` : ''}`, id);
 
     // 如果有代理，创建独立的浏览器实例
-    const browser = await this.getBrowser(browserProxy || null);
+    // 传入验证码插件配置
+    const browser = await this.getBrowser(browserProxy || null, useCaptcha, captchaKey);
     const isProxyBrowser = !!browserProxy;
 
     let page;
@@ -1093,6 +1124,25 @@ export class RenewalService {
       const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
       this.log('info', `使用 User-Agent: ${userAgent}`, id);
       await page.setUserAgent(userAgent);
+
+      // 如果有手动配置的 Cookie，注入它 (优先级高)
+      if (renewal.manualCookies) {
+        let domain = '';
+        try {
+          const urlObj = new URL(url);
+          domain = urlObj.hostname;
+        } catch (e) {
+          this.log('warning', `无法解析 URL 获取域名: ${url}`, id);
+        }
+
+        if (domain) {
+          const cookies = this.parseCookieString(renewal.manualCookies, domain);
+          if (cookies.length > 0) {
+            this.log('info', `注入手动配置的 Cookie (${cookies.length} 个)...`, id);
+            await page.setCookie(...cookies);
+          }
+        }
+      }
 
       // 尝试恢复 Cookies
       const savedCookies = this.cookies.get(id);
@@ -2031,7 +2081,7 @@ export class RenewalService {
   /**
    * 执行续期请求
    */
-  async executeRenewal(id, retryWithLogin = true) {
+  async executeRenewal(id, options = {}, retryWithLogin = true) {
     const renewal = this.getRenewal(id);
     if (!renewal) {
       this.log('error', `续期配置不存在`, id);
@@ -2051,7 +2101,7 @@ export class RenewalService {
     // 模式1: 浏览器自动点击
     if (mode === 'browserClick') {
       this.log('info', '使用浏览器自动点击模式...', id);
-      const result = await this.browserClickRenew(renewal);
+      const result = await this.browserClickRenew(renewal, options);
       this.updateRenewalResult(id, result);
       this.broadcast('renewalResult', { id, result });
       return result;
@@ -2209,8 +2259,11 @@ export class RenewalService {
   /**
    * 手动测试续期
    */
-  async testRenewal(id) {
-    return this.executeRenewal(id);
+  /**
+   * 手动测试续期
+   */
+  async testRenewal(id, options = {}) {
+    return this.executeRenewal(id, options);
   }
 
   /**

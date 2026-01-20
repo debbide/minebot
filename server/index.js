@@ -287,6 +287,20 @@ app.get('/api/status', (req, res) => {
   res.json(botManager.getStatus());
 });
 
+// Check captcha balance
+app.post('/api/captcha/balance', async (req, res) => {
+  try {
+    const { key } = req.body;
+    if (!key) {
+      return res.status(400).json({ error: 'API Key is required' });
+    }
+    const balance = await renewalService.checkNopechaBalance(key);
+    res.json(balance);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get all configuration
 app.get('/api/config', (req, res) => {
   res.json(configManager.getConfig());
@@ -967,7 +981,7 @@ app.delete('/api/renewals/:id', (req, res) => {
 // 测试续期
 app.post('/api/renewals/:id/test', async (req, res) => {
   try {
-    const result = await renewalService.testRenewal(req.params.id);
+    const result = await renewalService.testRenewal(req.params.id, req.body);
     res.json({ success: true, result });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
