@@ -1928,117 +1928,114 @@ export class RenewalService {
       // 检查结果
       // 检查结果 - 使用 visible text 而不是 HTML source，避免匹配到 class="btn-success" 等
       const bodyText = await page.evaluate(() => document.body.innerText);
-      const lowerText = bodyText.toLowerCase();
-
       const finalUrl = page.url();
       this.log('info', `续期后页面 URL: ${finalUrl}`, id);
 
-      // 成功判定：检查可见文本中的关键词
-      // [修正] 移除 'renewed' 这种容易误判的通用词 (如 "Last renewed at...")
-      // 只保留明确的成功提示词
-      const successKeywords = ['server renewed', 'successfully renewed', 'success', '成功', '已续期', '已延长'];
-      const errorKeywords = ['failed', 'error', '失败', '错误', 'wrong', 'incorrect'];
-
       // 检查是否有明确的成功提示元素 (Alerts, Toasts)
-      const hasSuccessElement = await page.evaluate(() => {
-        const successSelectors = [
-          '.alert-success',
-          '.toast-success',
-          '.text-success',
-          '[class*="success"]', // 宽泛匹配 class 包含 success 的可见元素
-          '.swal2-success' // SweetAlert2
+      const visibleAlerts = await page.evaluate(() => {
+        const selectors = [
+          '.alert',
+          '.toast',
+          '.notification',
+          '[class*="alert"]',
+          '[class*="toast"]',
+          '[class*="message"]',
+          '.swal2-container'
         ];
 
-        for (const selector of successSelectors) {
+        const results = [];
+        for (const selector of selectors) {
           const els = document.querySelectorAll(selector);
           for (const el of els) {
-            // 必须是可见的，并且包含相关文字
-            if (el.offsetParent !== null && (el.innerText.toLowerCase().includes('success') || el.innerText.includes('成功'))) {
-              return true;
+            if (el.offsetParent !== null && el.innerText.trim()) {
+              results.push(el.innerText.trim());
             }
           }
         }
-        return false;
+        return results;
       });
 
-      let success = hasSuccessElement;
-
-      // 如果没有找到明确的元素，检查文本
-      if (!success) {
-        // [修正] 只有当没有发生点击错误时，才尝试宽泛文本匹配
-        // 如果刚才的 try-catch 捕获了错误 (如超时)，则不应依赖文本猜测
-        if (!clickError) {
-          success = successKeywords.some(kw => lowerText.includes(kw.toLowerCase()));
-        }
+      if (visibleAlerts.length > 0) {
+        this.log('info', `检测到页面提示: ${visibleAlerts.join(' | ')}`, id);
       }
 
-      const hasError = errorKeywords.some(kw => lowerText.includes(kw.toLowerCase()));
+      let success = false;
 
-      // 二次确认：如果有 error 关键字，即使有 success 也认为是失败
-      if (hasError) {
-        success = false;
-        this.log('warning', '检测到错误关键词，标记为失败', id);
+      // 1. 检查提示内容是否包含成功关键词
+      const successKeywords = ['server renewed', 'successfully renewed', 'success', '成功', '已续期', '已延长', 'expiration', 'extended'];
+      const hasSuccessKeyword = visibleAlerts.some(text =>
+        successKeywords.some(kw => text.toLowerCase().includes(kw.toLowerCase()))
+      );
+
+      // 2. 检查页面文本是否包含关键词 (如果没有找到明确的 Alert)
+      const bodyText = await page.evaluate(() => document.body.innerText);
+      const lowerText = bodyText.toLowerCase();
+      const hasBodySuccess = successKeywords.some(kw => lowerText.includes(kw.toLowerCase()));
+
+      // 3. 检查是否有错误关键词
+      const errorKeywords = ['failed', 'error', '失败', '错误', 'wrong', 'incorrect', 'went wrong'];
+      const hasError = visibleAlerts.some(text =>
+        errorKeywords.some(kw => text.toLowerCase().includes(kw.toLowerCase()))
+      ) || errorKeywords.some(kw => lowerText.includes(kw.toLowerCase()));
+
+      if (hasSuccessKeyword) {
+        success = true;
+      } else if (!hasError && hasBodySuccess) {
+        // 如果 body 有成功词且没错误词，也算成功
+        success = true;
       }
 
       // [新增] 如果点击过程报错(如超时)且没有明确的成功元素显示，强制判负
-      if (clickError && !hasSuccessElement) {
+      if (clickError && !success) {
         success = false;
         this.log('warning', `点击过程异常 (${clickError ? clickError.message : 'unknown'})，且未检测到成功元素，标记为失败`, id);
       }
 
       const result = {
-        success: !hasError && success, // 只有 success 为 true 且 no error 才是 true
-        message: success ? '续期成功' : (hasError ? '续期可能失败' : '已点击续期按钮'),
-        response: success ? '检测到成功提示' : (hasError ? '检测到错误提示' : '已执行点击操作'),
+        success: !hasError && success,
+        message: success ? '续期成功' : (hasError ? '续期可能失败' : '已点击续期按钮(结果未知)'),
+        response: visibleAlerts.length > 0 ? visibleAlerts.join(', ') : (success ? '检测到成功关键词' : '未检测到明确结果'),
         timestamp: new Date().toISOString()
       };
 
-      if (success) {
-        this.log('success', '续期成功', id);
-
-        // 截图保存证据
+      // 截图保存证据 (无论是成功还是未知结果，都截图以便分析)
+      if (success || !hasError) {
         try {
           if (!fs.existsSync(SCREENSHOT_DIR)) {
             fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
           }
           const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const screenshotPath = path.join(SCREENSHOT_DIR, `success-${id}-${timestamp}.png`);
+          const type = success ? 'success' : 'ambiguous';
+          const screenshotPath = path.join(SCREENSHOT_DIR, `${type}-${id}-${timestamp}.png`);
           await page.screenshot({ path: screenshotPath, fullPage: true });
-          this.log('info', `已保存成功截图: ${screenshotPath}`, id);
+          this.log('info', `已保存${success ? '成功' : '状态'}截图: ${screenshotPath}`, id);
 
-          // 将截图路径添加到结果中，以便前端可能显示 (可选)
           const screenshotFilename = path.basename(screenshotPath);
           result.screenshotUrl = `/api/screenshots/${screenshotFilename}`;
 
-          this.log('info', `截图已就绪: ${result.screenshotUrl}`, id);
+          if (success) {
+            this.log('success', '续期成功', id);
+            // 成功后保存最新的 Cookie
+            try {
+              const currentCookies = await page.cookies();
+              if (currentCookies && currentCookies.length > 0) {
+                this.cookies.set(id, currentCookies);
+                this.saveCookiesToDisk();
+                this.log('info', '已更新并保存 Cookie', id);
+              }
+            } catch (e) {
+              this.log('warning', `保存 Cookie 失败: ${e.message}`, id);
+            }
+          } else {
+            this.log('warning', '已点击，但未检测到明确成功/失败信号，请查看截图', id);
+          }
         } catch (e) {
           this.log('warning', `保存截图失败: ${e.message}`, id);
         }
-
-        // 成功后保存最新的 Cookie
-        try {
-          const currentCookies = await page.cookies();
-          if (currentCookies && currentCookies.length > 0) {
-            this.cookies.set(id, currentCookies);
-            this.saveCookiesToDisk();
-            this.log('info', '已更新并保存 Cookie', id);
-          }
-        } catch (e) {
-          this.log('warning', `保存 Cookie 失败: ${e.message}`, id);
-        }
-
       } else if (hasError) {
         this.log('error', '续期可能失败，检测到错误提示', id);
-      } else {
-        this.log('info', '已点击续期按钮，未检测到明确结果', id);
-
-        // 即使未检测到明确成功，只要没有报错，我们也尝试保存 Cookie (可能是已登录状态)
-        try {
-          const currentCookies = await page.cookies();
-          this.cookies.set(id, currentCookies);
-          this.saveCookiesToDisk();
-        } catch (e) { }
       }
+
       return result;
 
     } catch (error) {
