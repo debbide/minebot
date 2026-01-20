@@ -1072,8 +1072,10 @@ export class RenewalService {
       }
 
       // ========== 登录部分 - 复用 autoLoginAndGetCookies 的逻辑 ==========
-      // 访问登录页面，等待 Cloudflare 5秒盾
-      this.log('info', `访问登录页面: ${loginUrl}`, id);
+      // 访问目标页面（先尝试直接访问续期页，如果 Cookie 有效则不需要登录）
+      // 如果 Cookie 无效，通常会自动跳转到登录页
+      const targetUrl = url; // 续期页面 URL
+      this.log('info', `尝试直接访问目标页面: ${targetUrl}`, id);
 
       // 增加重试逻辑，应对 net::ERR_NETWORK_CHANGED 等网络波动
       let connectAttempts = 0;
@@ -1081,7 +1083,8 @@ export class RenewalService {
 
       while (connectAttempts < maxConnectAttempts) {
         try {
-          await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+          // 这里使用 targetUrl 而不是 loginUrl
+          await page.goto(targetUrl, { waitUntil: 'networkidle2', timeout: 60000 });
           break; // 成功则跳出循环
         } catch (e) {
           connectAttempts++;
