@@ -420,19 +420,41 @@ export class RenewalService {
     if (actualProxyUrl) {
       this.log('info', `启动无头浏览器 (代理: ${actualProxyUrl})...`);
       const args = [...commonArgs, `--proxy-server=${actualProxyUrl}`];
+
+      // [新增] 持久化 User Data Dir，根据代理区分 Profile
+      // 简单的 hash 或文件名替换
+      const safeProxyName = actualProxyUrl.replace(/[^a-zA-Z0-9]/g, '_');
+      const profilePath = path.join(process.cwd(), 'data', 'browser_profiles', `proxy_${safeProxyName.substring(0, 32)}`); // 截断避免太长
+
+      if (!fs.existsSync(profilePath)) {
+        try { fs.mkdirSync(profilePath, { recursive: true }); } catch (e) { }
+      }
+
+      this.log('info', `使用持久化浏览器配置: ${profilePath}`);
+
       return await puppeteer.launch({
         headless: 'new',
         executablePath,
+        userDataDir: profilePath, // 启用持久化
         args
       });
     }
 
     // 无代理时复用浏览器实例
     if (!this.browser || !this.browser.isConnected()) {
-      this.log('info', '启动无头浏览器...');
+      this.log('info', '启动无头浏览器 (无代理)...');
+
+      // [新增] 无代理的默认 Profile
+      const defaultProfilePath = path.join(process.cwd(), 'data', 'browser_profiles', 'default');
+      if (!fs.existsSync(defaultProfilePath)) {
+        try { fs.mkdirSync(defaultProfilePath, { recursive: true }); } catch (e) { }
+      }
+      this.log('info', `使用持久化浏览器配置: ${defaultProfilePath}`);
+
       this.browser = await puppeteer.launch({
         headless: 'new',
         executablePath,
+        userDataDir: defaultProfilePath, // 启用持久化
         args: commonArgs
       });
     }
