@@ -1136,8 +1136,12 @@ export class RenewalService {
 
     this.log('info', `Captcha配置: Enabled=${useCaptcha}, Key=${captchaKey ? (captchaKey.substring(0, 5) + '...') : 'None'}`, id);
 
-    if (!loginUrl || !panelUsername || !panelPassword) {
-      throw new Error('浏览器点击续期需要配置登录URL、账号和密码');
+    // 获取 cookie 设置
+    const manualCookiesStr = options.manualCookies || renewal.manualCookies;
+
+    // 如果没有配置手动 Cookie，则必须配置账号密码
+    if (!manualCookiesStr && (!loginUrl || !panelUsername || !panelPassword)) {
+      throw new Error('浏览器点击续期需要配置登录URL、账号和密码，或者填写手动Cookie');
     }
 
     this.log('info', `开始浏览器点击续期...${browserProxy ? ` (代理: ${browserProxy})` : ''}`, id);
@@ -1430,6 +1434,16 @@ export class RenewalService {
           const title = await page.title();
           this.log('error', `当前页面标题: ${title}`, id);
           throw new Error('找不到登录表单');
+        }
+
+        if (!passwordInput && !panelPassword) {
+          // 这不应该发生，前面的 checks 应该覆盖了，但为了安全
+          throw new Error('找不到登录表单且未配置密码');
+        }
+
+        // 检查是否有凭据可用
+        if (!panelUsername || !panelPassword) {
+          throw new Error('Cookie 已失效，且未配置账号/密码，无法自动登录');
         }
 
         // 清空并填写表单 - 使用键盘输入方式确保 React 状态更新
