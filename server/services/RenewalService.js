@@ -1674,6 +1674,38 @@ export class RenewalService {
 
         // 处理可能的 Turnstile 验证
         await this.handleTurnstile(page, id);
+
+        // [新增] 严格的完成状态检查
+        // 循环检查 "Renew Server" 弹窗或 "正在验证" 是否还在
+        let waitResultCount = 0;
+        const maxResultWait = 20; // 最多再等 40 秒 (20 * 2000ms)
+
+        while (waitResultCount < maxResultWait) {
+          const content = await page.content();
+          // 检查是否存在未完成的验证弹窗
+          const isVerifying = content.includes('Renew Server') ||
+            content.includes('正在验证') ||
+            content.includes('checking your browser') ||
+            content.includes('Just a moment');
+
+          if (!isVerifying) {
+            this.log('info', '验证弹窗已消失，继续检查结果...', id);
+            break;
+          }
+
+          this.log('info', `等待验证完成... (${waitResultCount + 1}/${maxResultWait})`, id);
+
+          // 在等待期间，再次尝试检测 Turnstile (万一它后来才加载出来)
+          await this.handleTurnstile(page, id);
+
+          await this.delay(2000);
+          waitResultCount++;
+        }
+
+        if (waitResultCount >= maxResultWait) {
+          this.log('warning', '验证超时：弹窗长时间未消失，标记为失败', id);
+          throw new Error('验证超时：Renew Server 弹窗未消失');
+        }
       } catch (e) {
         this.log('warning', `点击按钮时出错: ${e.message}`, id);
       }
