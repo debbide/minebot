@@ -2105,11 +2105,30 @@ export class RenewalService {
 
     } catch (error) {
       this.log('error', `浏览器点击续期失败: ${error.message}`, id);
+
+      let screenshotUrl = '';
+      try {
+        if (page && !page.isClosed()) {
+          if (!fs.existsSync(SCREENSHOT_DIR)) {
+            fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+          }
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const screenshotPath = path.join(SCREENSHOT_DIR, `error-${id}-${timestamp}.png`);
+          await page.screenshot({ path: screenshotPath, fullPage: true });
+          this.log('info', `已保存错误截图: ${screenshotPath}`, id);
+          const screenshotFilename = path.basename(screenshotPath);
+          screenshotUrl = `/api/screenshots/${screenshotFilename}`;
+        }
+      } catch (e) {
+        this.log('warning', `保存错误截图失败: ${e.message}`, id);
+      }
+
       return {
         success: false,
         error: error.message,
         message: `浏览器点击续期失败: ${error.message}`,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        screenshotUrl: screenshotUrl
       };
     } finally {
       // 策略：
