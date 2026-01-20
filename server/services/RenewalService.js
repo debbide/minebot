@@ -10,6 +10,19 @@ import os from 'os';
 import fs from 'fs';
 import path from 'path';
 
+const USER_AGENTS = [
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 13_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+  "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+  "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:120.0) Gecko/20100101 Firefox/120.0",
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+];
+
 const COOKIE_FILE_PATH = path.join(process.cwd(), 'data', 'cookies.json');
 const SCREENSHOT_DIR = path.join(process.cwd(), 'data', 'screenshots');
 
@@ -354,8 +367,9 @@ export class RenewalService {
   /**
    * 获取或启动浏览器实例
    * @param {string} proxyUrl - 可选的代理地址，如 socks5://127.0.0.1:1080 或带认证的 socks5://user:pass@host:port
+   * @param {boolean} useGuestProfile - 是否使用访客模式启动浏览器
    */
-  async getBrowser(proxyUrl = null) {
+  async getBrowser(proxyUrl = null, useGuestProfile = false) {
     const executablePath = this.getChromePath();
     let actualProxyUrl = proxyUrl;
 
@@ -378,18 +392,23 @@ export class RenewalService {
       }
     }
 
+    const commonArgs = [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--disable-gpu',
+      '--window-size=1920,1080'
+    ];
+
+    if (useGuestProfile) {
+      commonArgs.push('--guest');
+    }
+
     // 如果指定了代理，每次都创建新的浏览器实例
     if (actualProxyUrl) {
       this.log('info', `启动无头浏览器 (代理: ${actualProxyUrl})...`);
-      const args = [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--window-size=1920,1080',
-        `--proxy-server=${actualProxyUrl}`
-      ];
+      const args = [...commonArgs, `--proxy-server=${actualProxyUrl}`];
       return await puppeteer.launch({
         headless: 'new',
         executablePath,
@@ -403,14 +422,7 @@ export class RenewalService {
       this.browser = await puppeteer.launch({
         headless: 'new',
         executablePath,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--disable-gpu',
-          '--window-size=1920,1080'
-        ]
+        args: commonArgs
       });
     }
     return this.browser;
@@ -515,7 +527,9 @@ export class RenewalService {
     try {
       // 设置视口和 User-Agent
       await page.setViewport({ width: 1920, height: 1080 });
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+      const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+      this.log('info', `使用 User-Agent: ${userAgent}`, id);
+      await page.setUserAgent(userAgent);
 
       // 访问登录页面，等待 Cloudflare 5秒盾
       this.log('info', '访问登录页面，等待 Cloudflare 验证...', id);
@@ -996,7 +1010,7 @@ export class RenewalService {
     this.log('info', `开始浏览器点击续期...${browserProxy ? ` (代理: ${browserProxy})` : ''}`, id);
 
     // 如果有代理，创建独立的浏览器实例
-    const browser = await this.getBrowser(browserProxy || null);
+    const browser = await this.getBrowser(browserProxy || null, true);
     const isProxyBrowser = !!browserProxy;
 
     let page;
@@ -1034,9 +1048,13 @@ export class RenewalService {
     }
 
     try {
-      // 设置视口和 User-Agent
+      // 设置视口
       await page.setViewport({ width: 1920, height: 1080 });
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+
+      // 随机选择 User-Agent
+      const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+      this.log('info', `使用 User-Agent: ${userAgent}`, id);
+      await page.setUserAgent(userAgent);
 
       // 尝试恢复 Cookies
       const savedCookies = this.cookies.get(id);
@@ -1099,6 +1117,18 @@ export class RenewalService {
 
       // 检查是否已经登录（浏览器可能保留了之前的登录状态）
       let currentUrl = page.url();
+
+      // 处理 Cookie 弹窗 (参考 DrissionPage 配置) - 在任何阶段都可能出现
+      try {
+        const cookieBtnSelector = "button.fc-cta-do-not-consent";
+        const cookieBtn = await page.$(cookieBtnSelector);
+        if (cookieBtn) {
+          this.log('info', '发现 Cookie 拒绝按钮，尝试点击自动关闭...', id);
+          await cookieBtn.click();
+          await this.delay(1000);
+        }
+      } catch (e) { }
+
       const alreadyLoggedIn = !currentUrl.includes('/login') &&
         !currentUrl.includes('/auth') &&
         !currentUrl.includes('/sign-in') &&
@@ -2111,13 +2141,14 @@ export class RenewalService {
       return { success: false, error: '代理地址不能为空' };
     }
 
-    this.log('info', `测试代理连接: ${proxyUrl}`);
+    this.log('info', `启动浏览器... ${proxyUrl ? '(使用代理)' : ''}`);
 
     let browser = null;
     let page = null;
 
     try {
-      browser = await this.getBrowser(proxyUrl);
+      // 使用 getBrowser 启动，并强制使用访客模式
+      browser = await this.getBrowser(proxyUrl, true); // Pass true for useGuestProfile
       page = await browser.newPage();
 
       await page.setViewport({ width: 1280, height: 720 });
