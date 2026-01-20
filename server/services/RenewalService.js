@@ -1804,11 +1804,36 @@ export class RenewalService {
       // 点击按钮
       try {
         this.log('info', '正在点击续期按钮...', id);
-        // 尝试多种方式点击
-        await page.evaluate((selector) => {
-          const btn = document.querySelector(selector);
-          if (btn) btn.click();
-        }, renewButtonSelector || 'button.btn-primary');
+
+        // 优先使用已找到的 renewButton 句柄
+        if (renewButton) {
+          try {
+            // 1. 尝试获取位置并模拟鼠标点击 (主要方式)
+            const box = await renewButton.boundingBox();
+            if (box) {
+              this.log('info', `按钮位置: (${Math.round(box.x)}, ${Math.round(box.y)})，模拟鼠标点击...`, id);
+              await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+              await this.delay(100);
+              await page.mouse.down();
+              await this.delay(50);
+              await page.mouse.up();
+            } else {
+              // 2. 如果获取不到位置 (可能是隐藏元素)，尝试直接 click()
+              this.log('info', '无法获取按钮位置，尝试直接调用 click()...', id);
+              await renewButton.click();
+            }
+          } catch (e) {
+            this.log('warning', `模拟点击失败 (${e.message})，尝试 JS 触发...`, id);
+            // 3. 失败则回退到 JS 触发
+            await page.evaluate(el => el.click(), renewButton);
+          }
+        } else {
+          // 仅仅作为最后的兜底 (理论上前面找不到 renewButton 就会抛错)
+          await page.evaluate((selector) => {
+            const btn = document.querySelector(selector);
+            if (btn) btn.click();
+          }, renewButtonSelector || 'button.btn-primary');
+        }
 
         // 等待操作结果 (根据用户反馈，先等待再检测 Turnstile)
         const waitTime = parseInt(clickWaitTime) || 5000;
