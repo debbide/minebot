@@ -12,7 +12,7 @@ import { AIService } from './services/AIService.js';
 import { ConfigManager } from './services/ConfigManager.js';
 import { AuthService } from './services/AuthService.js';
 import { AuditService } from './services/AuditService.js';
-import { RenewalService } from './services/RenewalService.js';
+
 import { SystemService } from './services/SystemService.js';
 
 dotenv.config();
@@ -269,7 +269,7 @@ function broadcast(type, data) {
 }
 
 // Initialize renewal service (after broadcast is defined)
-const renewalService = new RenewalService(configManager, broadcast);
+
 
 // API Routes
 
