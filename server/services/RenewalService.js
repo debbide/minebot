@@ -1419,6 +1419,11 @@ export class RenewalService {
           }
         }
 
+        // [新增] 如果 Sidecar 失败或未启用，尝试本地处理 (点击验证码)
+        // 这是对用户 "不能处理那个人机验证吗" 的回应
+        this.log('info', '尝试本地处理 Cloudflare 验证...', id);
+        await this.handleTurnstile(page, id);
+
         // 如果是 CF 页面，不要刷新，直接进入下面的流程让 handleTurnstile/插件 去处理
       } else if (reusedPage) {
         // 如果是复用的页面但未登录，可能登录失效，刷新页面重试
