@@ -92,6 +92,10 @@ class ApiService {
             body: JSON.stringify({ proxy }),
         });
     }
+
+    async getTaskLogs(id: string): Promise<{ success: boolean; logs: string }> {
+        return this.request(`/api/tasks/${id}/logs`);
+    }
 }
 
 export const api = new ApiService();

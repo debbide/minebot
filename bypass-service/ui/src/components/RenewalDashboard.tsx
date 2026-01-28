@@ -44,6 +44,7 @@ export function RenewalDashboard() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<RenewalTask | null>(null);
+    const [selectedTaskLogs, setSelectedTaskLogs] = useState<string>("");
     const [editingId, setEditingId] = useState<string | null>(null);
     const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -190,9 +191,16 @@ export function RenewalDashboard() {
         }
     };
 
-    const showDetails = (task: RenewalTask) => {
+    const showDetails = async (task: RenewalTask) => {
         setSelectedTask(task);
+        setSelectedTaskLogs("正在加载日志...");
         setDetailsOpen(true);
+        try {
+            const res = await api.getTaskLogs(task.id);
+            setSelectedTaskLogs(res.logs || "暂无日志记录");
+        } catch (e) {
+            setSelectedTaskLogs(`获取日志失败: ${e}`);
+        }
     };
 
     return (
@@ -546,15 +554,11 @@ export function RenewalDashboard() {
 
                             {/* Logs */}
                             {selectedTask.lastResult.logs && selectedTask.lastResult.logs.length > 0 && (
-                                <div className="space-y-2">
-                                    <Label>运行日志</Label>
-                                    <ScrollArea className="h-[200px] w-full rounded-md border bg-muted/30 p-4 font-mono text-xs">
-                                        {selectedTask.lastResult.logs.map((log: any, i: number) => (
-                                            <div key={i} className={`mb-1 ${log.type === 'error' ? 'text-red-500' : 'text-muted-foreground'}`}>
-                                                <span className="opacity-50">[{new Date(log.time).toLocaleTimeString()}]</span> {log.message}
-                                            </div>
-                                        ))}
-                                    </ScrollArea>
+                                <div className="mt-4">
+                                    <h3 className="font-semibold mb-2">执行日志</h3>
+                                    <div className="bg-black/90 text-white p-4 rounded-md font-mono text-xs h-[300px] overflow-y-auto whitespace-pre-wrap">
+                                        {selectedTaskLogs || "加载日志中..."}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -563,6 +567,9 @@ export function RenewalDashboard() {
                             该任务尚未运行，请点击“立即运行”以生成数据。
                         </div>
                     )}
+                    <DialogFooter>
+                        <Button onClick={() => setDetailsOpen(false)}>关闭</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </Card>
