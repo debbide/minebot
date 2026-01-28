@@ -199,6 +199,72 @@ def check_chrome_installed():
     return False
 
 
+def _run_sb_logic(sb, url, wait_time, save_cookies):
+    """执行浏览器自动化逻辑"""
+    result = {
+        "success": False,
+        "cookies": {},
+        "cf_clearance": None,
+        "user_agent": None,
+        "error": None
+    }
+    
+    try:
+        # 打开页面
+        sb.uc_open_with_reconnect(url, reconnect_time=wait_time)
+        time.sleep(2)
+        
+        # 检测并处理 Cloudflare 验证
+        page_source = sb.get_page_source().lower()
+        if any(x in page_source for x in ["turnstile", "challenges.cloudflare", "just a moment"]):
+            print("[*] 检测到验证，尝试点击...")
+            try:
+                sb.uc_gui_click_captcha()
+                time.sleep(3)
+            except:
+                # 备用点击
+                sb.click_if_visible('iframe[src*="challenge"]', by="css selector")
+                time.sleep(2)
+        
+        # 获取 Cookie
+        cookies_list = sb.get_cookies()
+        cookies = {c["name"]: c["value"] for c in cookies_list}
+        cf_clearance = cookies.get("cf_clearance")
+        user_agent = sb.execute_script("return navigator.userAgent")
+        
+        if cf_clearance:
+            result["success"] = True
+            result["cookies"] = cookies
+            result["cf_clearance"] = cf_clearance
+            result["user_agent"] = user_agent
+            
+            # 保存 Cookie (如果需要)
+            if save_cookies:
+                try:
+                    save_dir = Path("output/cookies")
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    
+                    with open(save_dir / f"cookies_{ts}.json", "w", encoding="utf-8") as f:
+                        json.dump({
+                            "url": url,
+                            "cookies": cookies,
+                            "user_agent": user_agent,
+                            "timestamp": ts
+                        }, f, indent=2)
+                        
+                    print(f"[+] Cookie已保存")
+                except Exception as e:
+                    print(f"[!] 保存Cookie失败: {e}")
+        else:
+            result["error"] = "未获取到 cf_clearance"
+            
+    except Exception as e:
+        result["error"] = str(e)
+        
+    return result
+
+
 def bypass_cloudflare_with_proxy_rotation(
     url: str,
     proxy_file: str = "proxy.txt",
