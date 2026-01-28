@@ -561,9 +561,12 @@ export class RenewalService {
    */
   async solveCaptchaWithSidecar(url, proxyUrl, mode = 'default') {
     const bypassServiceUrl = process.env.BYPASS_SERVICE_URL;
-    if (!bypassServiceUrl) return null;
+    if (!bypassServiceUrl) {
+      this.log('warning', 'Bypass Service URL 未配置，跳过 Sidecar 处理');
+      return null;
+    }
 
-    this.log('info', `尝试使用 Bypass Service (${bypassServiceUrl}) [模式: ${mode}]...`);
+    this.log('info', `[Sidecar] 准备调用 Bypass Service: ${bypassServiceUrl} [模式: ${mode}]`);
 
     try {
       const response = await fetch(`${bypassServiceUrl}/bypass`, {
@@ -578,21 +581,24 @@ export class RenewalService {
       });
 
       if (!response.ok) {
+        this.log('error', `[Sidecar] API 调用失败: ${response.status} ${response.statusText}`);
         throw new Error(`Bypass service error: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
+      this.log('info', `[Sidecar] API 响应: success=${result.success}, error=${result.error}`);
+
       if (!result.success) {
         throw new Error(result.error || 'Unknown bypass error');
       }
 
-      this.log('info', 'Bypass Service 成功获取 Cookies');
+      this.log('info', '[Sidecar] 成功获取 Cookies');
       return {
         cookies: result.cookies,
         userAgent: result.user_agent
       };
     } catch (error) {
-      this.log('warning', `Bypass Service 调用失败: ${error.message}，将回退到本地处理`);
+      this.log('warning', `[Sidecar] 处理失败: ${error.message}，将回退到本地处理`);
       return null;
     }
   }
