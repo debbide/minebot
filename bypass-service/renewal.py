@@ -3,8 +3,12 @@ import time
 import os
 import json
 import base64
+import platform
 from pathlib import Path
 from datetime import datetime
+
+# 检测 ARM 架构
+IS_ARM = platform.machine() in ['aarch64', 'arm64']
 
 class RenewalHandler:
     def __init__(self, output_dir="output"):
@@ -41,29 +45,37 @@ class RenewalHandler:
         log(f"开始任务: {url} (模式: {action_type})")
         
         try:
-            # UC Mode 启动浏览器 - 优化 Docker 参数
-            # 移除 incognito 避免部分权限问题，添加重试机制
+            # UC Mode 启动浏览器 - Docker 优化配置
+            # ARM 架构禁用 UC 模式（Chromium 不完全支持）
             sb_config = {
-                "uc": True,
+                "uc": not IS_ARM,  # ARM 上禁用 UC
                 "test": True,
                 "locale": "en",
                 "proxy": proxy,
-                "headless": False,  # Docker 中有 Xvfb，这里设为 False 以适配 UC 模式
-                "ad_block_on": False,
+                "headless": True,  # 使用普通 headless 模式
             }
             if proxy:
                 print(f"使用代理: {proxy}", flush=True)
 
+            if IS_ARM:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] ARM 架构检测，使用普通模式...", flush=True)
+            else:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] AMD64 架构，使用 UC 模式...", flush=True)
+
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] 正在初始化 SeleniumBase...", flush=True)
             with SB(**sb_config) as sb:
-                print("SB 上下文已进入", flush=True)
-                log("浏览器启动成功 (UC Mode)")
-                
+                log(f"浏览器启动成功 ({'普通模式' if IS_ARM else 'UC 模式'})")
+
                 # 1. 登录流程 (如果有 login_url 或检测到登录页)
                 target_url = url
                 start_url = login_url if login_url else url
-                
+
                 log(f"访问页面: {start_url}")
-                sb.uc_open_with_reconnect(start_url, reconnect_time=float(wait_time))
+                if IS_ARM:
+                    sb.open(start_url)
+                    time.sleep(wait_time)
+                else:
+                    sb.uc_open_with_reconnect(start_url, reconnect_time=float(wait_time))
                 
                 # 处理 Cloudflare
                 self._handle_cloudflare(sb, log)
@@ -83,9 +95,13 @@ class RenewalHandler:
                 
                 # 如果登录后需要跳转到目标页
                 if is_login and login_url and target_url != login_url:
-                     log(f"登录完成，跳转至目标页: {target_url}")
-                     sb.uc_open_with_reconnect(target_url, reconnect_time=float(wait_time))
-                     self._handle_cloudflare(sb, log)
+                    log(f"登录完成，跳转至目标页: {target_url}")
+                    if IS_ARM:
+                        sb.open(target_url)
+                        time.sleep(wait_time)
+                    else:
+                        sb.uc_open_with_reconnect(target_url, reconnect_time=float(wait_time))
+                    self._handle_cloudflare(sb, log)
 
                 # 2. 如果是保活模式，到这里就结束了
                 if action_type == "keepalive":
@@ -203,8 +219,13 @@ class RenewalHandler:
            "Just a moment" in sb.get_title():
             log("检测到 Cloudflare 验证，尝试处理...")
             try:
-                sb.uc_gui_click_captcha()
-                time.sleep(4)
+                if not IS_ARM:
+                    sb.uc_gui_click_captcha()
+                    time.sleep(4)
+                else:
+                    # ARM 上尝试点击 iframe
+                    sb.click_if_visible('iframe[src*="challenge"]', by="css selector")
+                    time.sleep(4)
             except:
                 # 备用点击方案
                 sb.click_if_visible('iframe[src*="challenge"]', by="css selector")
