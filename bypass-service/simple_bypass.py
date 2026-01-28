@@ -496,73 +496,63 @@ def bypass_cloudflare(
         
         try:
             # 设置超时（仅Unix系统支持信号）
+    # 重试循环
+    for attempt in range(1, max_retries + 1):
+        result["attempts"] = attempt
+        print(f"\n[*] 第 {attempt}/{max_retries} 次尝试...")
+        
+        # 设置超时（仅Unix系统支持信号）
+        try:
             if not is_linux() or platform.system() == "Darwin":
-                # Mac/Linux 使用信号超时
-                try:
-                    signal.signal(signal.SIGALRM, timeout_handler)
-                    signal.alarm(int(timeout))
-                except (AttributeError, ValueError):
-                    pass  # Windows 不支持
+                signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(int(timeout))
+        except (AttributeError, ValueError):
+            pass  # Windows 不支持
+        
+        try:
+            print(f"[*] 目标: {url}")
+            if proxy:
+                print(f"[*] 代理: {proxy}")
             
-            with SB(uc=True, test=True, locale="en", proxy=proxy) as sb:
-                print(f"[*] 正在打开: {url}")
-                
-                # 使用UC模式打开页面
-                sb.uc_open_with_reconnect(url, reconnect_time=wait_time)
-                time.sleep(2)
-                
-                # 检测并处理验证
-                page_source = sb.get_page_source().lower()
-                if any(x in page_source for x in ["turnstile", "challenges.cloudflare", "just a moment", "verify you are human"]):
-                    print("[*] 检测到 Cloudflare 验证，尝试点击...")
+            # 优先尝试 UC Mode
+            try:
+                with SB(uc=True, test=True, locale="en", proxy=proxy) as sb:
+                    print("[*] 浏览器已启动 (UC Mode)，正在加载页面...")
+                    temp_result = _run_sb_logic(sb, url, wait_time, save_cookies)
+                    if temp_result["success"]:
+                        result.update(temp_result)
+                        return result
+                    else:
+                        result["error"] = temp_result["error"]
+                        print(f"[-] UC Mode 失败: {result['error']}")
+            except Exception as e:
+                error_msg = str(e)
+                if "Exec format error" in error_msg or "executable" in error_msg.lower():
+                    print(f"[!] UC Mode 启动失败 (可能是架构兼容性问题): {e}")
+                    print("[*] 尝试降级到普通模式 (Standard Mode)...")
+                    
+                    # 降级尝试: 普通模式 (非 UC)
+                    # 使用系统安装的 chromium-driver (如果可用)
+                    # 注意: 普通模式更容易被检测，但能够运行
                     try:
-                        sb.uc_gui_click_captcha()
-                        time.sleep(3)
-                    except Exception as e:
-                        print(f"[!] 点击出错: {e}")
-                
-                # 获取Cookie
-                cookies_list = sb.get_cookies()
-                result["cookies"] = {c["name"]: c["value"] for c in cookies_list}
-                result["cf_clearance"] = result["cookies"].get("cf_clearance")
-                result["user_agent"] = sb.execute_script("return navigator.userAgent")
-                
-                # 取消超时
-                try:
-                    signal.alarm(0)
-                except (AttributeError, ValueError):
-                    pass
-                
-                if result["cf_clearance"]:
-                    result["success"] = True
-                    print(f"[+] 绕过成功！获取到 cf_clearance")
-                    
-                    # 保存Cookie
-                    if save_cookies:
-                        save_dir = Path("output/cookies")
-                        save_dir.mkdir(parents=True, exist_ok=True)
-                        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                        
-                        with open(save_dir / f"cookies_{ts}.json", "w", encoding="utf-8") as f:
-                            json.dump({"url": url, "cookies": result["cookies"], "user_agent": result["user_agent"]}, f, indent=2)
-                        
-                        with open(save_dir / f"cookies_{ts}.txt", "w") as f:
-                            f.write("# Netscape HTTP Cookie File\n")
-                            for c in cookies_list:
-                                domain = c.get("domain", "")
-                                f.write(f"{domain}\tTRUE\t{c.get('path', '/')}\t{'TRUE' if c.get('secure') else 'FALSE'}\t{int(c.get('expiry', 0))}\t{c['name']}\t{c['value']}\n")
-                        
-                        print(f"[+] Cookie已保存到: {save_dir}")
-                    
-                    return True
+                        with SB(uc=False, test=True, locale="en", proxy=proxy) as sb:
+                            print("[*] 浏览器已启动 (Standard Mode)，正在加载页面...")
+                            temp_result = _run_sb_logic(sb, url, wait_time, save_cookies)
+                            if temp_result["success"]:
+                                result.update(temp_result)
+                                return result
+                            else:
+                                result["error"] = temp_result["error"]
+                                print(f"[-] Standard Mode 失败: {result['error']}")
+                    except Exception as e_std:
+                        result["error"] = str(e_std)
+                        print(f"[-] Standard Mode 错误: {e_std}")
                 else:
-                    print(f"[-] 未获取到 cf_clearance，Cookie数: {len(result['cookies'])}")
-                    return False
-                    
+                    result["error"] = error_msg
+                    print(f"[-] UC Mode 错误: {e}")
+            
         except TimeoutError:
             print(f"[-] 超时 ({timeout}秒)")
-            try:
-                signal.alarm(0)
             except:
                 pass
             return False

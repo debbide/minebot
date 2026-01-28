@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y \
 
 # If google-chrome-stable failed (not in standard repos), try simple chromium
 RUN if ! command -v google-chrome > /dev/null; then \
-    apt-get update && apt-get install -y chromium \
+    apt-get update && apt-get install -y chromium chromium-driver \
     && rm -rf /var/lib/apt/lists/*; \
     fi
 
