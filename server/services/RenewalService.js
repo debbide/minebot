@@ -11,7 +11,7 @@ import fs from 'fs';
 import WebSocket from 'ws';
 import path from 'path';
 
-import fetch from 'node-fetch'; // Ensure node-fetch is available (built-in in newer node or needs install)
+
 
 // 如果 node 版本较低没有内置 fetch，需要 `npm install node-fetch`。
 // 这里假设环境已支持或已安装。为保险起见，如果使用的是 Node 18+，fetch 是全局的。
