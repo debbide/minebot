@@ -3,4 +3,7 @@
 
 seleniumbase>=4.28.0    # SeleniumBase UC Mode (核心)
 flask>=2.0.0
+flask-cors>=3.0.10
+APScheduler>=3.10.0
 pyvirtualdisplay
+requests
