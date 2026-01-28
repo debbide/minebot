@@ -194,10 +194,27 @@ def toggle_task(task_id):
 
 # ==================== Task Execution & Scheduling ====================
 
+@app.route('/api/tasks/<task_id>/logs', methods=['GET'])
+def get_task_logs(task_id):
+    """Get logs for a specific task"""
+    try:
+        limit = int(request.args.get('limit', 2000))
+        logs = task_store.get_logs(task_id, limit)
+        return jsonify({'success': True, 'logs': logs})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 def execute_task(task):
     """Execute a renewal task"""
     task_id = task['id']
     print(f"[Scheduler] Executing task: {task['name']} ({task_id})")
+    
+    # Logger callback
+    def task_logger(msg, level="INFO"):
+        task_store.append_log(task_id, msg, level)
+    
+    task_logger(f"========== 开始执行任务: {task['name']} ==========", "SYSTEM")
     
     try:
         result = renewal_handler.run_renewal(
@@ -206,21 +223,30 @@ def execute_task(task):
             password=task['password'],
             login_url=task.get('login_url'),
             action_type=task.get('action_type', 'renewal'),
-            proxy=task.get('proxy'),
+            proxy=task.get('proxy') if task.get('use_proxy') else None,
             selectors=task.get('selectors', {}),
             timeout=task.get('timeout', 120),
             wait_time=task.get('wait_time', 5),
-            success_keywords=task.get('success_keywords')
+            success_keywords=task.get('success_keywords'),
+            logger=task_logger
         )
         
         # Update task result
         task_store.update_result(task_id, result)
+        task_logger(f"任务执行完成. 结果: {'成功' if result['success'] else '失败'} - {result['message']}", "SYSTEM")
         
         return result
     except Exception as e:
+        import traceback
+        err_msg = str(e)
+        trace = traceback.format_exc()
+        
+        task_logger(f"任务执行异常: {err_msg}", "ERROR")
+        task_logger(trace, "DEBUG")
+        
         error_result = {
             'success': False,
-            'message': f'Execution failed: {str(e)}',
+            'message': f'Execution failed: {err_msg}',
             'timestamp': datetime.now().isoformat()
         }
         task_store.update_result(task_id, error_result)

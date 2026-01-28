@@ -54,6 +54,7 @@ class TaskStore:
             'login_url': task_data.get('login_url', ''),
             'action_type': task_data.get('action_type', 'renewal'),
             'proxy': task_data.get('proxy', ''),
+            'use_proxy': task_data.get('use_proxy', False),
             'selectors': task_data.get('selectors', {}),
             'timeout': task_data.get('timeout', 120),
             'wait_time': task_data.get('wait_time', 5),

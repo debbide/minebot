@@ -56,6 +56,7 @@ export function RenewalDashboard() {
         login_url: "",
         action_type: "renewal",
         proxy: "",
+        use_proxy: false,
         selectors: { renew_btn: "", confirm_btn: "" },
         timeout: 120,
         wait_time: 5,
@@ -118,6 +119,7 @@ export function RenewalDashboard() {
             login_url: "",
             action_type: "renewal",
             proxy: "",
+            use_proxy: false,
             selectors: { renew_btn: "", confirm_btn: "" },
             timeout: 120,
             wait_time: 5,
@@ -138,6 +140,7 @@ export function RenewalDashboard() {
             login_url: task.login_url || "",
             action_type: (task.action_type as any) || "renewal",
             proxy: task.proxy || "",
+            use_proxy: task.use_proxy ?? !!task.proxy, // Default to true if proxy string exists for backward compatibility
             selectors: {
                 renew_btn: task.selectors?.renew_btn || "",
                 confirm_btn: task.selectors?.confirm_btn || ""
@@ -306,34 +309,57 @@ export function RenewalDashboard() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>代理 (Proxy)</Label>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                placeholder="socks5://..."
-                                                value={formData.proxy}
-                                                onChange={(e) => setFormData({ ...formData, proxy: e.target.value })}
+                                    </div>
+
+                                    <div className="space-y-4 border rounded-lg p-4 bg-muted/20">
+                                        <div className="flex items-center justify-between">
+                                            <div className="space-y-0.5">
+                                                <Label className="text-base">代理设置</Label>
+                                                <div className="text-xs text-muted-foreground">如果您的网络无法直接访问目标站点，请启用代理</div>
+                                            </div>
+                                            <Switch
+                                                checked={formData.use_proxy}
+                                                onCheckedChange={(checked) => setFormData({ ...formData, use_proxy: checked })}
                                             />
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="icon"
-                                                title="测试代理连通性"
-                                                disabled={!formData.proxy || TESTING_PROXY}
-                                                onClick={async () => {
-                                                    setTestingProxy(true);
-                                                    try {
-                                                        const res = await api.checkProxy(formData.proxy);
-                                                        alert(res.success ? "✅ 代理可用" : "❌ 代理不可用");
-                                                    } catch (e) {
-                                                        alert(`测试出错: ${e}`);
-                                                    } finally {
-                                                        setTestingProxy(false);
-                                                    }
-                                                }}
-                                            >
-                                                {TESTING_PROXY ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                                            </Button>
                                         </div>
+
+                                        {formData.use_proxy && (
+                                            <div className="pt-2 animate-in slide-in-from-top-2 fade-in duration-200">
+                                                <div className="flex gap-2">
+                                                    <div className="flex-1">
+                                                        <Input
+                                                            placeholder="socks5://user:pass@host:port"
+                                                            value={formData.proxy}
+                                                            onChange={(e) => setFormData({ ...formData, proxy: e.target.value })}
+                                                            className="bg-background"
+                                                        />
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        className="shrink-0"
+                                                        disabled={!formData.proxy || TESTING_PROXY}
+                                                        onClick={async () => {
+                                                            setTestingProxy(true);
+                                                            try {
+                                                                const res = await api.checkProxy(formData.proxy);
+                                                                alert(res.success ? "✅ 代理可用" : "❌ 代理不可用");
+                                                            } catch (e) {
+                                                                alert(`测试出错: ${e}`);
+                                                            } finally {
+                                                                setTestingProxy(false);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {TESTING_PROXY ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                                                        测试连通性
+                                                    </Button>
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground mt-1.5 ml-1">
+                                                    支持 HTTP, HTTPS, SOCKS4, SOCKS5 协议
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
