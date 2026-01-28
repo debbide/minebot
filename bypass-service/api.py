@@ -208,28 +208,49 @@ def get_task_logs(task_id):
 def execute_task(task):
     """Execute a renewal task"""
     task_id = task['id']
-    print(f"[Scheduler] Executing task: {task['name']} ({task_id})")
+    print(f"\n[DEBUG] ========== 开始执行任务 API 调用 ==========")
+    print(f"[DEBUG] Task ID: {task_id}")
+    print(f"[DEBUG] Task Name: {task['name']}")
+    print(f"[DEBUG] URL: {task['url']}")
+    print(f"[DEBUG] Params: use_proxy={task.get('use_proxy')}, proxy={task.get('proxy')}, action={task.get('action_type')}")
+    print(f"[DEBUG] Params: wait_time={task.get('wait_time')}, timeout={task.get('timeout')}")
     
     # Logger callback
     def task_logger(msg, level="INFO"):
+        # 同时打印到控制台，确保 docker logs 能看到
+        print(f"[TaskLog] [{level}] {msg}")
         task_store.append_log(task_id, msg, level)
     
     task_logger(f"========== 开始执行任务: {task['name']} ==========", "SYSTEM")
     
     try:
-        result = renewal_handler.run_renewal(
-            url=task['url'],
-            username=task['username'],
-            password=task['password'],
-            login_url=task.get('login_url'),
-            action_type=task.get('action_type', 'renewal'),
-            proxy=task.get('proxy') if task.get('use_proxy') else None,
-            selectors=task.get('selectors', {}),
-            timeout=task.get('timeout', 120),
-            wait_time=task.get('wait_time', 5),
-            success_keywords=task.get('success_keywords'),
-            logger=task_logger
-        )
+        # 检查 renewal_handler 是否具备必要的方法
+        if not hasattr(renewal_handler, 'run_renewal'):
+             raise Exception("Critical: renewal_handler missing run_renewal method")
+
+        # 动态检测 logger 参数支持 (防御性编程，应对Docker缓存导致的旧代码问题)
+        import inspect
+        sig = inspect.signature(renewal_handler.run_renewal)
+        call_kwargs = {
+            'url': task['url'],
+            'username': task['username'],
+            'password': task['password'],
+            'login_url': task.get('login_url'),
+            'action_type': task.get('action_type', 'renewal'),
+            'proxy': task.get('proxy') if task.get('use_proxy') else None,
+            'selectors': task.get('selectors', {}),
+            'timeout': task.get('timeout', 120),
+            'wait_time': task.get('wait_time', 5),
+            'success_keywords': task.get('success_keywords')
+        }
+        
+        if 'logger' in sig.parameters:
+            call_kwargs['logger'] = task_logger
+        else:
+            print("[WARNING] renewal.py 是旧版本 (无 logger 参数)，正在以降级模式运行。请检查 Docker 构建缓存。")
+            task_logger("警告: 检测到因为 Docker 缓存问题导致后端代码未完全更新，日志功能可能受限。", "WARNING")
+
+        result = renewal_handler.run_renewal(**call_kwargs)
         
         # Update task result
         task_store.update_result(task_id, result)
@@ -240,6 +261,9 @@ def execute_task(task):
         import traceback
         err_msg = str(e)
         trace = traceback.format_exc()
+        
+        print(f"[ERROR] Task Execution Failed: {err_msg}")
+        print(f"[ERROR] Traceback: {trace}")
         
         task_logger(f"任务执行异常: {err_msg}", "ERROR")
         task_logger(trace, "DEBUG")
