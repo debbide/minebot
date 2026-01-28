@@ -39,7 +39,7 @@ services:
 
   bypass-service:
     build:
-      context: ../cloudflare-bypass-2026-main
+      context: ./bypass-service
       dockerfile: Dockerfile
     container_name: minebot-bypass
     restart: unless-stopped
