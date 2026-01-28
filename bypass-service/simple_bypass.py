@@ -489,13 +489,7 @@ def bypass_cloudflare(
     def timeout_handler(signum, frame):
         raise TimeoutError("操作超时")
     
-    # 单次尝试
-    def single_attempt(attempt_num: int) -> bool:
-        nonlocal result
-        print(f"\n[*] 第 {attempt_num}/{max_retries} 次尝试...")
-        
-        try:
-            # 设置超时（仅Unix系统支持信号）
+
     # 重试循环
     for attempt in range(1, max_retries + 1):
         result["attempts"] = attempt
