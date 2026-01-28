@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  renewal-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: renewal-service
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - renewal-data:/app/data
+      - renewal-screenshots:/app/output/screenshots
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DISPLAY=:99
+      - SE_OFFLINE=1
+      - PORT=5000
+    shm_size: 2gb
+
+volumes:
+  renewal-data:
+    driver: local
+  renewal-screenshots:
+    driver: local

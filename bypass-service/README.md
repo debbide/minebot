@@ -1,265 +1,97 @@
-# Cloudflare Bypass Tool 2026
+# Renewal Service
 
-基于 SeleniumBase UC Mode 的 Cloudflare Turnstile 验证绕过工具
+自动续期服务 - 基于 Python + SeleniumBase 的全栈应用
 
-A Cloudflare Turnstile bypass tool based on SeleniumBase UC Mode
+## 功能特性
 
-![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
-![Platform](https://img.shields.io/badge/Platform-Mac%20%7C%20Windows%20%7C%20Linux-green.svg)
-![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+- 🚀 自动登录网页面板并点击续期按钮
+- 🔄 定时任务调度（自定义续期间隔）
+- 🌐 Web 界面管理任务
+- 🛡️ 集成 Cloudflare/Turnstile 绕过
+- 📸 执行结果截图保存
+- 💾 任务配置持久化（JSON）
 
----
+## 快速开始
 
-## 免责声明 / Disclaimer
-
-本工具仅供学习研究使用，请遵守相关法律法规和目标网站的服务条款。
-
-This tool is for educational purposes only. Please comply with applicable laws and website terms of service.
-
----
-
-## 功能特点 / Features
-
-| 功能 | 说明 |
-|:---|:---|
-| SeleniumBase UC Mode | 操作系统级鼠标模拟，绕过率最高 |
-| 单浏览器模式 | 简单可靠，资源占用低 |
-| 并行模式 | 多浏览器同时运行，提高效率 |
-| 代理轮换 | 支持从文件批量加载代理 |
-| HTTPS隧道检测 | 自动验证代理是否支持HTTPS |
-| 跨平台 | Mac / Windows / Linux |
-| Cookie保存 | JSON + Netscape 双格式 |
-
----
-
-## 快速开始 / Quick Start
+### 使用 Docker Compose（推荐）
 
 ```bash
-# 安装
-pip install seleniumbase
-
-# 基础用法（推荐）
-python bypass.py https://example.com
-
-# 使用代理
-python bypass.py https://example.com -p http://127.0.0.1:7890
+cd bypass-service
+docker compose up -d --build
 ```
 
----
+访问: `http://localhost:5000`
 
-## 安装部署 / Installation
-
-### Mac / Windows
+### 手动构建
 
 ```bash
-git clone https://github.com/1837620622/cloudflare-bypass-2026.git
-cd cloudflare-bypass-2026
+# 1. 构建前端
+cd ui
+npm install
+npm run build
+cd ..
+
+# 2. 安装 Python 依赖
 pip install -r requirements.txt
+
+# 3. 启动服务
+python api.py
 ```
 
-### Linux (Ubuntu/Debian)
+## API 文档
 
-```bash
-# 方式1: 一键安装
-git clone https://github.com/1837620622/cloudflare-bypass-2026.git
-cd cloudflare-bypass-2026
-sudo bash install_linux.sh
+### 任务管理
 
-# 方式2: 手动安装
-sudo apt-get update
-sudo apt-get install -y xvfb libglib2.0-0 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libgbm1 libasound2
+- `GET /api/tasks` - 获取所有任务
+- `POST /api/tasks` - 创建新任务
+- `PUT /api/tasks/{id}` - 更新任务
+- `DELETE /api/tasks/{id}` - 删除任务
+- `POST /api/tasks/{id}/run` - 手动运行任务
+- `POST /api/tasks/{id}/toggle` - 启用/禁用任务
 
-# 安装Chrome
-wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-sudo dpkg -i google-chrome-stable_current_amd64.deb
-sudo apt-get install -f -y
+### Bypass 功能
 
-# Python依赖
-pip install seleniumbase pyvirtualdisplay
-```
+- `POST /bypass` - Cloudflare Bypass
+- `POST /renew` - 直接调用续期（无需创建任务）
 
----
+## 配置说明
 
-## 使用方法 / Usage
+### 任务配置字段
 
-### 1. 简单模式 (bypass.py) - 推荐
-
-单浏览器，简单可靠：
-
-```bash
-# 直连
-python bypass.py https://example.com
-
-# 使用代理
-python bypass.py https://example.com -p http://127.0.0.1:7890
-
-# 设置超时
-python bypass.py https://example.com -t 60
-```
-
-**参数：**
-
-| 参数 | 说明 | 默认值 |
-|:---|:---|:---:|
-| `url` | 目标URL | 必填 |
-| `-p, --proxy` | 代理地址 | 无 |
-| `-t, --timeout` | 超时(秒) | 60 |
-| `--no-save` | 不保存Cookie | 否 |
-
----
-
-### 2. 完整模式 (simple_bypass.py)
-
-支持并行和代理轮换：
-
-```bash
-# 直连模式
-python simple_bypass.py https://example.com
-
-# 指定代理
-python simple_bypass.py https://example.com -p http://127.0.0.1:7890
-
-# 代理轮换模式（顺序尝试proxy.txt中的代理）
-python simple_bypass.py https://example.com -r -f proxy.txt
-
-# 并行模式（3个浏览器同时运行）
-python simple_bypass.py https://example.com -P -b 3 -t 60
-
-# 并行 + 代理检测 + 30批次
-python simple_bypass.py https://example.com -P -c -b 3 -t 15 -n 30 -f proxy.txt
-```
-
-**参数：**
-
-| 参数 | 说明 | 默认值 |
-|:---|:---|:---:|
-| `url` | 目标URL | 必填 |
-| `-p, --proxy` | 指定代理地址 | 无 |
-| `-f, --proxy-file` | 代理文件路径 | proxy.txt |
-| `-r, --rotate` | 顺序代理轮换模式 | 否 |
-| `-P, --parallel` | 并行模式 | 否 |
-| `-b, --batch` | 并行浏览器数量 | 3 |
-| `-t, --timeout` | 超时时间(秒) | 60 |
-| `-n, --retries` | 最大批次/重试数 | 3 |
-| `-c, --check-proxy` | 预检测代理存活 | 否 |
-| `--no-save` | 不保存Cookie | 否 |
-
----
-
-### 3. Python API
-
-```python
-# 简单模式
-from bypass import bypass_cloudflare
-
-result = bypass_cloudflare("https://example.com")
-if result["success"]:
-    print(f"cf_clearance: {result['cf_clearance']}")
-    print(f"User-Agent: {result['user_agent']}")
-
-# 完整模式
-from simple_bypass import bypass_cloudflare, bypass_parallel
-
-# 单次绕过
-result = bypass_cloudflare("https://example.com", proxy="http://127.0.0.1:7890")
-
-# 并行绕过
-result = bypass_parallel(
-    url="https://example.com",
-    proxy_file="proxy.txt",
-    batch_size=3,
-    timeout=15.0,
-    max_batches=30
-)
-```
-
----
-
-## 代理文件格式 / Proxy Format
-
-`proxy.txt` 每行一个代理：
-
-```
-# 支持的格式
-127.0.0.1:7890
-http://127.0.0.1:7890
-socks5://127.0.0.1:1080
-http://user:pass@host:port
-```
-
----
-
-## 输出文件 / Output
-
-Cookie保存到 `output/cookies/` 目录：
-
-| 文件 | 格式 | 用途 |
-|:---|:---|:---|
-| `cookies_*.json` | JSON | 编程使用 |
-| `cookies_*.txt` | Netscape | curl -b 使用 |
-
-**JSON示例：**
 ```json
 {
-  "url": "https://example.com",
-  "cookies": {
-    "cf_clearance": "xxx..."
+  "name": "服务器名称",
+  "url": "https://panel.example.com/server?id=123",
+  "username": "your@email.com",
+  "password": "your_password",
+  "proxy": "socks5://127.0.0.1:1080",  // 可选
+  "selectors": {
+    "renew_btn": "button.renew"  // 可选，留空自动查找
   },
-  "user_agent": "Mozilla/5.0...",
-  "timestamp": "20260122_103000"
+  "interval": 6,  // 续期间隔（小时）
+  "enabled": true
 }
 ```
 
----
+## 技术栈
 
-## 项目结构 / Structure
+**前端**: React + TypeScript + Vite + Tailwind CSS + Shadcn UI
 
-```
-cloudflare-bypass-2026/
-├── bypass.py              # 简单版（推荐）
-├── simple_bypass.py       # 完整版（并行+代理轮换）
-├── bypass_seleniumbase.py # 详细版
-├── install_linux.sh       # Linux安装脚本
-├── requirements.txt       # Python依赖
-├── proxy.txt              # 代理列表
-├── output/                # Cookie输出目录
-└── README.md
-```
+**后端**: Python + Flask + APSched牛er + SeleniumBase
 
----
+**浏览器**: UC Mode (Anti-detection)
 
-## 常见问题 / FAQ
+## 数据持久化
 
-**Q: 为什么不用无头模式?**
-> Cloudflare可检测无头浏览器，建议保持可视化模式以获得最高成功率。
+- 任务配置: `/app/data/tasks.json`
+- 截图: `/app/output/screenshots/`
 
-**Q: cf_clearance有效期?**
-> 通常30分钟到数小时，建议过期前重新获取。
+## 环境变量
 
-**Q: Linux报错 "X11 display failed"?**
-> 运行 `sudo bash install_linux.sh` 安装Xvfb等依赖。
-
-**Q: 代理不工作?**
-> 大部分公共代理不支持HTTPS隧道。建议使用直连模式或购买高质量住宅代理。
-
-**Q: Chrome启动多个进程?**
-> 这是Chrome正常架构（主进程+渲染进程+GPU进程），非代码问题。
-
----
-
-## 技术参考 / References
-
-- [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/)
-- [SeleniumBase UC Mode](https://seleniumbase.com/)
-
----
+- `PORT`: 服务端口（默认 5000）
+- `DISPLAY`: X11 显示（Docker 中默认 :99）
+- `PYTHONUNBUFFERED`: Python 输出缓冲（默认 1）
 
 ## License
 
-MIT License - 2026
-
----
-
-**如果这个项目对你有帮助，请给个 Star!**
-
-**If this project helps you, please give it a Star!**
+MIT
