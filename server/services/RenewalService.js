@@ -10,7 +10,7 @@ import os from 'os';
 import fs from 'fs';
 import WebSocket from 'ws';
 import path from 'path';
-import config from '../config/index.js';
+
 import fetch from 'node-fetch'; // Ensure node-fetch is available (built-in in newer node or needs install)
 
 // 如果 node 版本较低没有内置 fetch，需要 `npm install node-fetch`。
