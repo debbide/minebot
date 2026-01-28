@@ -53,6 +53,9 @@ class TaskStore:
             'password': task_data['password'],
             'proxy': task_data.get('proxy', ''),
             'selectors': task_data.get('selectors', {}),
+            'timeout': task_data.get('timeout', 120),
+            'wait_time': task_data.get('wait_time', 5),
+            'success_keywords': task_data.get('success_keywords', []),
             'interval': task_data.get('interval', 6),  # hours
             'enabled': task_data.get('enabled', True),
             'lastRun': None,

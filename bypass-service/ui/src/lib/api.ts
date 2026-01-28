@@ -9,7 +9,11 @@ export interface RenewalTask {
     proxy?: string;
     selectors?: {
         renew_btn?: string;
+        confirm_btn?: string;
     };
+    timeout?: number;
+    wait_time?: number;
+    success_keywords?: string[];
     interval: number; // in hours
     enabled: boolean;
     lastRun?: string;
@@ -17,6 +21,7 @@ export interface RenewalTask {
         success: boolean;
         message: string;
         screenshot_url?: string;
+        logs?: Array<{ time: string, type: string, message: string }>;
         timestamp: string;
     };
 }
