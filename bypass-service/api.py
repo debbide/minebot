@@ -286,6 +286,13 @@ def serve_static(path):
         return send_from_directory(str(dist_dir), 'index.html')
 
 
+@app.route('/api/screenshots/<path:filename>')
+def serve_screenshot(filename):
+    """Serve screenshots"""
+    screenshots_dir = Path("output/screenshots")
+    return send_from_directory(screenshots_dir, filename)
+
+
 # ==================== Startup ====================
 
 if __name__ == '__main__':
