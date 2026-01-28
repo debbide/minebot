@@ -33,7 +33,6 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { api, type RenewalTask } from "@/lib/api";
 
 export function RenewalDashboard() {
