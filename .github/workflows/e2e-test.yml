@@ -1,9 +1,7 @@
 name: End-to-End Test
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
     paths:
       - 'bypass-service/**'
       - 'docker-compose.yml'
