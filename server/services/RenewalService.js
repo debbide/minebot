@@ -566,23 +566,52 @@ export class RenewalService {
 
     this.log('info', `开始自动登录: ${loginUrl}`, id);
 
+    let sidecarData = null;
+    // 尝试使用 Sidecar 预处理 (获取 Cloudflare Cookies)
+    if (process.env.BYPASS_SERVICE_URL) {
+      sidecarData = await this.solveCaptchaWithSidecar(loginUrl, null); // 暂时不透传代理，或者需要从 config 获取
+    }
+
     const browser = await this.getBrowser();
     const page = await browser.newPage();
 
     try {
-      // 设置视口和 User-Agent
+      // 设置视口
       await page.setViewport({ width: 1920, height: 1080 });
-      const userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+
+      let userAgent = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+
+      // 如果 Sidecar 成功，必须使用 Sidecar 返回的 UA 和 Cookies
+      if (sidecarData) {
+        if (sidecarData.userAgent) {
+          userAgent = sidecarData.userAgent;
+          this.log('info', `使用 Sidecar 提供的 User-Agent`, id);
+        }
+
+        if (sidecarData.cookies) {
+          const cookies = [];
+          for (const [name, value] of Object.entries(sidecarData.cookies)) {
+            cookies.push({
+              name,
+              value,
+              url: loginUrl
+            });
+          }
+          if (cookies.length > 0) {
+            this.log('info', `注入 Sidecar 提供的 ${cookies.length} 个 Cookies`, id);
+            await page.setCookie(...cookies);
+          }
+        }
+      }
+
       this.log('info', `使用 User-Agent: ${userAgent}`, id);
       await page.setUserAgent(userAgent);
 
-      // 访问登录页面，等待 Cloudflare 5秒盾
-      this.log('info', '访问登录页面，等待 Cloudflare 验证...', id);
+      // 访问登录页面
+      this.log('info', '访问登录页面...', id);
       await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
-      // 等待页面加载完成（可能需要通过 5 秒盾）
-      await this.delay(3000);
-
+      // 如果没有使用 Sidecar，或者 Sidecar 没过盾，这里可能还需要处理
       // 检查是否还在 Cloudflare 验证页面
       let pageContent = await page.content();
       let waitCount = 0;
