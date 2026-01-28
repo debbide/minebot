@@ -13,7 +13,7 @@ class RenewalHandler:
         self.screenshot_dir = self.output_dir / "screenshots"
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
 
-    def run_renewal(self, url, username, password, login_url=None, action_type="renewal", proxy=None, selectors=None, timeout=120, wait_time=5, success_keywords=None):
+    def run_renewal(self, url, username, password, login_url=None, action_type="renewal", proxy=None, selectors=None, timeout=120, wait_time=5, success_keywords=None, logger=None):
         result = {
             "success": False,
             "message": "初始化...",
@@ -31,6 +31,11 @@ class RenewalHandler:
             entry = f"[{datetime.now().strftime('%H:%M:%S')}] {msg}"
             print(entry)
             result["logs"].append({"time": datetime.now().isoformat(), "type": type, "message": msg})
+            if logger:
+                try:
+                    logger(msg, type)
+                except:
+                    pass
 
         log(f"开始任务: {url} (模式: {action_type})")
         
