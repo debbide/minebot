@@ -47,13 +47,29 @@ class RenewalHandler:
         try:
             # UC Mode 启动浏览器 - Docker 优化配置
             # ARM 架构禁用 UC 模式（Chromium 不完全支持）
-            sb_config = {
-                "uc": not IS_ARM,  # ARM 上禁用 UC
-                "test": True,
-                "locale": "en",
-                "proxy": proxy,
-                "headless": True,  # 使用普通 headless 模式
-            }
+            if IS_ARM:
+                # ARM: 使用系统 chromium，禁用自动下载 driver
+                sb_config = {
+                    "browser": "chrome",
+                    "headless": True,
+                    "test": True,
+                    "locale": "en",
+                    "proxy": proxy,
+                    "chromium_arg": "--no-sandbox,--disable-dev-shm-usage,--disable-gpu",
+                    "binary_location": "/usr/bin/chromium",
+                }
+                # 设置环境变量让 selenium 使用系统 chromedriver
+                os.environ["SE_CHROMEDRIVER"] = "/usr/bin/chromedriver"
+            else:
+                # AMD64: 使用 UC 模式
+                sb_config = {
+                    "uc": True,
+                    "test": True,
+                    "locale": "en",
+                    "proxy": proxy,
+                    "headless": True,
+                }
+
             if proxy:
                 print(f"使用代理: {proxy}", flush=True)
 
