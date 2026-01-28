@@ -8,8 +8,16 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import proxyChain from 'proxy-chain';
 import os from 'os';
 import fs from 'fs';
+import WebSocket from 'ws';
 import path from 'path';
+import config from '../config/index.js';
+import fetch from 'node-fetch'; // Ensure node-fetch is available (built-in in newer node or needs install)
 
+// 如果 node 版本较低没有内置 fetch，需要 `npm install node-fetch`。
+// 这里假设环境已支持或已安装。为保险起见，如果使用的是 Node 18+，fetch 是全局的。
+// 如果是 Node < 18，可能需要 polyfill。
+// 由于 dockerfile 是 node:20-alpine，所以 fetch 是全局可用的，不需要 import。
+// 但为了 TS/JS 检查，保留注释。
 const USER_AGENTS = [
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
@@ -203,6 +211,8 @@ export class RenewalService {
       loginUrl: renewalConfig.loginUrl || '',
       panelUsername: renewalConfig.panelUsername || '',
       panelPassword: renewalConfig.panelPassword || '',
+      bypassServiceUrl: renewalConfig.bypassServiceUrl || process.env.BYPASS_SERVICE_URL || 'http://bypass-service:5000',
+      useBypassService: renewalConfig.useBypassService !== false,
 
       // 浏览器点击配置（browserClick 模式）
       renewButtonSelector: renewalConfig.renewButtonSelector || '',
@@ -367,9 +377,9 @@ export class RenewalService {
   /**
    * 获取或启动浏览器实例
    * @param {string} proxyUrl - 可选的代理地址，如 socks5://127.0.0.1:1080 或带认证的 socks5://user:pass@host:port
-   * @param {boolean} useGuestProfile - 是否使用访客模式启动浏览器
+   * @param {string} proxyUrl - 可选的代理地址，如 socks5://127.0.0.1:1080 或带认证的 socks5://user:pass@host:port
    */
-  async getBrowser(proxyUrl = null, useExtension = false, extensionKey = null) {
+  async getBrowser(proxyUrl = null) {
     const executablePath = this.getChromePath();
     let actualProxyUrl = proxyUrl;
 
@@ -416,21 +426,7 @@ export class RenewalService {
       '--window-size=1920,1080'
     ];
 
-    // [配置] 如果启用插件且提供了Key，加载 NopeCHA
-    // 原来的 FreeGameHost 插件路径: 'e:\\ck\\docker\\freegamehost\\chrome-extension'
-    // 新的 NopeCHA 插件路径: 'e:\\ck\\docker\\chromium_automation'
 
-    if (useExtension && extensionKey) {
-      // 尝试更新 Manifest
-      this.updateExtensionManifest(extensionKey);
-
-      const extPath = 'e:\\ck\\docker\\chromium_automation';
-      commonArgs.push(`--disable-extensions-except=${extPath}`);
-      commonArgs.push(`--load-extension=${extPath}`);
-      this.log('info', '已启用验证码破解插件');
-    } else {
-      this.log('info', `跳过加载验证码插件: enabled=${useExtension}, key=${extensionKey ? '***' : 'null'}`);
-    }
 
     // 如果指定了代理，每次都创建新的浏览器实例
     if (actualProxyUrl) {
@@ -1046,64 +1042,61 @@ export class RenewalService {
     }
   }
 
-  /**
-   * 检查 NopeCHA 余额
-   */
-  async checkNopechaBalance(key) {
-    if (!key) return { error: '未提供 API Key' };
 
-    try {
-      this.log('info', `正在查询 NopeCHA 余额...`);
-      const response = await fetch(`https://api.nopecha.com/status?key=${key}`);
-      const data = await response.json();
-
-      if (data.error) {
-        return { error: data.message || '查询失败' };
-      }
-
-      return {
-        credit: data.credit,
-        status: 'active'
-      };
-    } catch (error) {
-      this.log('error', `查询 NopeCHA 余额失败: ${error.message}`);
-      return { error: `网络请求失败: ${error.message}` };
-    }
-  }
 
   /**
    * 更新扩展 Manifest (注入 Key)
    */
-  updateExtensionManifest(key) {
-    if (!key) return;
+
+
+  /**
+   * 使用 Bypass Service 获取 Cloudflare 验证后的 Cookies
+   * @param {string} targetUrl - 目标 URL
+   * @param {string} bypassServiceUrl - Bypass Service 的 URL
+   * @param {string} proxyUrl - 浏览器代理 URL (可选)
+   * @param {string} renewalId - 续期 ID
+   * @returns {Promise<object|null>} 包含 cookies 和 user_agent 的对象，或 null
+   */
+  async getCookiesFromBypassService(targetUrl, bypassServiceUrl, proxyUrl = null, renewalId = null) {
+    if (!bypassServiceUrl) {
+      this.log('error', '未配置 Bypass Service URL', renewalId);
+      return null;
+    }
+
+    this.log('info', `尝试通过 Bypass Service 获取 Cookies: ${targetUrl}`, renewalId);
 
     try {
-      // 扩展路径硬编码为 e:\ck\docker\chromium_automation
-      const extPath = 'e:\\ck\\docker\\chromium_automation';
-      const manifestPath = path.join(extPath, 'manifest.json');
+      const requestBody = {
+        url: targetUrl,
+        proxy: proxyUrl, // 传递代理信息给 Bypass Service
+        userAgent: USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)],
+      };
 
-      if (fs.existsSync(manifestPath)) {
-        const manifestContent = fs.readFileSync(manifestPath, 'utf8');
-        const manifest = JSON.parse(manifestContent);
+      const response = await fetch(`${bypassServiceUrl}/bypass`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-        // 如果 key 不同，更新并保存
-        if (manifest.nopecha_key !== key) { // 注意: 字段名可能不同，官方通常是 key 或 nopecha.key，这里假设直接注入 specific field 如果扩展支持，或者修改 background script
-          // 根据 NopeCHA 文档，通常是设置 storage 或修改 manifest 的 oauth2 / 预设 key
-          // 但这里用户之前的实现是注入 manifest.
-          // 假设扩展读取 manifest 中的 specific key，或者我们需要修改 content script?
-          // 这里我们按之前的计划: 注入到 manifest 的 nopecha.key 字段 (假设扩展逻辑如此)
-          // 或者更为通用的：NopeCHA 扩展通常支持 managed storage 或者首次运行配置
-          // 简单起见，我们假设修改 manifest.json 中的 key 字段是有效的，或者我们在此处仅仅是占位
-          // 实际 NopeCHA Chrome 扩展通常不需要修改 manifest，而是通过 UI 设置
-          // 但为了自动化，可能需要预填充 storage.
-          // 此处保留原定逻辑: 注入 nopecha_key
-          manifest.nopecha_key = key;
-          fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-          this.log('info', '已更新扩展 Manifest 中的 Key');
-        }
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Bypass Service 返回错误: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.cookies) {
+        this.log('info', `Bypass Service 成功获取到 ${Object.keys(data.cookies).length} 个 Cookies`, renewalId);
+        return data;
+      } else {
+        this.log('warning', `Bypass Service 未能成功获取 Cookies: ${data.message || '未知错误'}`, renewalId);
+        return null;
       }
     } catch (error) {
-      this.log('warning', `更新扩展 Manifest 失败: ${error.message}`);
+      this.log('error', `调用 Bypass Service 失败: ${error.message}`, renewalId);
+      throw error;
     }
   }
 
@@ -1275,7 +1268,6 @@ export class RenewalService {
       }
 
       // 等待页面 React/Vue 渲染完成
-      this.log('info', '等待页面渲染完成...', id);
       await this.delay(2000);
 
       // 检查是否已经登录（浏览器可能保留了之前的登录状态）
@@ -1292,7 +1284,16 @@ export class RenewalService {
         }
       } catch (e) { }
 
-      const alreadyLoggedIn = !currentUrl.includes('/login') &&
+      // [修正] 增加对 Cloudflare 页面的判断
+      // 如果页面包含 Cloudflare 验证相关内容，即便 URL 对了，也不能算已登录
+      const pageContentForLoginCheck = await page.content();
+      const isCloudflarePage = pageContentForLoginCheck.includes('challenges.cloudflare.com') ||
+        pageContentForLoginCheck.includes('turnstile') ||
+        pageContentForLoginCheck.includes('checking your browser') ||
+        pageContentForLoginCheck.includes('Just a moment');
+
+      const alreadyLoggedIn = !isCloudflarePage &&
+        !currentUrl.includes('/login') &&
         !currentUrl.includes('/auth') &&
         !currentUrl.includes('/sign-in') &&
         !currentUrl.includes('signin');
@@ -1300,6 +1301,9 @@ export class RenewalService {
       // 如果已登录，跳过登录流程，直接进入续期
       if (alreadyLoggedIn) {
         this.log('info', `检测到已登录状态，跳过登录步骤 (当前页面: ${currentUrl})`, id);
+      } else if (isCloudflarePage) {
+        this.log('warning', '检测到仍在 Cloudflare 验证页面，等待插件处理...', id);
+        // 如果是 CF 页面，不要刷新，直接进入下面的流程让 handleTurnstile/插件 去处理
       } else if (reusedPage) {
         // 如果是复用的页面但未登录，可能登录失效，刷新页面重试
         this.log('warning', '复用页面未检测到登录状态，尝试刷新...', id);
@@ -1693,7 +1697,38 @@ export class RenewalService {
       let renewPageContent = await page.content();
       let cfWaitCount = 0;
       while ((renewPageContent.includes('checking your browser') || renewPageContent.includes('Just a moment')) && cfWaitCount < 15) {
-        this.log('info', '等待续期页面 Cloudflare 验证...', id);
+        const pageTitle = await page.title();
+        if (pageTitle.includes('Cloudflare') || pageTitle.includes('Attention Required')) {
+          this.log('info', '等待续期页面 Cloudflare 验证...', id);
+
+          if (renewal.useBypassService) {
+            this.log('info', '尝试使用 Bypass Service 进行验证...', id);
+            try {
+              const bypassResult = await this.getCookiesFromBypassService(url, renewal.bypassServiceUrl, renewal.browserProxy, id);
+              if (bypassResult && bypassResult.cookies) {
+                this.log('info', 'Bypass Service 验证成功，注入 Cookie...', id);
+                const cookiesToInject = Object.entries(bypassResult.cookies).map(([name, value]) => ({
+                  name,
+                  value,
+                  domain: new URL(url).hostname,
+                  path: '/',
+                }));
+                await page.setCookie(...cookiesToInject);
+                if (bypassResult.user_agent) {
+                  await page.setUserAgent(bypassResult.user_agent);
+                }
+
+                // 重新刷新页面
+                this.log('info', 'Cookie 注入完成，刷新页面...', id);
+                await page.reload({ waitUntil: 'networkidle2' });
+              }
+            } catch (err) {
+              this.log('error', `Bypass Service 调用失败: ${err.message}`, id);
+              // 失败后继续尝试默认的 puppeteer 逻辑
+            }
+          }
+        }
+
         await this.delay(2000);
         renewPageContent = await page.content();
         cfWaitCount++;
@@ -1961,10 +1996,13 @@ export class RenewalService {
                   this.log('info', `重新找到续期按钮: ${text.trim().substring(0, 50)}`, id);
                   break;
                 }
+
+
+
+                if (renewButtonAgain) break;
               }
               if (renewButtonAgain) break;
             }
-            if (renewButtonAgain) break;
           } catch (e) { }
         }
 
@@ -2506,9 +2544,6 @@ export class RenewalService {
   /**
    * 手动测试续期
    */
-  /**
-   * 手动测试续期
-   */
   async testRenewal(id, options = {}) {
     return this.executeRenewal(id, options);
   }
@@ -2622,5 +2657,50 @@ export class RenewalService {
     }
     // 关闭浏览器
     this.closeBrowser();
+  }
+
+  /**
+   * 调用 Bypass Service 获取 Cookies
+   */
+  async getCookiesFromBypassService(url, serviceUrl, proxy, id) {
+    if (!serviceUrl) {
+      this.log('error', '未配置 Bypass Service URL', id);
+      return null;
+    }
+
+    this.log('info', `尝试通过 Bypass Service 获取 Cookies: ${url}`, id);
+
+    try {
+      const requestBody = {
+        url,
+        proxy,
+        timeout: 60
+      };
+
+      const response = await fetch(`${serviceUrl}/bypass`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Bypass Service responded with ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.cookies) {
+        this.log('info', `Bypass Service 成功获取到 ${Object.keys(data.cookies).length} 个 Cookies`, id);
+        return data;
+      } else {
+        this.log('warning', `Bypass Service 未能成功获取 Cookies: ${data.error || '未知错误'}`, id);
+        return null;
+      }
+    } catch (error) {
+      this.log('error', `调用 Bypass Service 失败: ${error.message}`, id);
+      return null;
+    }
   }
 }
