@@ -69,50 +69,46 @@ def is_linux() -> bool:
 
 def check_proxy_alive(proxy: str, timeout: float = 8.0) -> bool:
     """
-    检测代理是否支持HTTPS隧道（使用HTTPS网站测试）
-    
-    参数:
-        proxy: 代理地址
-        timeout: 超时时间（秒）
-    
-    返回:
-        代理是否可用
+    检测代理是否有效，使用 requests 库（如果可用）或 socket 进行基本连接测试
     """
-    import urllib.request
-    import ssl
-    
     try:
-        # 确保代理格式正确
-        if "://" not in proxy:
-            proxy = f"http://{proxy}"
-        
-        # 创建代理处理器
-        proxy_handler = urllib.request.ProxyHandler({
-            'http': proxy,
-            'https': proxy
-        })
-        opener = urllib.request.build_opener(proxy_handler)
-        
-        # 使用HTTPS网站测试，确保代理支持HTTPS隧道(CONNECT)
-        request = urllib.request.Request(
-            "https://httpbin.org/ip",
-            headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0'
-            }
-        )
-        
-        # 忽略SSL证书验证
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        
-        response = opener.open(request, timeout=timeout)
-        
-        if response.status == 200:
+        # 方法1: 尝试使用 requests (更准确)
+        import requests
+        proxies = {
+            "http": proxy,
+            "https": proxy
+        }
+        try:
+            resp = requests.get("https://www.google.com/generate_204", proxies=proxies, timeout=timeout)
+            return resp.status_code == 204 or resp.status_code == 200
+        except:
+            # 备用地址
+            resp = requests.get("https://httpbin.org/ip", proxies=proxies, timeout=timeout)
+            return resp.status_code == 200
+            
+    except ImportError:
+        # 方法2: 如果没有 requests，使用 urllib (不推荐但兜底)
+        import urllib.request
+        import ssl
+        try:
+            if "://" not in proxy:
+                proxy = f"http://{proxy}"
+            
+            proxy_handler = urllib.request.ProxyHandler({'http': proxy, 'https': proxy})
+            opener = urllib.request.build_opener(proxy_handler)
+            request = urllib.request.Request("https://httpbin.org/ip")
+            
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
+            opener.open(request, timeout=timeout)
             return True
-        return False
-        
-    except Exception:
+        except:
+            return False
+            
+    except Exception as e:
+        print(f"Proxy check failed: {e}")
         return False
 
 
