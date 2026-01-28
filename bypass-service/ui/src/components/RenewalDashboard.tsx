@@ -39,6 +39,7 @@ import { api, type RenewalTask } from "@/lib/api";
 export function RenewalDashboard() {
     const [tasks, setTasks] = useState<RenewalTask[]>([]);
     const [loading, setLoading] = useState(false);
+    const [TESTING_PROXY, setTestingProxy] = useState(false);
     const [runningId, setRunningId] = useState<string | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [detailsOpen, setDetailsOpen] = useState(false);
@@ -297,11 +298,33 @@ export function RenewalDashboard() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label>代理 (Proxy)</Label>
-                                        <Input
-                                            placeholder="socks5://..."
-                                            value={formData.proxy}
-                                            onChange={(e) => setFormData({ ...formData, proxy: e.target.value })}
-                                        />
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="socks5://..."
+                                                value={formData.proxy}
+                                                onChange={(e) => setFormData({ ...formData, proxy: e.target.value })}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="icon"
+                                                title="测试代理连通性"
+                                                disabled={!formData.proxy || TESTING_PROXY}
+                                                onClick={async () => {
+                                                    setTestingProxy(true);
+                                                    try {
+                                                        const res = await api.checkProxy(formData.proxy);
+                                                        alert(res.success ? "✅ 代理可用" : "❌ 代理不可用");
+                                                    } catch (e) {
+                                                        alert(`测试出错: ${e}`);
+                                                    } finally {
+                                                        setTestingProxy(false);
+                                                    }
+                                                }}
+                                            >
+                                                {TESTING_PROXY ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
 
