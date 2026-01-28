@@ -204,8 +204,13 @@ def execute_task(task):
             url=task['url'],
             username=task['username'],
             password=task['password'],
+            login_url=task.get('login_url'),
+            action_type=task.get('action_type', 'renewal'),
             proxy=task.get('proxy'),
-            selectors=task.get('selectors', {})
+            selectors=task.get('selectors', {}),
+            timeout=task.get('timeout', 120),
+            wait_time=task.get('wait_time', 5),
+            success_keywords=task.get('success_keywords')
         )
         
         # Update task result

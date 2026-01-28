@@ -13,7 +13,7 @@ class RenewalHandler:
         self.screenshot_dir = self.output_dir / "screenshots"
         self.screenshot_dir.mkdir(parents=True, exist_ok=True)
 
-    def run_renewal(self, url, username, password, proxy=None, selectors=None, timeout=120):
+    def run_renewal(self, url, username, password, login_url=None, action_type="renewal", proxy=None, selectors=None, timeout=120, wait_time=5, success_keywords=None):
         result = {
             "success": False,
             "message": "初始化...",
@@ -24,46 +24,61 @@ class RenewalHandler:
         
         selectors = selectors or {}
         
+        if success_keywords is None:
+            success_keywords = ["success", "renewed", "extended", "成功", "已续期"]
+            
         def log(msg, type="info"):
             entry = f"[{datetime.now().strftime('%H:%M:%S')}] {msg}"
             print(entry)
             result["logs"].append({"time": datetime.now().isoformat(), "type": type, "message": msg})
 
-        log(f"开始续期流程: {url}")
+        log(f"开始任务: {url} (模式: {action_type})")
         
         try:
             # UC Mode 启动浏览器
             with SB(uc=True, test=True, locale="en", proxy=proxy, incognito=True) as sb:
                 log("浏览器启动成功 (UC Mode)")
                 
-                # 1. 访问登录页 (自适应逻辑: 先访问目标页，如果跳转到登录页则处理)
-                log(f"访问页面: {url}")
-                sb.uc_open_with_reconnect(url, reconnect_time=6.0)
+                # 1. 登录流程 (如果有 login_url 或检测到登录页)
+                target_url = url
+                start_url = login_url if login_url else url
+                
+                log(f"访问页面: {start_url}")
+                sb.uc_open_with_reconnect(start_url, reconnect_time=float(wait_time))
                 
                 # 处理 Cloudflare
                 self._handle_cloudflare(sb, log)
                 
-                # 等待页面加载
-                time.sleep(3)
-                
                 # 检查是否需要登录
                 current_url = sb.get_current_url()
-                log(f"当前页面: {current_url}")
+                is_login = False
                 
-                if self._check_is_login_page(sb, current_url):
-                    log("检测到登录页面，开始登录流程...")
-                    self._handle_login(sb, username, password, log)
+                # 如果明确指定了 login_url，或者当前页面看起来像登录页
+                if (login_url and start_url == login_url) or self._check_is_login_page(sb, current_url):
+                    log("进入登录流程...")
+                    self._handle_login(sb, username, password, log, wait_time)
+                    is_login = True
                     
-                    # 登录后再次处理可能的验证
+                    # 登录后再次处理验证
                     self._handle_cloudflare(sb, log)
-                    
-                    # 再次检查是否在目标页面
-                    current_url = sb.get_current_url()
-                    if self._check_is_login_page(sb, current_url):
-                         # 尝试再次跳转
-                         log("登录后似乎未跳转，尝试重新访问目标URL...")
-                         sb.uc_open_with_reconnect(url, reconnect_time=3.0)
-                         time.sleep(3)
+                
+                # 如果登录后需要跳转到目标页
+                if is_login and login_url and target_url != login_url:
+                     log(f"登录完成，跳转至目标页: {target_url}")
+                     sb.uc_open_with_reconnect(target_url, reconnect_time=float(wait_time))
+                     self._handle_cloudflare(sb, log)
+
+                # 2. 如果是保活模式，到这里就结束了
+                if action_type == "keepalive":
+                    log("保活任务: 页面访问完成")
+                    result["success"] = True
+                    result["message"] = "页面访问成功 (保活模式)"
+                    screenshot_name = f"keepalive_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+                    sb.save_screenshot(str(self.screenshot_dir / screenshot_name))
+                    result["screenshot_url"] = f"/api/screenshots/{screenshot_name}"
+                    return result
+                
+                # 3. 续期模式: 查找并点击续期按钮
 
                 # 2. 查找并点击续期按钮
                 log("查找续期按钮...")
@@ -132,7 +147,7 @@ class RenewalHandler:
                     # 验证成功状态
                     time.sleep(2)
                     page_text = sb.get_text("body").lower()
-                    success_keywords = ["success", "renewed", "extended", "成功", "已续期"]
+                    # success_keywords already defined at top
                     
                     # 截图
                     screenshot_name = f"success_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
@@ -185,7 +200,7 @@ class RenewalHandler:
             return True
         return False
         
-    def _handle_login(self, sb, username, password, log):
+    def _handle_login(self, sb, username, password, log, wait_time=5):
         log("填写登录表单...")
         
         # 查找用户名
