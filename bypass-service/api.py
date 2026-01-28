@@ -10,10 +10,7 @@ app = Flask(__name__)
 # Global display (for Linux)
 display = None
 
-@app.before_first_request
-def startup():
-    global display
-    display = setup_display()
+
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -44,5 +41,8 @@ def bypass():
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
+    # Initialize display on startup
+    display = setup_display()
+    
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
