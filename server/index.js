@@ -1360,6 +1360,14 @@ app.post('/api/webhooks/trigger', async (req, res) => {
 
     console.log('[Webhook] Received trigger:', content.substring(0, 200) + '...');
 
+    // 广播到前端日志，方便用户调试
+    broadcast('log', {
+      type: 'info',
+      icon: '🔔',
+      message: `收到 Webhook: ${content.substring(0, 50)}...`,
+      timestamp: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+    });
+
     const matchedBots = [];
 
     // 遍历所有机器人实例
@@ -1371,16 +1379,21 @@ app.post('/api/webhooks/trigger', async (req, res) => {
       if (serverName && content.includes(serverName)) {
         // 检查是否有面板配置
         if (bot.status.pterodactyl?.url && bot.status.pterodactyl?.apiKey) {
-          console.log(`[Webhook] Matched server: ${serverName}, sending start signal...`);
+          const msg = `Webhook 匹配到服务器: ${bot.config.name}，正在执行开机...`;
+          console.log(`[Webhook] ${msg}`);
+          broadcast('log', { type: 'success', icon: '⚡', message: msg, timestamp: new Date().toLocaleTimeString() });
 
           // 为了不阻塞响应，异步执行开机
           bot.sendPowerSignal('start').catch(e => {
             console.error(`[Webhook] Failed to start ${serverName}:`, e.message);
+            broadcast('log', { type: 'error', icon: '❌', message: `开机失败: ${e.message}`, timestamp: new Date().toLocaleTimeString() });
           });
 
           matchedBots.push(serverName);
         } else {
-          console.log(`[Webhook] Matched ${serverName} but no Pterodactyl config found.`);
+          const msg = `Webhook 匹配到 ${bot.config.name} 但未配置翼龙面板信息`;
+          console.log(`[Webhook] ${msg}`);
+          broadcast('log', { type: 'warning', icon: '⚠️', message: msg, timestamp: new Date().toLocaleTimeString() });
         }
       }
     }

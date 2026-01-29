@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { MultiServerPanel } from "@/components/MultiServerPanel";
+import { ConsoleLog } from "@/components/ConsoleLog";
 
 import { StatsOverview } from "@/components/StatsOverview";
 import { useWebSocket } from "@/hooks/useBot";
@@ -23,6 +24,10 @@ const Index = () => {
 
         <div className="space-y-4">
           <MultiServerPanel />
+          {/* 日志控制台 */}
+          <div className="mt-8">
+            <ConsoleLog externalLogs={status?.logs} />
+          </div>
         </div>
       </main>
 
