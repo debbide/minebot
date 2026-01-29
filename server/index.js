@@ -217,7 +217,7 @@ app.post('/api/auth/logout', (req, res) => {
 
 // Apply auth middleware to all /api routes except auth and screenshots
 app.use('/api', (req, res, next) => {
-  if (req.path.startsWith('/auth/') || req.path.startsWith('/screenshots/') || req.path.startsWith('/webhooks/')) {
+  if (req.path === '/auth/login' || req.path === '/auth/check' || req.path.startsWith('/screenshots/') || req.path.startsWith('/webhooks/')) {
     return next();
   }
   return authService.authMiddleware()(req, res, next);
