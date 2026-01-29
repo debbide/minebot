@@ -105,6 +105,15 @@ const systemService = new SystemService();
 const auditService = new AuditService();
 const botManager = new BotManager(configManager, aiService, broadcast);
 
+// Apply auth middleware to all /api routes except auth and screenshots
+// MUST be defined BEFORE API routes
+app.use('/api', (req, res, next) => {
+  if (req.path === '/auth/login' || req.path === '/auth/check' || req.path.startsWith('/screenshots/') || req.path.startsWith('/webhooks/')) {
+    return next();
+  }
+  return authService.authMiddleware()(req, res, next);
+});
+
 // Health check endpoint (before all middleware, for Docker health check)
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
@@ -215,13 +224,7 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
-// Apply auth middleware to all /api routes except auth and screenshots
-app.use('/api', (req, res, next) => {
-  if (req.path === '/auth/login' || req.path === '/auth/check' || req.path.startsWith('/screenshots/') || req.path.startsWith('/webhooks/')) {
-    return next();
-  }
-  return authService.authMiddleware()(req, res, next);
-});
+
 
 // Serve static files
 app.use(express.static(join(__dirname, '../dist')));
