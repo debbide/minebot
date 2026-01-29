@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { api, TelegramConfig } from "@/lib/api";
-import { Loader2, Save, Send } from "lucide-react";
+import { Loader2, Save, Send, Lock } from "lucide-react";
 
 interface GlobalSettingsDialogProps {
     open: boolean;
@@ -23,6 +23,12 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
         enabled: false,
         botToken: "",
         chatId: ""
+    });
+
+    const [passwordData, setPasswordData] = useState({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
     });
 
     useEffect(() => {
@@ -69,6 +75,50 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
         }
     };
 
+    const handleSavePassword = async () => {
+        if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+            toast({
+                title: "错误",
+                description: "请填写所有密码字段",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            toast({
+                title: "错误",
+                description: "两次输入的密码不一致",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            setSaving(true);
+            await api.changePassword(
+                passwordData.currentPassword,
+                passwordData.newPassword,
+                passwordData.confirmPassword
+            );
+            toast({
+                title: "密码修改成功",
+                description: "请使用新密码重新登录",
+            });
+            // Optional: Logout user?
+            setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+        } catch (error: any) {
+            console.error("Failed to change password:", error);
+            toast({
+                title: "修改失败",
+                description: error.message || "无法修改密码，请检查当前密码是否正确",
+                variant: "destructive",
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[600px] top-[15%] translate-y-0">
@@ -80,9 +130,10 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                 </DialogHeader>
 
                 <Tabs defaultValue="telegram" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="telegram">Telegram 通知</TabsTrigger>
-                        <TabsTrigger value="general" disabled>通用设置 (开发中)</TabsTrigger>
+                        <TabsTrigger value="security">账号安全</TabsTrigger>
+                        <TabsTrigger value="general" disabled>通用设置</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="telegram" className="space-y-4 py-4">
@@ -141,8 +192,61 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                             </Button>
                         </div>
                     </TabsContent>
+
+                    <TabsContent value="security" className="space-y-4 py-4">
+                        <div className="flex items-center space-x-2 border-b pb-4 mb-4">
+                            <Lock className="h-5 w-5 text-primary" />
+                            <div>
+                                <h3 className="font-medium">修改登录密码</h3>
+                                <p className="text-xs text-muted-foreground">修改管理员账号的登录密码</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="current-password">当前密码</Label>
+                                <Input
+                                    id="current-password"
+                                    type="password"
+                                    placeholder="输入当前使用的密码"
+                                    value={passwordData.currentPassword}
+                                    onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="new-password">新密码</Label>
+                                <Input
+                                    id="new-password"
+                                    type="password"
+                                    placeholder="输入新密码"
+                                    value={passwordData.newPassword}
+                                    onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="confirm-password">确认新密码</Label>
+                                <Input
+                                    id="confirm-password"
+                                    type="password"
+                                    placeholder="再次输入新密码"
+                                    value={passwordData.confirmPassword}
+                                    onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end pt-4">
+                            <Button onClick={handleSavePassword} disabled={saving}>
+                                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                <Save className="mr-2 h-4 w-4" />
+                                修改密码
+                            </Button>
+                        </div>
+                    </TabsContent>
                 </Tabs>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     );
 }

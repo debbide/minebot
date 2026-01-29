@@ -197,6 +197,21 @@ class ApiService {
     return this.request('/api/auth/check');
   }
 
+  async changePassword(currentPassword: string, newPassword: string, confirmPassword: string): Promise<{ success: boolean; message?: string }> {
+    const response = await fetch(`${this.baseUrl}/api/auth/change-password`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Password change failed');
+    }
+
+    return response.json();
+  }
+
   // Status
   async getStatus(): Promise<BotStatus> {
     return this.request<BotStatus>('/api/status');
