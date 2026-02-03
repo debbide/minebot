@@ -1,0 +1,118 @@
+// ==UserScript==
+// @name         FreezeHost AFK 自动挂机 (v17 零点突破版)
+// @namespace    http://tampermonkey.net/
+// @version      17.0
+// @description  解决倒计时0:00卡住不刷新的问题，加入强制重置逻辑
+// @author       Gemini
+// @match        https://free.freezehost.pro/earn
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    const CHECK_INTERVAL = 1000;
+
+    // --- 状态面板 ---
+    const infoBox = document.createElement('div');
+    Object.assign(infoBox.style, {
+        position: 'fixed', bottom: '20px', right: '20px', padding: '12px 16px',
+        backgroundColor: 'rgba(0, 0, 0, 0.9)', color: '#fff', borderRadius: '8px',
+        zIndex: '999999', fontFamily: 'monospace', fontSize: '12px',
+        borderLeft: '5px solid #888', boxShadow: '0 4px 15px rgba(0,0,0,0.6)',
+        minWidth: '240px'
+    });
+    infoBox.innerHTML = '脚本 v17 初始化...';
+    document.body.appendChild(infoBox);
+
+    // --- 点击函数 ---
+    function triggerClick(element, actionName) {
+        console.log(`[Action] 点击: ${actionName}`);
+        element.style.border = "4px solid #fff";
+        const opts = { bubbles: true, cancelable: true, view: window };
+        element.dispatchEvent(new MouseEvent('mousedown', opts));
+        element.dispatchEvent(new MouseEvent('mouseup', opts));
+        element.click();
+        setTimeout(() => { if (element) element.style.border = ""; }, 500);
+    }
+
+    // --- 更新面板 ---
+    function updateHUD(color, status, detail, action) {
+        infoBox.style.borderLeftColor = color;
+        infoBox.innerHTML = `
+            <div style="font-size:14px; font-weight:bold; color:${color}; margin-bottom:6px;">${status}</div>
+            <div style="color:#bbb; margin-bottom:4px;">📊 状态: <span style="color:#fff">${detail}</span></div>
+            <div style="color:#888; border-top:1px solid #444; padding-top:4px; font-size:11px;">
+               🤖 动作: <span style="color:${color}">${action}</span>
+            </div>
+        `;
+    }
+
+    // --- 主循环 ---
+    function loop() {
+        const bodyText = document.body.innerText;
+        const startBtn = document.getElementById('start-afk-btn');
+        const timerElement = document.getElementById('session-timer');
+        const timerText = timerElement ? timerElement.innerText.trim() : "";
+
+        // =================================================================
+        // 0. 特殊情况处理：倒计时归零 (0:00)
+        // =================================================================
+        // 这是为了解决你截图里卡在 0:00 的问题。
+        // 只要看到 0:00，不管其他文字显示什么，直接判死刑 -> 刷新。
+        if (timerText === "0:00" || timerText === "00:00") {
+            updateHUD("#ff00ff", "时间耗尽", "检测到 0:00 卡死", "强制刷新页面...");
+            console.log("倒计时归零，强制重置...");
+
+            // 尝试找一下续期按钮，如果有就点，没有就直接刷新网页
+            const renewBtnResult = document.evaluate("//button[contains(., 'Start New Session')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+            const renewBtn = renewBtnResult.singleNodeValue;
+
+            if (renewBtn) {
+                renewBtn.click();
+            } else {
+                // 等待 2 秒后刷新，给网页一点反应机会
+                setTimeout(() => location.reload(), 2000);
+            }
+            return;
+        }
+
+        // =================================================================
+        // 1. 正常续期 (Start New Session)
+        // =================================================================
+        const renewBtnResult = document.evaluate("//button[contains(., 'Start New Session')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const renewBtn = renewBtnResult.singleNodeValue;
+        if (renewBtn && renewBtn.offsetParent !== null) {
+            updateHUD("#ff00ff", "Session 完成", "等待刷新", "点击 Start New Session");
+            triggerClick(renewBtn, "Start New Session");
+            return;
+        }
+
+        // =================================================================
+        // 2. 挂机运行中 (You are now earning coins)
+        // =================================================================
+        if (bodyText.includes("You are now earning coins") || bodyText.includes("1 coin will be added")) {
+            if (startBtn) {
+                startBtn.style.border = "2px dashed #444";
+                startBtn.style.opacity = "0.5";
+            }
+            updateHUD("#00ccff", "稳定挂机中...", `倒计时: ${timerText}`, "静默监控 (禁止操作)");
+            return;
+        }
+
+        // =================================================================
+        // 3. 断线/未开始 (点击 Start AFK Session)
+        // =================================================================
+        if (startBtn) {
+            updateHUD("#00ff00", "准备就绪 / 断线", "当前处于闲置状态", "点击 Start AFK Session");
+            triggerClick(startBtn, "Start AFK Session");
+            return;
+        }
+
+        updateHUD("#888", "加载中...", "正在分析页面", "等待按钮出现");
+    }
+
+    setInterval(loop, CHECK_INTERVAL);
+    console.log("FreezeHost v17 (零点突破版) 已启动");
+
+})();
