@@ -4,7 +4,8 @@
 // @version      1.1
 // @description  自动检测 AFK 状态，模拟心跳防止掉线，并在掉线时自动重登
 // @author       Antigravity
-// @match        *://freedash.worldofangara.fun/*
+// @match        *://*.worldofangara.fun/*
+// @run-at       document-end
 // @grant        none
 // ==/UserScript==
 (function () {
@@ -16,79 +17,80 @@
         HEARTBEAT_INTERVAL: 60000, // 心跳频率 (1分钟)
     };
     console.log("%c[Angara AFK Helper] 脚本已启动", "color: #ff4500; font-weight: bold;");
-    // --- 可视化面板 UI ---
-    const panel = document.createElement('div');
-    panel.style = `
-        position: fixed; top: 10px; right: 10px; width: 280px; height: 180px;
-        background: rgba(0, 0, 0, 0.85); color: #00ff00; font-family: monospace;
-        font-size: 12px; padding: 10px; border-radius: 8px; z-index: 100000;
-        border: 1px solid #444; overflow: hidden; pointer-events: none;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-    `;
-    panel.innerHTML = `
-        <div style="border-bottom: 1px solid #444; padding-bottom: 5px; margin-bottom: 5px; font-weight: bold; color: #ffa500;">
-            🚀 Angara AFK Monitor v1.2
-        </div>
-        <div id="afk-log-container" style="height: 140px; overflow-y: auto;"></div>
-    `;
-    document.body.appendChild(panel);
-    const logContainer = panel.querySelector('#afk-log-container');
-    function customLog(msg, color = "#00ff00") {
-        const time = new Date().toLocaleTimeString();
-        const line = document.createElement('div');
-        line.style.marginBottom = '2px';
-        line.innerHTML = `<span style="color: #888;">[${time}]</span> <span style="color: ${color};">${msg}</span>`;
-        logContainer.prepend(line);
-        // 只保留最近 50 条日志
-        if (logContainer.children.length > 50) logContainer.lastChild.remove();
+    // --- 状态面板 (参考用户喜好的右下角样式) ---
+    const infoBox = document.createElement('div');
+    Object.assign(infoBox.style, {
+        position: 'fixed', bottom: '20px', right: '20px', padding: '12px 16px',
+        backgroundColor: 'rgba(0, 0, 0, 0.9)', color: '#fff', borderRadius: '8px',
+        zIndex: '999999', fontFamily: 'monospace', fontSize: '12px',
+        borderLeft: '5px solid #00ff00', boxShadow: '0 4px 15px rgba(0,0,0,0.6)',
+        minWidth: '260px', pointerEvents: 'none'
+    });
+    infoBox.innerHTML = '脚本 v1.4 初始化中...';
+    document.body.appendChild(infoBox);
+    // --- 状态更新函数 ---
+    function updateHUD(color, status, detail, action) {
+        infoBox.style.borderLeftColor = color;
+        infoBox.innerHTML = `
+            <div style="font-size:14px; font-weight:bold; color:${color}; margin-bottom:6px;">🚀 ${status}</div>
+            <div style="color:#bbb; margin-bottom:4px;">📊 状态: <span style="color:#fff">${detail}</span></div>
+            <div style="color:#888; border-top:1px solid #444; padding-top:4px; font-size:11px;">
+               🤖 动作: <span style="color:${color}">${action}</span>
+            </div>
+        `;
     }
-    customLog("脚本初始化成功...");
-    // 1. 模拟人类心跳 (维持会话)
+    // --- 点击触发函数 ---
+    function triggerClick(element, name) {
+        if (!element) return;
+        updateHUD("#ffa500", "触发点击", name, "正在模拟点击动作...");
+        const opts = { bubbles: true, cancelable: true, view: window };
+        element.dispatchEvent(new MouseEvent('mousedown', opts));
+        element.dispatchEvent(new MouseEvent('mouseup', opts));
+        element.click();
+    }
+    // --- 核心心跳 (维持会话) ---
     setInterval(() => {
-        // 模拟微小的页面滚动
         window.scrollBy(0, 2);
         setTimeout(() => window.scrollBy(0, -2), 500);
-        customLog("💓 发送活跃心跳 (Session Keepalive)", "#1e90ff");
+        console.log("Keep-alive Heartbeat sent.");
     }, CONFIG.HEARTBEAT_INTERVAL);
-    // 2. 状态监控与主逻辑
-    setInterval(() => {
+    // --- 主循环 ---
+    function mainLoop() {
         const currentUrl = window.location.href;
-        // A. 如果在登录页，不做动作（等待用户输入密码，避免死循环）
+        // 1. 登录页检测
         if (currentUrl.includes('login')) {
-            customLog("⚠️ 发现登录页，请手动登录", "#ff4500");
+            updateHUD("#ff4500", "登录失效", "当前处于登录页面", "请手动输入账号密码登录");
             return;
         }
-        // B. 如果在主页但没去挂机页，自动跳转过去
+        // 2. 挂机页跳转检测
         if (!currentUrl.includes(CONFIG.AFK_URL)) {
-            customLog("🚀 不在挂机页，尝试跳转...", "#ffa500");
+            updateHUD("#ffa500", "不在挂机页", "准备跳转到 AFK 页面", "自动跳转中...");
             const afkLink = Array.from(document.querySelectorAll('a')).find(a => a.innerText.includes('AFK Rewards'));
             if (afkLink) {
                 afkLink.click();
             } else if (!currentUrl.includes('/earn')) {
-                // 如果找不到侧边栏链接，且不在任何 /earn 子页面，直接修改地址
                 window.location.pathname = CONFIG.AFK_URL;
             }
             return;
         }
-        // C. 检查挂机状态
-        const statusText = document.body.innerText.toLowerCase();
+        // 3. 挂机按钮检测
         const startBtn = Array.from(document.querySelectorAll('button')).find(b =>
             b.innerText.toLowerCase().includes('start afk') ||
             b.innerText.toLowerCase().includes('begin afk')
         );
-        const isActive = statusText.includes('status: active');
-        if (!isActive) {
-            if (startBtn) {
-                customLog("⚡ 挂机已停止，执行自动重启!", "#00ff00");
-                startBtn.click();
-            } else {
-                customLog("💬 等待页面加载按钮...", "#888");
-            }
+        const statusText = document.body.innerText.toLowerCase();
+        const isActive = statusText.includes('status: active') || statusText.includes('earning coins');
+        if (isActive) {
+            updateHUD("#00ff00", "运行中", "AFK Status: Active", "静默监控中 (每60s心跳)");
+        } else if (startBtn) {
+            updateHUD("#ff00ff", "挂机停止", "发现开始按钮", "点击 Start AFK...");
+            triggerClick(startBtn, "Start AFK 按钮");
         } else {
-            // 仅每 3 次循环显示一次正常状态，避免刷屏
-            if (Math.random() > 0.7) customLog("✅ 挂机中: Status Active", "#32cd32");
+            updateHUD("#888", "分析中", "等待关键元素加载", "正在扫描页面内容...");
         }
-    }, CONFIG.CHECK_INTERVAL);
+    }
+    setInterval(mainLoop, CONFIG.CHECK_INTERVAL);
+    console.log("Angara Host Helper v1.4 已启动");
 })();
 
 Comment
