@@ -57,8 +57,20 @@
     // --- 主循环 ---
     function mainLoop() {
         const currentUrl = window.location.href;
-        // 1. 登录页检测
-        if (currentUrl.includes('login')) {
+        const bodyText = document.body.innerText;
+        // 0. 弹窗错误处理 (Session Error 等)
+        const modalOkBtn = Array.from(document.querySelectorAll('button')).find(b =>
+            (b.innerText === 'OK' || b.innerText === 'Confirm') &&
+            (bodyText.includes('Session Error') || bodyText.includes('expired'))
+        );
+        if (modalOkBtn) {
+            updateHUD("#ff0000", "检测到错误弹窗", "正在尝试重置会话...", "点击 OK 按钮");
+            modalOkBtn.click();
+            setTimeout(() => location.reload(), 2000);
+            return;
+        }
+        // 1. 登录页检测 (加强匹配)
+        if (currentUrl.includes('login') || bodyText.includes('Please log in again')) {
             updateHUD("#ff4500", "登录失效", "当前处于登录页面", "请手动输入账号密码登录");
             return;
         }
