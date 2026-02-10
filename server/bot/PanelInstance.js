@@ -418,6 +418,7 @@ export class PanelInstance {
     });
 
     const data = response.data.attributes;
+    this.status.panelServerState = data.current_state;
     this.status.panelServerStats = {
       cpuPercent: data.resources?.cpu_absolute || 0,
       memoryBytes: data.resources?.memory_bytes || 0,
@@ -524,16 +525,6 @@ export class PanelInstance {
       this.log('success', `电源信号已发送: ${signalNames[signal]}`, '⚡');
 
       // Update manualStop flag
-      if (signal === 'stop' || signal === 'kill') {
-        this.autoRestart.manualStop = true;
-      } else if (signal === 'start' || signal === 'restart') {
-        this.autoRestart.manualStop = false;
-        // Reset retry count on manual start
-        this.autoRestart.retryCount = 0;
-      }
-
-      // 刷新状态
-      setTimeout(() => this.fetchServerStatus().catch(() => { }), 2000);
       if (signal === 'stop' || signal === 'kill') {
         this.autoRestart.manualStop = true;
       } else if (signal === 'start' || signal === 'restart') {
