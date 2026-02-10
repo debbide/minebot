@@ -598,6 +598,7 @@ export class PanelInstance {
    * 设置翼龙面板配置
    */
   setPterodactylConfig(config) {
+    console.log('[Debug] setPterodactylConfig received:', JSON.stringify(config));
     // 如果所有字段都为空，清除配置
     const url = (config.url || '').replace(/\/$/, '');
     const apiKey = config.apiKey || '';
@@ -612,7 +613,18 @@ export class PanelInstance {
     } else {
       this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, serverId };
       if (config.autoRestart) {
-        this.status.pterodactyl.autoRestart = config.autoRestart;
+        // Ensure types are correct
+        this.status.pterodactyl.autoRestart = {
+          enabled: config.autoRestart.enabled === true || config.autoRestart.enabled === 'true',
+          maxRetries: parseInt(config.autoRestart.maxRetries) || 3
+        };
+      } else {
+        // Preserve existing autoRestart if not provided in config (safety fallback)
+        const currentAutoRestart = (this.status.pterodactyl && this.status.pterodactyl.autoRestart)
+          || (this.configManager?.getFullConfig()?.servers?.find(s => s.id === this.id)?.pterodactyl?.autoRestart);
+        if (currentAutoRestart) {
+          this.status.pterodactyl.autoRestart = currentAutoRestart;
+        }
       }
       this.log('info', `翼龙面板配置已更新 [${authType === 'cookie' ? 'Cookie' : 'API Key'}]`, '🔑');
     }
