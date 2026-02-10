@@ -225,27 +225,27 @@ export class BotInstance {
     if (this.destroyed || this.isRepairing) {
       return;
     }
-    
+
     this.isRepairing = true;
     this.status.connected = false;
     this.reconnectAttempts++;
-    
+
     this.log('warning', `连接异常 (${reason})，${10}秒后重连 (第${this.reconnectAttempts}次)...`, '🔄');
-    
+
     // 彻底清理旧连接
     this.cleanup();
-    
+
     if (this.onStatusChange) {
       this.onStatusChange(this.id, this.getStatus());
     }
-    
+
     // 固定10秒后重连，不要立即重试
     this.reconnectTimeout = setTimeout(async () => {
       if (this.destroyed) {
         this.isRepairing = false;
         return;
       }
-      
+
       try {
         await this.connect();
         this.log('success', '重连成功', '✅');
@@ -254,7 +254,7 @@ export class BotInstance {
         this.log('error', `重连失败: ${err.message}`, '✗');
         // 失败后继续尝试，但间隔会更长
       }
-      
+
       this.isRepairing = false;
     }, 10000);
   }
@@ -295,12 +295,12 @@ export class BotInstance {
     // 只使用手动配置的地址，不使用面板API获取的地址
     const host = this.config.host;
     const port = this.config.port || 25565;
-    
+
     if (!host) {
       this.log('error', '未配置服务器地址，请在设置中配置 host', '❌');
       throw new Error('未配置服务器地址');
     }
-    
+
     const username = this.config.username || this.generateUsername();
     const version = this.config.version || false;
 
@@ -844,12 +844,32 @@ export class BotInstance {
    * 设置翼龙面板配置
    */
   setPterodactylConfig(config) {
-    this.status.pterodactyl = {
-      url: (config.url || '').replace(/\/$/, ''),
-      apiKey: config.apiKey || '',
-      serverId: config.serverId || ''
-    };
-    this.log('info', '翼龙面板配置已更新', '🔑');
+    const url = (config.url || '').replace(/\/$/, '');
+    const apiKey = config.apiKey || '';
+    const cookie = config.cookie || '';
+    const csrfToken = config.csrfToken || '';
+    const authType = config.authType || 'api';
+    const serverId = config.serverId || '';
+
+    const oldPterodactyl = this.status.pterodactyl;
+
+    if (!url && !apiKey && !cookie && !serverId) {
+      this.status.pterodactyl = null;
+      this.log('info', '翼龙面板配置已清除', '🔑');
+    } else {
+      this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, serverId };
+      if (config.autoRestart) {
+        // Ensure types are correct
+        this.status.pterodactyl.autoRestart = {
+          enabled: config.autoRestart.enabled === true || config.autoRestart.enabled === 'true',
+          maxRetries: parseInt(config.autoRestart.maxRetries) || 3
+        };
+      } else if (oldPterodactyl?.autoRestart) {
+        this.status.pterodactyl.autoRestart = oldPterodactyl.autoRestart;
+      }
+      this.log('info', `翼龙面板配置已更新 [${authType === 'cookie' ? 'Cookie' : 'API Key'}]`, '🔑');
+    }
+
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     // 保存配置
     this.saveConfig();

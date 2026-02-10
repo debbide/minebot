@@ -424,6 +424,7 @@ export class ConfigManager {
       pterodactyl: { ...current.pterodactyl, ...(updates.pterodactyl || {}) },
       sftp: { ...current.sftp, ...(updates.sftp || {}) }
     };
+    console.log(`[ConfigManager] 更新服务器 ${id} 配置项:`, Object.keys(updates));
     this.saveConfig();
     return this.config.servers[index];
   }

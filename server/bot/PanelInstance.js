@@ -598,6 +598,8 @@ export class PanelInstance {
     const authType = config.authType || 'api';
     const serverId = config.serverId || '';
 
+    const oldPterodactyl = this.status.pterodactyl;
+
     if (!url && !apiKey && !cookie && !serverId) {
       this.status.pterodactyl = null;
       this.log('info', '翼龙面板配置已清除', '🔑');
@@ -609,19 +611,16 @@ export class PanelInstance {
           enabled: config.autoRestart.enabled === true || config.autoRestart.enabled === 'true',
           maxRetries: parseInt(config.autoRestart.maxRetries) || 3
         };
-      } else {
+      } else if (oldPterodactyl?.autoRestart) {
         // Preserve existing autoRestart if not provided in config (safety fallback)
-        const currentAutoRestart = (this.status.pterodactyl && this.status.pterodactyl.autoRestart)
-          || (this.configManager?.getFullConfig()?.servers?.find(s => s.id === this.id)?.pterodactyl?.autoRestart);
-        if (currentAutoRestart) {
-          this.status.pterodactyl.autoRestart = currentAutoRestart;
-        }
+        this.status.pterodactyl.autoRestart = oldPterodactyl.autoRestart;
       }
       this.log('info', `翼龙面板配置已更新 [${authType === 'cookie' ? 'Cookie' : 'API Key'}]`, '🔑');
     }
 
     // 保存配置
     if (this.configManager) {
+      console.log(`[Debug] [${this.id}] 更新服务器配置:`, JSON.stringify(this.status.pterodactyl));
       this.configManager.updateServer(this.id, {
         pterodactyl: this.status.pterodactyl || {}
       });
@@ -630,9 +629,6 @@ export class PanelInstance {
     if (this.onStatusChange) {
       this.onStatusChange(this.id, this.getStatus());
     }
-
-    // 刷新状态检查（切换到 TCP ping 或面板 API）
-    this.refreshStatusCheck();
 
     // 刷新状态检查（切换到 TCP ping 或面板 API）
     this.refreshStatusCheck();
