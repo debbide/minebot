@@ -14,6 +14,9 @@ import {
   MoreVertical,
   Info,
   GripVertical,
+  Zap,
+  Cpu,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -192,16 +195,27 @@ function SortableServerCard({
       {/* 底部运行状态 (延时和负载) */}
       <div className="mt-4 pl-5">
         <p className="text-xs text-muted-foreground truncate h-4">
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-x-2.5">
             {server.tcpLatency !== undefined && server.tcpLatency !== null && (
-              <span>延时: {server.tcpLatency}ms</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <Zap className="h-3 w-3 text-yellow-500/80" />
+                <span className="tabular-nums">{server.tcpLatency}ms</span>
+              </div>
             )}
             {server.panelServerStats && (
               <>
-                {server.tcpLatency !== undefined && server.tcpLatency !== null && <span className="opacity-30">|</span>}
-                <span>负载: {server.panelServerStats.cpuPercent.toFixed(0)}%</span>
-                <span className="opacity-30">|</span>
-                <span>内存: {formatSize(server.panelServerStats.memoryBytes)}</span>
+                {(server.tcpLatency !== undefined && server.tcpLatency !== null) && (
+                  <span className="opacity-20 text-[10px] shrink-0">|</span>
+                )}
+                <div className="flex items-center gap-1 shrink-0">
+                  <Cpu className="h-3 w-3 text-blue-500/80" />
+                  <span className="tabular-nums">{server.panelServerStats.cpuPercent.toFixed(0)}%</span>
+                </div>
+                <span className="opacity-20 text-[10px] shrink-0">|</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Activity className="h-3 w-3 text-green-500/80" />
+                  <span className="tabular-nums whitespace-nowrap">{formatSize(server.panelServerStats.memoryBytes)}</span>
+                </div>
               </>
             )}
             {!isPanel && !server.tcpLatency && (
