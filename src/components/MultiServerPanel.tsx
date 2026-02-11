@@ -149,7 +149,7 @@ function SortableServerCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer group ${isDragging ? "shadow-lg" : ""
+      className={`relative p-4 rounded-lg border bg-card hover:bg-accent/50 transition-all cursor-pointer group flex flex-col min-h-[140px] ${isDragging ? "shadow-lg" : ""
         }`}
       onClick={() => openDetail(server)}
     >
@@ -181,36 +181,33 @@ function SortableServerCard({
         )}
       </div>
 
-      {/* 服务器名称 */}
-      <h3 className="font-medium truncate mb-1 pl-5">
-        {server.name || server.id}
-      </h3>
+      {/* 内容区域 (保持高度以对齐布局) */}
+      <div className="flex-1">
+        {/* 服务器名称 */}
+        <h3 className="font-medium truncate mb-1 pl-5">
+          {server.name || server.id}
+        </h3>
+      </div>
 
-      {/* 服务器地址 (面板服务器隐藏) */}
-      {!isPanel && (
-        <p className="text-sm text-muted-foreground truncate mb-1 font-mono pl-5">
-          {server.host ? `${server.host}:${server.port}` : "未配置地址"}
+      {/* 底部运行状态 (延时和负载) */}
+      <div className="mt-4 pl-5">
+        <p className="text-xs text-muted-foreground truncate h-4">
+          <span className="flex items-center gap-2">
+            {server.tcpLatency !== undefined && server.tcpLatency !== null && (
+              <span>延时: {server.tcpLatency}ms</span>
+            )}
+            {server.panelServerStats && (
+              <>
+                {server.tcpLatency !== undefined && server.tcpLatency !== null && <span className="opacity-30">|</span>}
+                <span>负载: {server.panelServerStats.cpuPercent.toFixed(0)}%</span>
+              </>
+            )}
+            {!isPanel && !server.tcpLatency && (
+              <span className="opacity-50">运行中</span>
+            )}
+          </span>
         </p>
-      )}
-
-      {/* 用户名或运行状态 (面板服务器显示负载和延迟) */}
-      <p className="text-xs text-muted-foreground truncate pl-5 h-4">
-        {server.type === "panel"
-          ? (
-            <span className="flex items-center gap-2">
-              {server.tcpLatency !== undefined && server.tcpLatency !== null && (
-                <span>延时: {server.tcpLatency}ms</span>
-              )}
-              {server.panelServerStats && (
-                <>
-                  {server.tcpLatency !== undefined && server.tcpLatency !== null && <span className="opacity-30">|</span>}
-                  <span>负载: {server.panelServerStats.cpuPercent.toFixed(0)}%</span>
-                </>
-              )}
-            </span>
-          )
-          : server.username || "随机用户名"}
-      </p>
+      </div>
 
       {/* 操作按钮 */}
       <div
