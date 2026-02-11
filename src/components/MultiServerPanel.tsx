@@ -193,9 +193,9 @@ function SortableServerCard({
       </div>
 
       {/* 底部运行状态 (延时和负载) */}
-      <div className="mt-4 pl-5">
-        <p className="text-xs text-muted-foreground truncate h-4">
-          <span className="flex items-center gap-x-2.5">
+      <div className="mt-4">
+        <p className="text-[10px] text-muted-foreground truncate h-4">
+          <span className="flex items-center gap-x-1.5">
             {server.tcpLatency !== undefined && server.tcpLatency !== null && (
               <div className="flex items-center gap-1 shrink-0">
                 <Zap className="h-3 w-3 text-yellow-500/80" />
