@@ -167,7 +167,7 @@ function SortableServerCard({
       </div>
 
       {/* 状态指示灯 */}
-      <div className="flex items-start justify-between mb-3 pl-5">
+      <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor(server)}`} />
           <Badge
@@ -187,7 +187,7 @@ function SortableServerCard({
       {/* 内容区域 (保持高度以对齐布局) */}
       <div className="flex-1">
         {/* 服务器名称 */}
-        <h3 className="font-medium truncate mb-1 pl-5">
+        <h3 className="font-medium truncate mb-1">
           {server.name || server.id}
         </h3>
       </div>
