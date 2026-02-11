@@ -4,7 +4,7 @@
 // @version      1.1
 // @description  自动检测 AFK 状态，模拟心跳防止掉线，并在掉线时自动重登
 // @author       Antigravity
-// @match        *://*.worldofangara.fun/*
+// @match        *://*.slicenodes.in/*
 // @run-at       document-end
 // @grant        none
 // ==/UserScript==
