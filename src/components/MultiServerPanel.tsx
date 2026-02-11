@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { formatUptime } from "@/lib/utils";
+import { formatUptime, formatSize } from "@/lib/utils";
 import { ServerDetailDialog } from "./ServerDetailDialog";
 import {
   DndContext,
@@ -200,6 +200,8 @@ function SortableServerCard({
               <>
                 {server.tcpLatency !== undefined && server.tcpLatency !== null && <span className="opacity-30">|</span>}
                 <span>负载: {server.panelServerStats.cpuPercent.toFixed(0)}%</span>
+                <span className="opacity-30">|</span>
+                <span>内存: {formatSize(server.panelServerStats.memoryBytes)}</span>
               </>
             )}
             {!isPanel && !server.tcpLatency && (

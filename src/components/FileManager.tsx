@@ -60,6 +60,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { api, FileInfo } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { formatSize } from "@/lib/utils";
 
 interface FileManagerProps {
   serverId: string;
@@ -207,14 +208,6 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
     return <File className="h-5 w-5 text-gray-400" />;
   };
 
-  // 格式化文件大小
-  const formatSize = (bytes: number) => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-  };
 
   // 格式化时间
   const formatDate = (dateStr: string) => {
