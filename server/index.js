@@ -13,8 +13,8 @@ import { AIService } from './services/AIService.js';
 import { ConfigManager } from './services/ConfigManager.js';
 import { AuthService } from './services/AuthService.js';
 import { AuditService } from './services/AuditService.js';
-
 import { SystemService } from './services/SystemService.js';
+import { proxyService } from './services/ProxyService.js';
 
 dotenv.config();
 
@@ -104,6 +104,15 @@ const aiService = new AIService(configManager);
 const systemService = new SystemService();
 const auditService = new AuditService();
 const botManager = new BotManager(configManager, aiService, broadcast);
+
+// Initialize Proxy Service
+const initializeProxy = async () => {
+  const config = configManager.getFullConfig();
+  if (config.proxyNodes && config.proxyNodes.length > 0) {
+    await proxyService.restart(config.proxyNodes);
+  }
+};
+initializeProxy();
 
 // Apply auth middleware to all /api routes except auth and screenshots
 // MUST be defined BEFORE API routes
@@ -284,6 +293,33 @@ app.get('/api/system/status', (req, res) => {
 
 app.get('/api/system/memory', (req, res) => {
   res.json(systemService.getMemoryStatus());
+});
+
+// Proxy Management
+app.get('/api/proxy/nodes', (req, res) => {
+  const config = configManager.getFullConfig();
+  res.json(config.proxyNodes || []);
+});
+
+app.post('/api/proxy/nodes', async (req, res) => {
+  const nodes = req.body;
+  if (!Array.isArray(nodes)) {
+    return res.status(400).json({ error: 'Nodes must be an array' });
+  }
+
+  try {
+    configManager.updateConfig({ proxyNodes: nodes });
+
+    // Restart proxy service with new nodes
+    await proxyService.restart(nodes);
+
+    // Broadcast status change if needed (e.g. to update frontend UI node list)
+    // broadcast('config_updated', { proxyNodes: nodes });
+
+    res.json({ success: true, message: 'Proxy nodes updated' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Get bot status

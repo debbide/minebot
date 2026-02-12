@@ -7,6 +7,8 @@ import {
     PowerOff,
     Zap,
     Crown,
+    Globe,
+    Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api";
+import { api, ProxyNode } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface BotSettingsPanelProps {
@@ -50,6 +52,7 @@ interface BotSettingsPanelProps {
         basePath: string;
     } | null;
     fileAccessType?: 'pterodactyl' | 'sftp' | 'none';
+    proxyNodeId?: string;
     onUpdate?: () => void;
 }
 
@@ -60,6 +63,7 @@ export function BotSettingsPanel({
     pterodactyl,
     sftp: sftpProp,
     fileAccessType: fileAccessTypeProp = 'pterodactyl',
+    proxyNodeId: proxyNodeIdProp = '',
     onUpdate
 }: BotSettingsPanelProps) {
     const [loading, setLoading] = useState<string | null>(null);
@@ -90,6 +94,8 @@ export function BotSettingsPanel({
     const [sftpPassword, setSftpPassword] = useState(sftpProp?.password || "");
     const [sftpBasePath, setSftpBasePath] = useState(sftpProp?.basePath || "/");
     const [fileAccessType, setFileAccessType] = useState<'pterodactyl' | 'sftp' | 'none'>(fileAccessTypeProp);
+    const [proxyNodeId, setProxyNodeId] = useState(proxyNodeIdProp || "");
+    const [proxyNodes, setProxyNodes] = useState<ProxyNode[]>([]);
 
     // Sync state when props change
     useEffect(() => {
@@ -111,7 +117,13 @@ export function BotSettingsPanel({
         setSftpPassword(sftpProp?.password || "");
         setSftpBasePath(sftpProp?.basePath || "/");
         setFileAccessType(fileAccessTypeProp);
-    }, [botId, restartTimer, autoChatProp, pterodactyl, sftpProp, fileAccessTypeProp]);
+        setProxyNodeId(proxyNodeIdProp || "");
+    }, [botId, restartTimer, autoChatProp, pterodactyl, sftpProp, fileAccessTypeProp, proxyNodeIdProp]);
+
+    // Load proxy nodes once
+    useEffect(() => {
+        api.getProxyNodes().then(setProxyNodes).catch(console.error);
+    }, []);
 
     // Handlers
     const handleSaveRestartTimer = async () => {
@@ -259,12 +271,30 @@ export function BotSettingsPanel({
         }
     };
 
+    const handleSaveProxy = async (nodeId: string) => {
+        setLoading("proxy");
+        try {
+            await api.updateServer(botId, { proxyNodeId: nodeId });
+            setProxyNodeId(nodeId);
+            toast({
+                title: "服务器代理已更新",
+                description: nodeId ? `已连接到代理节点` : "已切换为直连模式"
+            });
+            onUpdate?.();
+        } catch (error) {
+            toast({ title: "错误", description: String(error), variant: "destructive" });
+        } finally {
+            setLoading(null);
+        }
+    };
+
     return (
         <Tabs defaultValue="restart" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="restart">定时重启</TabsTrigger>
-                <TabsTrigger value="chat">自动喊话</TabsTrigger>
-                <TabsTrigger value="panel">翼龙面板</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="restart">通用</TabsTrigger>
+                <TabsTrigger value="chat">喊话</TabsTrigger>
+                <TabsTrigger value="network">网络</TabsTrigger>
+                <TabsTrigger value="panel">面板</TabsTrigger>
                 <TabsTrigger value="sftp">SFTP</TabsTrigger>
             </TabsList>
 
@@ -306,6 +336,49 @@ export function BotSettingsPanel({
                         下次重启: {new Date(restartTimer.nextRestart).toLocaleString()}
                     </p>
                 )}
+            </TabsContent>
+
+            <TabsContent value="network" className="space-y-4 pt-4">
+                <div className="space-y-4">
+                    <div className="flex items-center space-x-2 border-b pb-4">
+                        <Globe className="h-5 w-5 text-primary" />
+                        <div>
+                            <h3 className="font-medium text-sm">代理设置</h3>
+                            <p className="text-xs text-muted-foreground">选择此服务器卡片使用的出口代理节点</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>出口代理节点</Label>
+                        <select
+                            className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            value={proxyNodeId}
+                            onChange={(e) => handleSaveProxy(e.target.value)}
+                            disabled={loading === "proxy"}
+                        >
+                            <option value="">直连 (不使用代理)</option>
+                            {proxyNodes.map(node => (
+                                <option key={node.id} value={node.id}>
+                                    {node.name} ({node.type} - {node.server})
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-[0.8rem] text-muted-foreground">
+                            {proxyNodeId
+                                ? "改变代理设置后，可能需要手动重启机器人以生效"
+                                : "当前使用直连模式，直接连接到 Minecraft 服务器"}
+                        </p>
+                    </div>
+
+                    <div className="p-3 bg-muted/30 rounded-lg text-xs space-y-2 text-muted-foreground border">
+                        <div className="flex items-center space-x-1 font-medium text-foreground">
+                            <Shield className="h-3 w-3" />
+                            <span>安全与隐私</span>
+                        </div>
+                        <p>启用代理后，该服务器的所有 Minecraft 流量以及翼龙面板 API 访问都将通过指定的本地加密隧道转发。</p>
+                        <p>这对于绕过网络限制、隐藏主控 IP 或连接受限服务器非常有用。</p>
+                    </div>
+                </div>
             </TabsContent>
 
             <TabsContent value="chat" className="space-y-4 pt-4">

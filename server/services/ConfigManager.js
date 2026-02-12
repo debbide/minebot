@@ -206,7 +206,8 @@ export class ConfigManager {
         aiView: false,
         patrol: false,
         autoChat: false
-      }
+      },
+      proxyNodes: [] // 全局代理节点库
     };
   }
 
@@ -422,7 +423,8 @@ export class ConfigManager {
       autoChat: { ...current.autoChat, ...(updates.autoChat || {}) },
       restartTimer: { ...current.restartTimer, ...(updates.restartTimer || {}) },
       pterodactyl: { ...current.pterodactyl, ...(updates.pterodactyl || {}) },
-      sftp: { ...current.sftp, ...(updates.sftp || {}) }
+      sftp: { ...current.sftp, ...(updates.sftp || {}) },
+      proxyNodeId: updates.proxyNodeId !== undefined ? updates.proxyNodeId : current.proxyNodeId
     };
     console.log(`[ConfigManager] 更新服务器 ${id} 配置项:`, Object.keys(updates));
     this.saveConfig();

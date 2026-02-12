@@ -22,7 +22,7 @@ import {
   Activity,
   FolderOpen,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, BotStatus } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { formatUptime } from "@/lib/utils";
 import { BotControlPanel } from "./BotControlPanel";
@@ -37,65 +37,8 @@ interface LogEntry {
   message: string;
 }
 
-interface ServerConfig {
-  id: string;
-  name: string;
-  type?: "minecraft" | "panel";
-  host: string;
-  port: number;
-  username?: string;
-  connected?: boolean;
-  serverAddress?: string;
-  version?: string;
-  health?: number;
-  food?: number;
-  position?: { x: number; y: number; z: number };
-  players?: string[];
-  modes?: {
-    follow?: boolean;
-    autoAttack?: boolean;
-    patrol?: boolean;
-    mining?: boolean;
-    aiView?: boolean;
-    autoChat?: boolean;
-    invincible?: boolean;
-  };
-  restartTimer?: {
-    enabled: boolean;
-    intervalMinutes: number;
-    nextRestart: string | null;
-  };
-  autoChat?: {
-    enabled: boolean;
-    interval: number;
-    messages: string[];
-  };
-  pterodactyl?: {
-    url: string;
-    apiKey: string;
-    serverId: string;
-  } | null;
-  sftp?: {
-    host: string;
-    port: number;
-    username: string;
-    password: string;
-    privateKey: string;
-    basePath: string;
-  } | null;
-  fileAccessType?: 'pterodactyl' | 'sftp' | 'none';
-  panelServerState?: string;
-  panelServerStats?: {
-    cpuPercent: number;
-    memoryBytes: number;
-    diskBytes: number;
-    uptime: number;
-  };
-  serverHost?: string;
-  serverPort?: number;
-  tcpOnline?: boolean | null;
-  tcpLatency?: number | null;
-}
+// 使用从 api.ts 导入的 BotStatus 作为 ServerConfig 的别名
+type ServerConfig = BotStatus;
 
 interface ServerDetailDialogProps {
   server: ServerConfig | null;
@@ -506,6 +449,7 @@ export function ServerDetailDialog({
                         pterodactyl={server.pterodactyl}
                         sftp={server.sftp}
                         fileAccessType={server.fileAccessType}
+                        proxyNodeId={server.proxyNodeId}
                         onUpdate={onUpdate}
                       />
                     </div>

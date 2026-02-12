@@ -30,7 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { api } from "@/lib/api";
+import { api, BotStatus } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { formatUptime, formatSize } from "@/lib/utils";
 import { ServerDetailDialog } from "./ServerDetailDialog";
@@ -52,65 +52,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-interface ServerConfig {
-  id: string;
-  name: string;
-  type?: "minecraft" | "panel";
-  host: string;
-  port: number;
-  username?: string;
-  connected?: boolean;
-  serverAddress?: string;
-  version?: string;
-  health?: number;
-  food?: number;
-  position?: { x: number; y: number; z: number };
-  players?: string[];
-  modes?: {
-    follow?: boolean;
-    autoAttack?: boolean;
-    patrol?: boolean;
-    mining?: boolean;
-    aiView?: boolean;
-    autoChat?: boolean;
-    invincible?: boolean;
-  };
-  restartTimer?: {
-    enabled: boolean;
-    intervalMinutes: number;
-    nextRestart: string | null;
-  };
-  autoChat?: {
-    enabled: boolean;
-    interval: number;
-    messages: string[];
-  };
-  pterodactyl?: {
-    url: string;
-    apiKey: string;
-    serverId: string;
-  } | null;
-  sftp?: {
-    host: string;
-    port: number;
-    username: string;
-    password: string;
-    privateKey: string;
-    basePath: string;
-  } | null;
-  fileAccessType?: 'pterodactyl' | 'sftp' | 'none';
-  panelServerState?: string;
-  panelServerStats?: {
-    cpuPercent: number;
-    memoryBytes: number;
-    diskBytes: number;
-    uptime: number;
-  };
-  serverHost?: string;
-  serverPort?: number;
-  tcpOnline?: boolean | null;
-  tcpLatency?: number | null;
-}
+// 使用从 api.ts 导入的 BotStatus 作为 ServerConfig 的别名，保持代码可读性
+type ServerConfig = BotStatus;
 
 // 可排序服务器卡片组件
 function SortableServerCard({

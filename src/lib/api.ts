@@ -13,6 +13,12 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export interface BotStatus {
+  id: string;
+  name: string;
+  type?: "minecraft" | "panel";
+  host: string;
+  port: number;
+  username?: string;
   connected: boolean;
   serverAddress: string;
   version: string;
@@ -21,10 +27,57 @@ export interface BotStatus {
   position: { x: number; y: number; z: number } | null;
   players: string[];
   modes: {
-    aiView: boolean;
-    patrol: boolean;
-    autoChat: boolean;
+    follow?: boolean;
+    autoAttack?: boolean;
+    patrol?: boolean;
+    mining?: boolean;
+    aiView?: boolean;
+    autoChat?: boolean;
+    invincible?: boolean;
   };
+  restartTimer?: {
+    enabled: boolean;
+    intervalMinutes: number;
+    nextRestart: string | null;
+  };
+  autoChat?: {
+    enabled: boolean;
+    interval: number;
+    messages: string[];
+  };
+  pterodactyl?: {
+    url: string;
+    apiKey: string;
+    serverId: string;
+    authType?: 'api' | 'cookie';
+    cookie?: string;
+    csrfToken?: string;
+    autoRestart?: {
+      enabled: boolean;
+      maxRetries: number;
+    };
+  } | null;
+  sftp?: {
+    host: string;
+    port: number;
+    username: string;
+    password: string;
+    privateKey: string;
+    basePath: string;
+  } | null;
+  fileAccessType?: 'pterodactyl' | 'sftp' | 'none';
+  panelServerState?: string;
+  panelServerStats?: {
+    cpuPercent: number;
+    memoryBytes: number;
+    diskBytes: number;
+    uptime: number;
+  };
+  serverHost?: string;
+  serverPort?: number;
+  tcpOnline?: boolean | null;
+  tcpLatency?: number | null;
+  proxyNodeId?: string;
 }
 
 export interface LogEntry {
@@ -71,6 +124,7 @@ export interface Config {
     botToken: string;
     chatId: string;
   };
+  proxyNodes: ProxyNode[];
 }
 
 export interface TelegramConfig {
@@ -146,6 +200,17 @@ export interface FileInfo {
   mimetype: string;
   createdAt: string;
   modifiedAt: string;
+}
+
+export interface ProxyNode {
+  id: string;
+  name: string;
+  type: string;
+  server: string;
+  port: number;
+  password?: string;
+  uuid?: string;
+  sni?: string;
 }
 
 class ApiService {
@@ -356,6 +421,7 @@ class ApiService {
     username?: string;
     host?: string;
     port?: number;
+    proxyNodeId?: string;
   }): Promise<{ success: boolean; config: unknown }> {
     return this.request(`/api/bots/${id}`, {
       method: 'PUT',
@@ -644,6 +710,19 @@ class ApiService {
     return this.request('/api/config/telegram', {
       method: 'POST',
       body: JSON.stringify(config),
+    });
+  }
+
+  // ==================== 代理节点 API ====================
+
+  async getProxyNodes(): Promise<ProxyNode[]> {
+    return this.request('/api/proxy/nodes');
+  }
+
+  async updateProxyNodes(nodes: ProxyNode[]): Promise<{ success: boolean; message: string }> {
+    return this.request('/api/proxy/nodes', {
+      method: 'POST',
+      body: JSON.stringify(nodes),
     });
   }
 }

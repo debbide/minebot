@@ -1,6 +1,8 @@
 import axios from 'axios';
 import net from 'net';
 import SftpClient from 'ssh2-sftp-client';
+import { SocksProxyAgent } from 'socks-proxy-agent';
+import { proxyService } from '../services/ProxyService.js';
 
 /**
  * Panel-only server instance (no Minecraft bot)
@@ -141,6 +143,28 @@ export class PanelInstance {
     }
 
     return headers;
+  }
+
+  /**
+   * 获取完整的 HTTP 请求配置 (包含代理和 Headers)
+   */
+  getHttpOptions(extraConfig = {}) {
+    const options = {
+      ...extraConfig,
+      headers: { ...this.getAuthHeaders(), ...(extraConfig.headers || {}) },
+      timeout: extraConfig.timeout || 15000
+    };
+
+    if (this.config.proxyNodeId) {
+      const localPort = proxyService.getLocalPort(this.config.proxyNodeId);
+      if (localPort) {
+        const agent = new SocksProxyAgent(`socks5://127.0.0.1:${localPort}`);
+        options.httpsAgent = agent;
+        options.httpAgent = agent;
+      }
+    }
+
+    return options;
   }
 
   /**
@@ -334,13 +358,7 @@ export class PanelInstance {
 
     const url = `${panel.url}/api/client/servers/${panel.serverId}`;
 
-    const response = await axios.get(url, {
-      headers: {
-        'Authorization': `Bearer ${panel.apiKey}`,
-        'Accept': 'application/json'
-      },
-      timeout: 10000
-    });
+    const response = await axios.get(url, this.getHttpOptions());
 
     const data = response.data.attributes;
     const relationships = data.relationships;
@@ -412,10 +430,7 @@ export class PanelInstance {
 
     const url = `${panel.url}/api/client/servers/${panel.serverId}/resources`;
 
-    const response = await axios.get(url, {
-      headers: this.getAuthHeaders(),
-      timeout: 10000
-    });
+    const response = await axios.get(url, this.getHttpOptions());
 
     const data = response.data.attributes;
     this.status.panelServerState = data.current_state;
@@ -517,10 +532,7 @@ export class PanelInstance {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/power`;
       this.log('info', `正在发送电源信号: ${signalNames[signal]}`, '⚡');
 
-      await axios.post(url, { signal }, {
-        headers: this.getAuthHeaders(),
-        timeout: 15000
-      });
+      await axios.post(url, { signal }, this.getHttpOptions());
 
       this.log('success', `电源信号已发送: ${signalNames[signal]}`, '⚡');
 
@@ -569,10 +581,7 @@ export class PanelInstance {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/command`;
       this.log('info', `发送控制台命令: ${command}`, '🖥️');
 
-      await axios.post(url, { command }, {
-        headers: this.getAuthHeaders(),
-        timeout: 10000
-      });
+      await axios.post(url, { command }, this.getHttpOptions());
 
       this.log('success', `命令已发送: ${command}`, '🖥️');
       return { success: true, message: `已发送: ${command}` };
@@ -671,11 +680,7 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/list`;
-      const response = await axios.get(url, {
-        params: { directory },
-        headers: this.getAuthHeaders(),
-        timeout: 15000
-      });
+      const response = await axios.get(url, this.getHttpOptions({ params: { directory } }));
 
       const files = response.data.data.map(item => ({
         name: item.attributes.name,
@@ -709,11 +714,7 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/contents`;
-      const response = await axios.get(url, {
-        params: { file },
-        headers: this.getAuthHeaders(),
-        timeout: 30000
-      });
+      const response = await axios.get(url, this.getHttpOptions({ params: { file }, timeout: 30000 }));
 
       return { success: true, content: response.data, file };
     } catch (error) {
@@ -736,14 +737,11 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/write`;
-      await axios.post(url, content, {
+      await axios.post(url, content, this.getHttpOptions({
         params: { file },
-        headers: {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'text/plain'
-        },
+        headers: { 'Content-Type': 'text/plain' },
         timeout: 30000
-      });
+      }));
 
       this.log('success', `文件已保存: ${file}`, '💾');
       return { success: true, message: '文件已保存' };
@@ -766,11 +764,7 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/download`;
-      const response = await axios.get(url, {
-        params: { file },
-        headers: this.getAuthHeaders(),
-        timeout: 15000
-      });
+      const response = await axios.get(url, this.getHttpOptions({ params: { file } }));
 
       return { success: true, url: response.data.attributes.url };
     } catch (error) {
@@ -791,10 +785,7 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/upload`;
-      const response = await axios.get(url, {
-        headers: this.getAuthHeaders(),
-        timeout: 15000
-      });
+      const response = await axios.get(url, this.getHttpOptions());
 
       return { success: true, url: response.data.attributes.url };
     } catch (error) {
@@ -817,10 +808,7 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/create-folder`;
-      await axios.post(url, { root, name }, {
-        headers: this.getAuthHeaders(),
-        timeout: 15000
-      });
+      await axios.post(url, { root, name }, this.getHttpOptions());
 
       this.log('success', `文件夹已创建: ${root}${name}`, '📁');
       return { success: true, message: '文件夹已创建' };
@@ -844,10 +832,7 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/delete`;
-      await axios.post(url, { root, files }, {
-        headers: this.getAuthHeaders(),
-        timeout: 30000
-      });
+      await axios.post(url, { root, files }, this.getHttpOptions({ timeout: 30000 }));
 
       this.log('success', `已删除 ${files.length} 个文件`, '🗑️');
       return { success: true, message: `已删除 ${files.length} 个文件` };
@@ -875,10 +860,7 @@ export class PanelInstance {
       await axios.put(url, {
         root,
         files: [{ from, to }]
-      }, {
-        headers: this.getAuthHeaders(),
-        timeout: 15000
-      });
+      }, this.getHttpOptions());
 
       this.log('success', `已重命名: ${from} -> ${to}`, '✏️');
       return { success: true, message: '重命名成功' };
@@ -901,10 +883,7 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/copy`;
-      await axios.post(url, { location }, {
-        headers: this.getAuthHeaders(),
-        timeout: 30000
-      });
+      await axios.post(url, { location }, this.getHttpOptions({ timeout: 30000 }));
 
       this.log('success', `已复制: ${location}`, '📋');
       return { success: true, message: '复制成功' };
@@ -928,10 +907,7 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/compress`;
-      const response = await axios.post(url, { root, files }, {
-        headers: this.getAuthHeaders(),
-        timeout: 120000 // 压缩可能需要较长时间
-      });
+      const response = await axios.post(url, { root, files }, this.getHttpOptions({ timeout: 120000 }));
 
       const archiveName = response.data.attributes.name;
       this.log('success', `已压缩为: ${archiveName}`, '📦');
@@ -956,10 +932,7 @@ export class PanelInstance {
 
     try {
       const url = `${panel.url}/api/client/servers/${panel.serverId}/files/decompress`;
-      await axios.post(url, { root, file }, {
-        headers: this.getAuthHeaders(),
-        timeout: 120000 // 解压可能需要较长时间
-      });
+      await axios.post(url, { root, file }, this.getHttpOptions({ timeout: 120000 }));
 
       this.log('success', `已解压: ${file}`, '📂');
       return { success: true, message: '解压成功' };

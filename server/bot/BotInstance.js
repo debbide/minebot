@@ -4,6 +4,8 @@ const { pathfinder, Movements, goals } = pkg;
 import { BehaviorManager } from './behaviors/index.js';
 import axios from 'axios';
 import SftpClient from 'ssh2-sftp-client';
+import { SocksProxyAgent } from 'socks-proxy-agent';
+import { proxyService } from '../services/ProxyService.js';
 
 // 协议数据缓存，内存紧张时清空
 const mcDataCache = new Map();
@@ -304,6 +306,16 @@ export class BotInstance {
     const username = this.config.username || this.generateUsername();
     const version = this.config.version || false;
 
+    // Handle Proxy
+    let agent = null;
+    if (this.config.proxyNodeId) {
+      const localPort = proxyService.getLocalPort(this.config.proxyNodeId);
+      if (localPort) {
+        this.log('info', `使用代理节点: ${this.config.proxyNodeId} (桥接端口: ${localPort})`, '🌐');
+        agent = new SocksProxyAgent(`socks5://127.0.0.1:${localPort}`);
+      }
+    }
+
     this.status.username = username;
     this.log('info', `正在连接 ${host}:${port} (用户: ${username})...`, '⚡');
 
@@ -315,8 +327,9 @@ export class BotInstance {
           username,
           version: version || undefined,
           auth: 'offline',
-          connectTimeout: 15000, // 缩短连接超时到15秒
-          checkTimeoutInterval: 30000 // 缩短心跳检查到30秒
+          connectTimeout: 15000,
+          checkTimeoutInterval: 30000,
+          agent: agent || undefined
         };
 
         this.bot = mineflayer.createBot(botOptions);
