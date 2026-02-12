@@ -12,8 +12,11 @@ class ProxyService {
     constructor() {
         this.proxyProcess = null;
         this.nodes = [];
-        this.configPath = path.join(__dirname, '../data/proxy_config.json');
-        this.binPath = process.platform === 'win32' ? 'sing-box.exe' : 'sing-box'; // Expecting sing-box in path or bin folder
+        // Use process.cwd() for definitive root on Windows
+        this.projectRoot = process.cwd();
+        this.configPath = path.join(this.projectRoot, 'server/data/proxy_config.json');
+        console.log('[ProxyService] Initialized with dynamic config path:', this.configPath);
+        this.binPath = process.platform === 'win32' ? 'sing-box.exe' : 'sing-box';
         this.basePort = 20000;
         this.nodePortMap = new Map(); // nodeId -> localPort
     }
@@ -243,22 +246,33 @@ class ProxyService {
 
             console.log(`[ProxyService] Starting sing-box with ${this.nodes.length} nodes...`);
 
-            // Try to find sing-box in several locations
+            // Try multiple paths for sing-box bin
             let execPath = this.binPath;
-            const localBin = path.join(__dirname, '../bin', this.binPath);
-            if (fs.existsSync(localBin)) {
-                execPath = localBin;
+            const possiblePaths = [
+                path.join(this.projectRoot, 'server/bin', this.binPath),
+                path.join(this.projectRoot, 'bin', this.binPath),
+                path.join(this.projectRoot, this.binPath), // Root check
+                this.binPath // Fallback to PATH
+            ];
+
+            for (const p of possiblePaths) {
+                if (fs.existsSync(p)) {
+                    execPath = p;
+                    break;
+                }
             }
+            console.log(`[ProxyService] Final sing-box executable path: ${execPath}`);
 
             this.proxyProcess = spawn(execPath, ['run', '-c', this.configPath]);
 
             this.proxyProcess.stdout.on('data', (data) => {
-                // Silencing verbose logs unless debugging
-                // console.log(`[Proxy] ${data}`);
+                const msg = data.toString();
+                console.log(`[Proxy Log] ${msg.trim()}`);
             });
 
             this.proxyProcess.stderr.on('data', (data) => {
-                console.error(`[Proxy Error] ${data}`);
+                const msg = data.toString();
+                console.error(`[Proxy STDOUT/ERR] ${msg.trim()}`);
             });
 
             this.proxyProcess.on('error', (err) => {
