@@ -43,9 +43,7 @@ class ProxyService {
         const inbounds = this.nodes.map((node, index) => ({
             type: 'socks',
             tag: `in-${node.id}`,
-            listen: '127.0.0.1', // Ensure binding to localhost
-            listen_port: this.basePort + index,
-            listen: '127.0.0.1', // Ensure binding to localhost
+            listen: '127.0.0.1',
             listen_port: this.basePort + index
         }));
 
@@ -123,39 +121,41 @@ class ProxyService {
 
             // Handle Transport (WS/GRPC)
             if (node.transport === 'ws') {
+                // [V25 Critical] Strip ?ed= from path before sending to server
+                // ?ed=2048 is a V2Ray URL convention for early data, NOT part of the actual WS endpoint
+                let cleanPath = node.wsPath || '/';
+                let maxEarlyData = node.max_early_data;
+
+                if (cleanPath.includes('ed=')) {
+                    try {
+                        const match = cleanPath.match(/[?&]ed=(\d+)/);
+                        if (match && match[1]) {
+                            if (maxEarlyData === undefined) maxEarlyData = parseInt(match[1]);
+                            // Strip ed= param from path
+                            cleanPath = cleanPath.replace(/[?&]ed=\d+/, '');
+                            // Clean up trailing ? or & if nothing left
+                            cleanPath = cleanPath.replace(/\?$/, '').replace(/&$/, '');
+                            if (!cleanPath) cleanPath = '/';
+                        }
+                    } catch (e) { /* ignore parse error */ }
+                }
+
                 outbound.transport = {
                     type: 'ws',
-                    path: node.wsPath || '/',
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                    }
+                    path: cleanPath,
+                    headers: {}
                 };
 
                 // Host header logic: prefer wsHost, then sni, fallback to server
-                // [V24] Crucial: Sync SNI and Host to prevent Cloudflare 404s
                 const hostHeader = node.wsHost || node.sni || node.server;
                 if (hostHeader && !hostHeader.match(/^\d+\.\d+\.\d+\.\d+$/)) {
                     outbound.transport.headers['Host'] = hostHeader;
-                    // Auto-sync SNI if it was missing to match the Host
                     if (outbound.tls && !outbound.tls.server_name) {
                         outbound.tls.server_name = hostHeader;
                     }
                 }
 
-                // Handle Early Data (0-RTT)
-                // 1. Explicitly set in node params
-                // 2. Auto-detected from path (e.g. /path?ed=2048)
-                let maxEarlyData = node.max_early_data;
-
-                if (maxEarlyData === undefined && node.wsPath && node.wsPath.includes('ed=')) {
-                    try {
-                        const match = node.wsPath.match(/[?&]ed=(\d+)/);
-                        if (match && match[1]) {
-                            maxEarlyData = parseInt(match[1]);
-                        }
-                    } catch (e) { /* ignore parse error */ }
-                }
-
+                // Apply Early Data (0-RTT) if detected
                 if (maxEarlyData !== undefined) {
                     outbound.transport.max_early_data = parseInt(maxEarlyData);
                     outbound.transport.early_data_header_name = node.early_data_header_name || 'Sec-WebSocket-Protocol';
