@@ -36,6 +36,7 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
     });
 
     const [proxyNodes, setProxyNodes] = useState<ProxyNode[]>([]);
+    const [selectedNode, setSelectedNode] = useState<ProxyNode | null>(null);
     const [testLoading, setTestLoading] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
@@ -381,159 +382,9 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                                                 </TableCell>
                                                 <TableCell className="py-2 text-right">
                                                     <div className="flex items-center justify-end gap-1">
-                                                        <Popover>
-                                                            <PopoverTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-7 w-7">
-                                                                    <Settings2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </PopoverTrigger>
-                                                            <PopoverContent className="w-80 space-y-4 shadow-2xl border-primary/10">
-                                                                <div className="grid gap-4">
-                                                                    <div className="space-y-2">
-                                                                        <h4 className="font-medium leading-none">编辑节点</h4>
-                                                                        <p className="text-xs text-muted-foreground">配置高级传输与安全参数</p>
-                                                                    </div>
-
-                                                                    <div className="grid grid-cols-2 gap-2">
-                                                                        <div className="space-y-1">
-                                                                            <Label className="text-[10px]">协议类型</Label>
-                                                                            <select
-                                                                                className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                                                                value={node.type}
-                                                                                onChange={e => updateProxyNode(node.id, { type: e.target.value })}
-                                                                            >
-                                                                                <option value="vless">VLESS</option>
-                                                                                <option value="vmess">VMess</option>
-                                                                                <option value="trojan">Trojan</option>
-                                                                                <option value="shadowsocks">Shadowsocks</option>
-                                                                                <option value="hysteria2">Hysteria2</option>
-                                                                                <option value="tuic">TUIC</option>
-                                                                                <option value="socks">SOCKS5</option>
-                                                                                <option value="http">HTTP</option>
-                                                                            </select>
-                                                                        </div>
-                                                                        <div className="space-y-1">
-                                                                            <Label className="text-[10px]">传输方式</Label>
-                                                                            <select
-                                                                                className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                                                                value={node.transport || 'tcp'}
-                                                                                onChange={e => updateProxyNode(node.id, { transport: e.target.value as any })}
-                                                                            >
-                                                                                <option value="tcp">TCP</option>
-                                                                                <option value="ws">WebSocket</option>
-                                                                                <option value="grpc">gRPC</option>
-                                                                            </select>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="grid grid-cols-3 gap-2">
-                                                                        <div className="col-span-2 space-y-1">
-                                                                            <Label className="text-[10px]">服务器地址</Label>
-                                                                            <Input
-                                                                                className="h-8 text-xs"
-                                                                                value={node.server}
-                                                                                onChange={e => updateProxyNode(node.id, { server: e.target.value })}
-                                                                                placeholder="host"
-                                                                            />
-                                                                        </div>
-                                                                        <div className="space-y-1">
-                                                                            <Label className="text-[10px]">端口</Label>
-                                                                            <Input
-                                                                                type="number"
-                                                                                className="h-8 text-xs px-1"
-                                                                                value={node.port}
-                                                                                onChange={e => updateProxyNode(node.id, { port: parseInt(e.target.value) || 0 })}
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-
-                                                                    <div className="space-y-1">
-                                                                        <Label className="text-[10px]">用户 ID / 密码</Label>
-                                                                        <Input
-                                                                            className="h-8 text-xs"
-                                                                            type="password"
-                                                                            value={node.uuid || node.password || ""}
-                                                                            onChange={e => {
-                                                                                const val = e.target.value;
-                                                                                if (['vless', 'vmess'].includes(node.type)) updateProxyNode(node.id, { uuid: val });
-                                                                                else updateProxyNode(node.id, { password: val });
-                                                                            }}
-                                                                            placeholder="Credentials"
-                                                                        />
-                                                                    </div>
-
-                                                                    <div className="grid grid-cols-2 gap-2">
-                                                                        <div className="space-y-1">
-                                                                            <Label className="text-[10px]">安全 / TLS</Label>
-                                                                            <select
-                                                                                className="w-full h-8 rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                                                                value={node.security || 'none'}
-                                                                                onChange={e => updateProxyNode(node.id, { security: e.target.value as any })}
-                                                                            >
-                                                                                <option value="none">None</option>
-                                                                                <option value="tls">TLS</option>
-                                                                                <option value="reality">Reality</option>
-                                                                            </select>
-                                                                        </div>
-                                                                        <div className="space-y-1">
-                                                                            <Label className="text-[10px]">SNI (域名)</Label>
-                                                                            <Input
-                                                                                className="h-8 text-xs"
-                                                                                value={node.sni || ""}
-                                                                                onChange={e => updateProxyNode(node.id, { sni: e.target.value })}
-                                                                                placeholder="sni"
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {node.transport === 'ws' && (
-                                                                        <div className="grid grid-cols-2 gap-2 p-2 bg-muted/40 rounded-md border border-border/50">
-                                                                            <div className="space-y-1">
-                                                                                <Label className="text-[9px] uppercase font-bold text-muted-foreground">WS 路径</Label>
-                                                                                <Input
-                                                                                    className="h-7 text-xs bg-background"
-                                                                                    value={node.wsPath || ""}
-                                                                                    onChange={e => updateProxyNode(node.id, { wsPath: e.target.value })}
-                                                                                    placeholder="/"
-                                                                                />
-                                                                            </div>
-                                                                            <div className="space-y-1">
-                                                                                <Label className="text-[9px] uppercase font-bold text-muted-foreground">WS Host</Label>
-                                                                                <Input
-                                                                                    className="h-7 text-xs bg-background"
-                                                                                    value={node.wsHost || ""}
-                                                                                    onChange={e => updateProxyNode(node.id, { wsHost: e.target.value })}
-                                                                                    placeholder="host"
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-
-                                                                    {node.security === 'reality' && (
-                                                                        <div className="space-y-2 p-2 bg-blue-500/5 rounded-md border border-blue-500/10">
-                                                                            <div className="grid grid-cols-2 gap-2">
-                                                                                <div className="space-y-1">
-                                                                                    <Label className="text-[9px] uppercase font-bold text-blue-500/70">Reality PBK</Label>
-                                                                                    <Input
-                                                                                        className="h-7 text-xs"
-                                                                                        value={node.pbk || ""}
-                                                                                        onChange={e => updateProxyNode(node.id, { pbk: e.target.value })}
-                                                                                    />
-                                                                                </div>
-                                                                                <div className="space-y-1">
-                                                                                    <Label className="text-[9px] uppercase font-bold text-blue-500/70">Reality SID</Label>
-                                                                                    <Input
-                                                                                        className="h-7 text-xs"
-                                                                                        value={node.sid || ""}
-                                                                                        onChange={e => updateProxyNode(node.id, { sid: e.target.value })}
-                                                                                    />
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </PopoverContent>
-                                                        </Popover>
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedNode(node)}>
+                                                            <Settings2 className="h-4 w-4" />
+                                                        </Button>
 
                                                         <Button
                                                             variant="ghost"
@@ -615,6 +466,165 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                     </TabsContent>
                 </Tabs>
             </DialogContent>
-        </Dialog >
+
+            {/* Sub-Dialog for editing node */}
+            {selectedNode && (
+                <Dialog open={!!selectedNode} onOpenChange={(open) => !open && setSelectedNode(null)}>
+                    <DialogContent className="sm:max-w-[480px] top-[10%] translate-y-0 z-[100] border-primary/20 shadow-2xl">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Settings2 className="h-5 w-5 text-primary" />
+                                编辑节点: {selectedNode.name}
+                            </DialogTitle>
+                            <DialogDescription>
+                                这里的参数将直接透传至 sing-box 配置文件。
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-1">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">协议类型</Label>
+                                    <select
+                                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                                        value={selectedNode.type}
+                                        onChange={e => updateProxyNode(selectedNode.id, { type: e.target.value })}
+                                    >
+                                        <option value="vless">VLESS</option>
+                                        <option value="vmess">VMess</option>
+                                        <option value="trojan">Trojan</option>
+                                        <option value="shadowsocks">Shadowsocks</option>
+                                        <option value="hysteria2">Hysteria2</option>
+                                        <option value="tuic">TUIC</option>
+                                        <option value="socks">SOCKS5</option>
+                                        <option value="http">HTTP</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">传输方式</Label>
+                                    <select
+                                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                                        value={selectedNode.transport || 'tcp'}
+                                        onChange={e => updateProxyNode(selectedNode.id, { transport: e.target.value as any })}
+                                    >
+                                        <option value="tcp">TCP</option>
+                                        <option value="ws">WebSocket</option>
+                                        <option value="grpc">gRPC</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                                <div className="col-span-2 space-y-1.5">
+                                    <Label className="text-xs font-semibold">服务器地址</Label>
+                                    <Input
+                                        className="h-9 text-sm"
+                                        value={selectedNode.server}
+                                        onChange={e => updateProxyNode(selectedNode.id, { server: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">端口</Label>
+                                    <Input
+                                        type="number"
+                                        className="h-9 text-sm"
+                                        value={selectedNode.port}
+                                        onChange={e => updateProxyNode(selectedNode.id, { port: parseInt(e.target.value) || 0 })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-semibold">UUID / 密码</Label>
+                                <Input
+                                    className="h-9 text-sm"
+                                    type="password"
+                                    value={selectedNode.uuid || selectedNode.password || ""}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        if (['vless', 'vmess'].includes(selectedNode.type)) updateProxyNode(selectedNode.id, { uuid: val });
+                                        else updateProxyNode(selectedNode.id, { password: val });
+                                    }}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">安全 / TLS</Label>
+                                    <select
+                                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm"
+                                        value={selectedNode.security || 'none'}
+                                        onChange={e => updateProxyNode(selectedNode.id, { security: e.target.value as any })}
+                                    >
+                                        <option value="none">None</option>
+                                        <option value="tls">TLS</option>
+                                        <option value="reality">Reality</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">SNI (域名)</Label>
+                                    <Input
+                                        className="h-9 text-sm"
+                                        value={selectedNode.sni || ""}
+                                        onChange={e => updateProxyNode(selectedNode.id, { sni: e.target.value })}
+                                        placeholder="sni"
+                                    />
+                                </div>
+                            </div>
+
+                            {selectedNode.transport === 'ws' && (
+                                <div className="grid grid-cols-2 gap-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase">WS 路径</Label>
+                                        <Input
+                                            className="h-8 text-sm bg-background"
+                                            value={selectedNode.wsPath || ""}
+                                            onChange={e => updateProxyNode(selectedNode.id, { wsPath: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold text-muted-foreground uppercase">WS Host</Label>
+                                        <Input
+                                            className="h-8 text-sm bg-background"
+                                            value={selectedNode.wsHost || ""}
+                                            onChange={e => updateProxyNode(selectedNode.id, { wsHost: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* JSON Preview Block */}
+                            <div className="mt-2 space-y-2 border-t pt-4">
+                                <Label className="text-xs font-bold text-primary flex items-center gap-1">
+                                    <LinkIcon className="h-3 w-3" />
+                                    生成的 Sing-box JSON 预览:
+                                </Label>
+                                <pre className="p-3 bg-zinc-950 text-emerald-400 rounded-md border border-emerald-900/30 overflow-auto max-h-[120px] font-mono text-[11px] leading-tight">
+                                    {JSON.stringify({
+                                        tag: `out-${selectedNode.id}`,
+                                        type: selectedNode.type,
+                                        server: selectedNode.server,
+                                        server_port: selectedNode.port,
+                                        ...(selectedNode.uuid && { uuid: selectedNode.uuid }),
+                                        ...(selectedNode.password && { password: selectedNode.password }),
+                                        ...(selectedNode.security === 'tls' && {
+                                            tls: { enabled: true, server_name: selectedNode.sni || selectedNode.server, utls: { enabled: true, fingerprint: 'chrome' } }
+                                        }),
+                                        ...(selectedNode.transport === 'ws' && {
+                                            transport: { type: 'ws', path: selectedNode.wsPath || '/', headers: { Host: selectedNode.wsHost || selectedNode.sni || selectedNode.server } }
+                                        })
+                                    }, null, 2)}
+                                </pre>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="outline" size="sm" onClick={() => setSelectedNode(null)}>取消</Button>
+                            <Button size="sm" onClick={() => setSelectedNode(null)}>确定</Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </Dialog>
     );
 }
