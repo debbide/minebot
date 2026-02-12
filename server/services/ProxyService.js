@@ -110,7 +110,14 @@ class ProxyService {
             // Handle TUIC
             if (node.type === 'tuic') {
                 // Use sanitized outbound.uuid if available, otherwise fallback to password
-                outbound.uuid = outbound.uuid || node.password;
+                let tuicUuid = outbound.uuid || node.password;
+
+                // Sanitize again in case we fell back to a dirty password
+                if (tuicUuid && (tuicUuid.includes('%3A') || tuicUuid.includes(':'))) {
+                    tuicUuid = decodeURIComponent(tuicUuid).split(':')[0];
+                }
+
+                outbound.uuid = tuicUuid;
                 outbound.password = node.password;
                 outbound.congestion_control = 'bbr';
                 if (!outbound.tls) outbound.tls = { enabled: true };
