@@ -39,7 +39,9 @@ class ProxyService {
             type: 'socks',
             tag: `in-${node.id}`,
             listen: '127.0.0.1',
-            listen_port: this.basePort + index
+            listen_port: this.basePort + index,
+            sniff: true,
+            sniff_override_destination: true
         }));
 
         const outbounds = this.nodes.map(node => {
@@ -191,17 +193,31 @@ class ProxyService {
                     inbound: [`in-${node.id}`],
                     outbound: `out-${node.id}`
                 }))
-            ]
+            ],
+            auto_detect_interface: true,
+            final: 'direct'
         };
 
         const dns = {
             servers: [
                 {
+                    tag: 'google',
+                    address: 'tls://8.8.8.8',
+                    detour: this.nodes.length > 0 ? `out-${this.nodes[0].id}` : 'direct'
+                },
+                {
+                    tag: 'local',
                     address: '223.5.5.5',
-                    tag: 'dns-local',
                     detour: 'direct'
                 }
             ],
+            rules: [
+                {
+                    outbound: 'any',
+                    server: 'local'
+                }
+            ],
+            strategy: 'prefer_ipv4',
             independent_cache: true
         };
 
