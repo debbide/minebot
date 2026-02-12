@@ -64,33 +64,34 @@ class ProxyService {
 
             // Protocol specific tuning
             if (node.type === 'vmess') {
-                outbound.security = 'auto';
+                outbound.security = node.security || 'auto';
+                outbound.alter_id = parseInt(node.alterId || 0);
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
             }
 
             // Handle Security (TLS / Reality)
-            // Handle Security (TLS / Reality)
-            // VMess uses 'tls' property, others use 'security'='tls'
+            // VMess uses 'tls' property (boolean), others use 'security'='tls'
             const isTls = node.security === 'tls' || node.security === 'reality' || node.tls === true;
 
             if (isTls || node.sni) {
                 outbound.tls = {
                     enabled: true,
-                    server_name: node.sni || node.server,
+                    // SNI logic: prefer sni, then wsHost (for vmess), then fallback to server
+                    server_name: node.sni || (node.type === 'vmess' ? node.wsHost : null) || node.server,
                     insecure: !!node.insecure
                 };
 
-                // Only enable uTLS if fingerprint is specified (matching python reference)
+                // Only enable uTLS if fingerprint is specified
                 if (node.fp) {
                     outbound.tls.utls = { enabled: true, fingerprint: node.fp };
                 }
 
-                // Add alpn if present or default for WS
+                // Add alpn if present or default for WS (Confirmed fix for Cloudflare 502)
                 if (node.alpn) {
                     outbound.tls.alpn = Array.isArray(node.alpn) ? node.alpn : node.alpn.split(',');
                 } else if (node.transport === 'ws') {
-                    // Modern CDNs often require http/1.1 for WS upgrades
+                    // Modern CDNs require http/1.1 for WS upgrades over TLS
                     outbound.tls.alpn = ['http/1.1'];
                 }
 
@@ -111,15 +112,9 @@ class ProxyService {
                     path: node.wsPath || '/',
                     headers: {}
                 };
-                // Improved Host header logic: Python script leaves it empty if missing.
-                // We will try wsHost, then sni. If both missing, leave undefined (let sing-box/underlying lib handle it or send no host)
-                // Defaulting to node.server (IP) is often bad for CDN/Nginx.
-                const hostHeader = node.wsHost || node.sni;
-                if (hostHeader) {
-                    outbound.transport.headers['Host'] = hostHeader;
+                if (node.wsHost) {
+                    outbound.transport.headers['Host'] = node.wsHost;
                 }
-                // Add User-Agent to prevent 502 from some CDNs (Cloudflare sometimes blocks empty UA)
-                outbound.transport.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
             } else if (node.transport === 'grpc') {
                 outbound.transport = {
                     type: 'grpc',
@@ -145,25 +140,23 @@ class ProxyService {
 
             // Handle TUIC
             if (node.type === 'tuic') {
-                // Use sanitized outbound.uuid if available, otherwise fallback to password
-                let tuicUuid = outbound.uuid || node.password;
-
-                // Sanitize again in case we fell back to a dirty password
-                if (tuicUuid && (tuicUuid.includes('%3A') || tuicUuid.includes(':'))) {
-                    tuicUuid = decodeURIComponent(tuicUuid).split(':')[0];
-                }
-
-                outbound.uuid = tuicUuid;
+                outbound.uuid = node.uuid;
                 outbound.password = node.password;
                 outbound.congestion_control = node.congestion_control || 'bbr';
                 outbound.udp_relay_mode = node.udp_relay_mode || 'quic-rfc';
 
-                if (!outbound.tls) outbound.tls = { enabled: true };
-
-                // Disable uTLS for TUIC as it causes "unsupported usage" error in some sing-box versions/QUIC
-                if (outbound.tls.utls) {
-                    delete outbound.tls.utls;
+                // TUIC expects TLS with specific settings from Python script
+                if (!outbound.tls) {
+                    outbound.tls = {
+                        enabled: true,
+                        server_name: node.sni || node.server,
+                        insecure: !!node.insecure
+                    };
+                    if (node.alpn) outbound.tls.alpn = Array.isArray(node.alpn) ? node.alpn : [node.alpn];
                 }
+
+                // Disable uTLS for TUIC
+                if (outbound.tls && outbound.tls.utls) delete outbound.tls.utls;
             }
 
             return outbound;
@@ -287,12 +280,10 @@ class ProxyService {
                     port: parseInt(json.port),
                     uuid: json.id,
                     security: json.scy || 'auto',
-                    alertId: parseInt(json.aid || 0),
+                    alterId: parseInt(json.aid || 0),
                     transport: json.net === 'ws' ? 'ws' : (json.net === 'grpc' ? 'grpc' : 'tcp'),
                     wsPath: json.path || '',
                     wsHost: json.host || '',
-                    // tls mapped to boolean/object in config generation
-                    // Here we store raw to help UI or config generation
                     tls: json.tls === 'tls',
                     sni: json.sni || json.host || ''
                 };
