@@ -69,7 +69,8 @@ class ProxyService {
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
             } else if (node.type === 'vless') {
-                // Remove packet_encoding for better compatibility during debug
+                // Highly recommended for VLESS over WS/TLS to prevent some 502/dropped connections
+                outbound.packet_encoding = 'xudp';
             }
 
             // Handle Security (TLS / Reality)
@@ -84,14 +85,15 @@ class ProxyService {
                     insecure: !!node.insecure
                 };
 
-                // Only enable uTLS if fingerprint is specified (Align with Python)
-                if (node.fp) {
-                    outbound.tls.utls = { enabled: true, fingerprint: node.fp };
-                }
+                // Enable uTLS (Highly recommended for bypassing CDN/WAF blocks)
+                // Default to chrome if not specified
+                outbound.tls.utls = { enabled: true, fingerprint: node.fp || 'chrome' };
 
-                // Add alpn only if explicitly present (Reverting forced http/1.1 as requested)
+                // Force ALPN http/1.1 for WS nodes over TLS (Confirmed fix for Cloudflare 502)
                 if (node.alpn) {
                     outbound.tls.alpn = Array.isArray(node.alpn) ? node.alpn : node.alpn.split(',');
+                } else if (node.transport === 'ws') {
+                    outbound.tls.alpn = ['http/1.1'];
                 }
 
                 if (node.security === 'reality') {
@@ -319,10 +321,16 @@ class ProxyService {
             // Common TLS/Network params
             if (params.get('sni')) config.sni = params.get('sni');
             if (params.get('security')) config.security = params.get('security');
-            if (params.get('tls') === 'tls' || params.get('tls') === '1') config.tls = true;
+            if (params.get('tls') === 'tls' || params.get('tls') === '1' || params.get('tls') === 'true') config.tls = true;
             if (params.get('alpn')) config.alpn = params.get('alpn');
             if (params.get('path')) config.wsPath = params.get('path');
-            if (params.get('host')) config.wsHost = params.get('host');
+
+            // Host/wsHost mapping
+            config.wsHost = params.get('host') || params.get('wsHost') || '';
+
+            // Transport type (net, type, transport)
+            config.transport = params.get('type') || params.get('transport') || params.get('net') || 'tcp';
+
             if (params.get('serviceName')) config.serviceName = params.get('serviceName'); // grpc
             if (params.get('fp')) config.fp = params.get('fp');
             if (params.get('pbk')) config.pbk = params.get('pbk');
