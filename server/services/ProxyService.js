@@ -136,9 +136,22 @@ class ProxyService {
                     }
                 }
 
-                // Handle Early Data (0-RTT) - Passthrough from node params
-                if (node.max_early_data !== undefined) {
-                    outbound.transport.max_early_data = parseInt(node.max_early_data);
+                // Handle Early Data (0-RTT)
+                // 1. Explicitly set in node params
+                // 2. Auto-detected from path (e.g. /path?ed=2048)
+                let maxEarlyData = node.max_early_data;
+
+                if (maxEarlyData === undefined && node.wsPath && node.wsPath.includes('ed=')) {
+                    try {
+                        const match = node.wsPath.match(/[?&]ed=(\d+)/);
+                        if (match && match[1]) {
+                            maxEarlyData = parseInt(match[1]);
+                        }
+                    } catch (e) { /* ignore parse error */ }
+                }
+
+                if (maxEarlyData !== undefined) {
+                    outbound.transport.max_early_data = parseInt(maxEarlyData);
                     outbound.transport.early_data_header_name = node.early_data_header_name || 'Sec-WebSocket-Protocol';
                 }
             } else if (node.transport === 'grpc') {
