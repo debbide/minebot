@@ -11,5 +11,5 @@ def run_cmd(cmd):
     return res.returncode
 
 run_cmd("git add .")
-run_cmd('git commit -m "fix: implement aggressive Cloudflare 502 fixes (ALPN, EarlyData, uTLS, xudp)"')
+run_cmd('git commit -m "fix: surgical proxy fixes (port NaN, tls params parsing, clean headers, sni fallback)"')
 run_cmd("git push origin main")
