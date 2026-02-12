@@ -69,8 +69,7 @@ class ProxyService {
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
             } else if (node.type === 'vless') {
-                // Recommended for VLESS over WS/TLS to prevent some 502/dropped connections
-                outbound.packet_encoding = 'xudp';
+                // Remove packet_encoding for better compatibility during debug
             }
 
             // Handle Security (TLS / Reality)
@@ -80,8 +79,8 @@ class ProxyService {
             if (isTls || node.sni) {
                 outbound.tls = {
                     enabled: true,
-                    // SNI logic: prefer sni, then wsHost (for vmess), then fallback to server
-                    server_name: node.sni || (node.type === 'vmess' ? node.wsHost : null) || node.server,
+                    // SNI logic: prefer sni, then wsHost (the domain), then fallback to server
+                    server_name: node.sni || node.wsHost || node.server,
                     insecure: !!node.insecure
                 };
 
@@ -112,10 +111,15 @@ class ProxyService {
                 outbound.transport = {
                     type: 'ws',
                     path: node.wsPath || '/',
-                    headers: {}
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
                 };
-                if (node.wsHost) {
-                    outbound.transport.headers['Host'] = node.wsHost;
+
+                // Host header logic: prefer wsHost, then sni, then fallback to server
+                const hostHeader = node.wsHost || node.sni || node.server;
+                if (hostHeader && !hostHeader.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+                    outbound.transport.headers['Host'] = hostHeader;
                 }
 
                 // Handle Early Data (0-RTT) - Crucial for Argo Tunnels
