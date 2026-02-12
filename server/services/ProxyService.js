@@ -64,7 +64,8 @@ class ProxyService {
 
             // Protocol specific tuning
             if (node.type === 'vmess') {
-                outbound.security = node.security || 'auto';
+                // v2rayN uses 'none' for many Cloudflare/Argo nodes
+                outbound.security = node.security || 'none';
                 outbound.alter_id = parseInt(node.alterId || 0);
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
@@ -88,10 +89,11 @@ class ProxyService {
                 // Enable uTLS (Highly recommended for bypassing CDN/WAF blocks)
                 outbound.tls.utls = {
                     enabled: true,
-                    fingerprint: node.fp || 'firefox' // v2rayN default is often firefox
+                    fingerprint: node.fp || 'firefox'
                 };
 
-                outbound.tls.record_fragment = true; // Found in working v2rayN config
+                // record_fragment can be unstable in Docker/MTU envs, disabling to match standard v2rayN baseline
+                // unless explicitly needed
 
                 // Add alpn only if explicitly present
                 if (node.alpn) {
@@ -182,14 +184,32 @@ class ProxyService {
         });
 
         const routes = {
-            rules: this.nodes.map(node => ({
-                inbound: [`in-${node.id}`],
-                outbound: `out-${node.id}`
-            }))
+            rules: [
+                {
+                    ip_is_private: true,
+                    outbound: 'direct'
+                },
+                ...this.nodes.map(node => ({
+                    inbound: [`in-${node.id}`],
+                    outbound: `out-${node.id}`
+                }))
+            ]
+        };
+
+        const dns = {
+            servers: [
+                {
+                    address: '223.5.5.5',
+                    tag: 'dns-local',
+                    detour: 'direct'
+                }
+            ],
+            independent_cache: true
         };
 
         return {
             log: { level: 'info' },
+            dns,
             inbounds,
             outbounds: [...outbounds, { type: 'direct', tag: 'direct' }],
             route: routes
@@ -461,7 +481,7 @@ class ProxyService {
             await axios.get('http://cp.cloudflare.com/generate_204', {
                 httpAgent: agent,
                 httpsAgent: agent,
-                timeout: 10000,
+                timeout: 15000,
                 proxy: false
             });
             return Date.now() - startTime;
