@@ -106,6 +106,9 @@ class ProxyService {
                 // Add alpn only if explicitly present
                 if (node.alpn) {
                     outbound.tls.alpn = Array.isArray(node.alpn) ? node.alpn : node.alpn.split(',');
+                } else if (node.transport === 'ws') {
+                    // [V24 Fix] WS over TLS requires http/1.1 ALPN, h2 will fail handshake
+                    outbound.tls.alpn = ['http/1.1'];
                 }
 
                 if (node.security === 'reality') {
@@ -123,7 +126,9 @@ class ProxyService {
                 outbound.transport = {
                     type: 'ws',
                     path: node.wsPath || '/',
-                    headers: {}
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
                 };
 
                 // Host header logic: prefer wsHost, then sni, fallback to server
