@@ -11,5 +11,5 @@ def run_cmd(cmd):
     return res.returncode
 
 run_cmd("git add .")
-run_cmd('git commit -m "fix: v20 reliability (removed automatic 0-RTT injection)"')
+run_cmd('git commit -m "fix: v21 final zero-guesswork (passthrough all URI params)"')
 run_cmd("git push origin main")

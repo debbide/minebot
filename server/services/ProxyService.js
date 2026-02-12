@@ -66,14 +66,13 @@ class ProxyService {
 
             // Protocol specific tuning
             if (node.type === 'vmess') {
-                // v2rayN uses 'none' for many Cloudflare/Argo nodes
-                outbound.security = node.security || 'none';
+                outbound.security = node.security || 'auto';
                 outbound.alter_id = parseInt(node.alterId || 0);
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
             } else if (node.type === 'vless') {
-                // v2rayN working config uses xudp for VLESS
-                outbound.packet_encoding = 'xudp';
+                // Passthrough packet_encoding if present (e.g. xudp)
+                if (node.packet_encoding) outbound.packet_encoding = node.packet_encoding;
             }
 
             // Handle Security (TLS / Reality)
@@ -88,13 +87,16 @@ class ProxyService {
                     insecure: !!node.insecure
                 };
 
-                // Enable uTLS (Highly recommended for bypassing CDN/WAF blocks)
+                // Enable uTLS fingerprint from node or default
                 outbound.tls.utls = {
                     enabled: true,
                     fingerprint: node.fp || 'chrome'
                 };
 
-                outbound.tls.record_fragment = true; // Restoring for CDN handshake stability
+                // record_fragment: only if explicitly requested or for specific TLS nodes
+                if (node.record_fragment !== undefined) {
+                    outbound.tls.record_fragment = !!node.record_fragment;
+                }
 
                 // Add alpn only if explicitly present
                 if (node.alpn) {
@@ -127,17 +129,11 @@ class ProxyService {
                     outbound.transport.headers['Host'] = hostHeader;
                 }
 
-                // Handle Early Data (0-RTT) - ONLY if ed= is present in the path
-                const edMatch = outbound.transport.path.match(/ed=(\d+)/);
-                if (edMatch) {
-                    outbound.transport.max_early_data = parseInt(edMatch[1]);
-                    outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
-                } else if (outbound.transport.path.includes('ed=')) {
-                    // Default to 2560 if ed= exists but has no value
-                    outbound.transport.max_early_data = 2560;
-                    outbound.transport.early_data_header_name = 'Sec-WebSocket-Protocol';
+                // Handle Early Data (0-RTT) - Passthrough from node params
+                if (node.max_early_data !== undefined) {
+                    outbound.transport.max_early_data = parseInt(node.max_early_data);
+                    outbound.transport.early_data_header_name = node.early_data_header_name || 'Sec-WebSocket-Protocol';
                 }
-                // Removing the "|| isTls" default for 2560 to prevent 404/400 on non-Argo nodes
             } else if (node.transport === 'grpc') {
                 outbound.transport = {
                     type: 'grpc',
@@ -383,8 +379,15 @@ class ProxyService {
             if (params.get('spx')) config.spx = params.get('spx');
             if (params.get('flow')) config.flow = params.get('flow');
 
+            // Capture critical v2rayN alignment params
+            if (params.get('packet_encoding')) config.packet_encoding = params.get('packet_encoding');
+            if (params.get('ed')) config.max_early_data = params.get('ed');
+            if (params.get('max_early_data')) config.max_early_data = params.get('max_early_data');
+            if (params.get('early_data_header_name')) config.early_data_header_name = params.get('early_data_header_name');
+            if (params.get('record_fragment')) config.record_fragment = (params.get('record_fragment') === 'true' || params.get('record_fragment') === '1');
+
             // Insecure flag (allowInsecure)
-            if (params.get('insecure') === '1' || params.get('insecure') === 'true') {
+            if (params.get('insecure') === '1' || params.get('insecure') === 'true' || params.get('allowInsecure') === '1') {
                 config.insecure = true;
             }
 
