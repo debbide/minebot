@@ -53,6 +53,7 @@ interface BotSettingsPanelProps {
     } | null;
     fileAccessType?: 'pterodactyl' | 'sftp' | 'none';
     proxyNodeId?: string;
+    autoReconnect?: boolean;
     onUpdate?: () => void;
 }
 
@@ -64,6 +65,7 @@ export function BotSettingsPanel({
     sftp: sftpProp,
     fileAccessType: fileAccessTypeProp = 'pterodactyl',
     proxyNodeId: proxyNodeIdProp = '',
+    autoReconnect: autoReconnectProp = false,
     onUpdate
 }: BotSettingsPanelProps) {
     const [loading, setLoading] = useState<string | null>(null);
@@ -95,6 +97,7 @@ export function BotSettingsPanel({
     const [sftpBasePath, setSftpBasePath] = useState(sftpProp?.basePath || "/");
     const [fileAccessType, setFileAccessType] = useState<'pterodactyl' | 'sftp' | 'none'>(fileAccessTypeProp);
     const [proxyNodeId, setProxyNodeId] = useState(proxyNodeIdProp || "");
+    const [autoReconnect, setAutoReconnect] = useState(autoReconnectProp);
     const [proxyNodes, setProxyNodes] = useState<ProxyNode[]>([]);
 
     // Sync state when props change
@@ -118,7 +121,8 @@ export function BotSettingsPanel({
         setSftpBasePath(sftpProp?.basePath || "/");
         setFileAccessType(fileAccessTypeProp);
         setProxyNodeId(proxyNodeIdProp || "");
-    }, [botId, restartTimer, autoChatProp, pterodactyl, sftpProp, fileAccessTypeProp, proxyNodeIdProp]);
+        setAutoReconnect(autoReconnectProp);
+    }, [botId, restartTimer, autoChatProp, pterodactyl, sftpProp, fileAccessTypeProp, proxyNodeIdProp, autoReconnectProp]);
 
     // Load proxy nodes once
     useEffect(() => {
@@ -288,6 +292,23 @@ export function BotSettingsPanel({
         }
     };
 
+    const handleToggleAutoReconnect = async (enabled: boolean) => {
+        setLoading("autoReconnect");
+        try {
+            await api.updateServer(botId, { autoReconnect: enabled });
+            setAutoReconnect(enabled);
+            toast({
+                title: enabled ? "持久化重连已开启" : "持久化重连已关闭",
+                description: enabled ? "当连接断开且重连失败时，将持续尝试直到成功" : "仅在断开时尝试一次重连"
+            });
+            onUpdate?.();
+        } catch (error) {
+            toast({ title: "错误", description: String(error), variant: "destructive" });
+        } finally {
+            setLoading(null);
+        }
+    };
+
     return (
         <Tabs defaultValue="restart" className="w-full">
             <TabsList className="grid w-full grid-cols-5">
@@ -368,6 +389,18 @@ export function BotSettingsPanel({
                                 ? "改变代理设置后，可能需要手动重启机器人以生效"
                                 : "当前使用直连模式，直接连接到 Minecraft 服务器"}
                         </p>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-4 border-t">
+                        <div className="space-y-0.5">
+                            <Label>持久化重连 (Persistent Reconnection)</Label>
+                            <p className="text-xs text-muted-foreground">当服务器离线时按频率持续重连，不建议全部开启</p>
+                        </div>
+                        <Switch
+                            checked={autoReconnect}
+                            onCheckedChange={handleToggleAutoReconnect}
+                            disabled={loading === "autoReconnect"}
+                        />
                     </div>
 
                     <div className="p-3 bg-muted/30 rounded-lg text-xs space-y-2 text-muted-foreground border">

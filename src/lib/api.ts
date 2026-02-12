@@ -78,6 +78,7 @@ export interface BotStatus {
   tcpOnline?: boolean | null;
   tcpLatency?: number | null;
   proxyNodeId?: string;
+  autoReconnect?: boolean;
 }
 
 export interface LogEntry {
@@ -205,13 +206,23 @@ export interface FileInfo {
 export interface ProxyNode {
   id: string;
   name: string;
-  type: string;
+  type: string; // vless, vmess, trojan, shadowsocks, tuic, hysteria2, socks, http
   server: string;
   port: number;
   password?: string;
   uuid?: string;
   sni?: string;
   latency?: number;
+  // Advanced fields
+  transport?: 'tcp' | 'ws' | 'grpc' | 'quic' | 'http';
+  wsPath?: string;
+  wsHost?: string;
+  security?: 'none' | 'tls' | 'reality';
+  fp?: string; // Fingerprint
+  alpn?: string;
+  pbk?: string; // Reality publicKey
+  sid?: string; // Reality shortId
+  spx?: string; // Reality spiderX
 }
 
 class ApiService {
@@ -423,6 +434,7 @@ class ApiService {
     host?: string;
     port?: number;
     proxyNodeId?: string;
+    autoReconnect?: boolean;
   }): Promise<{ success: boolean; config: unknown }> {
     return this.request(`/api/bots/${id}`, {
       method: 'PUT',

@@ -450,6 +450,7 @@ export function ServerDetailDialog({
                         sftp={server.sftp}
                         fileAccessType={server.fileAccessType}
                         proxyNodeId={server.proxyNodeId}
+                        autoReconnect={server.autoReconnect}
                         onUpdate={onUpdate}
                       />
                     </div>

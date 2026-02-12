@@ -53,7 +53,46 @@ class ProxyService {
             // Add protocol specific fields
             if (node.password) outbound.password = node.password;
             if (node.uuid) outbound.uuid = node.uuid;
-            if (node.sni) outbound.tls = { enabled: true, server_name: node.sni };
+
+            // Protocol specific tuning
+            if (node.type === 'vmess') {
+                outbound.security = 'auto';
+            } else if (node.type === 'shadowsocks') {
+                outbound.method = node.method || 'aes-256-gcm';
+            }
+
+            // Handle Security (TLS / Reality)
+            if (node.security === 'tls' || node.security === 'reality' || node.sni) {
+                outbound.tls = {
+                    enabled: true,
+                    server_name: node.sni || node.server,
+                    utls: { enabled: true, fingerprint: node.fp || 'chrome' }
+                };
+
+                if (node.alpn) {
+                    outbound.tls.alpn = node.alpn.split(',').map(s => s.trim());
+                }
+
+                if (node.security === 'reality') {
+                    outbound.tls.reality = {
+                        enabled: true,
+                        public_key: node.pbk,
+                        short_id: node.sid
+                    };
+                    if (node.spx) outbound.tls.reality.spider_x = node.spx;
+                }
+            }
+
+            // Handle Transport (WS)
+            if (node.transport === 'ws') {
+                outbound.transport = {
+                    type: 'ws',
+                    path: node.wsPath || '/',
+                    headers: {
+                        'Host': node.wsHost || node.server
+                    }
+                };
+            }
 
             // Handle Hysteria2 specific
             if (node.type === 'hysteria2') {
@@ -143,9 +182,27 @@ class ProxyService {
         await this.start();
     }
 
-    // Parse proxy links (vless, ss, trojan, tuic, hysteria2)
+    // Parse proxy links (vless, vmess, ss, trojan, tuic, hysteria2)
     parseProxyLink(link) {
         try {
+            if (link.startsWith('vmess://')) {
+                const b64 = link.replace('vmess://', '');
+                const json = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8'));
+                return {
+                    id: Math.random().toString(36).substring(2, 9),
+                    name: json.ps || 'VMess',
+                    type: 'vmess',
+                    server: json.add,
+                    port: parseInt(json.port),
+                    uuid: json.id,
+                    transport: json.net === 'ws' ? 'ws' : 'tcp',
+                    wsPath: json.path || '',
+                    wsHost: json.host || '',
+                    security: json.tls === 'tls' ? 'tls' : 'none',
+                    sni: json.sni || json.host || ''
+                };
+            }
+
             const url = new URL(link);
             const protocol = url.protocol.slice(0, -1);
             const nodeId = Math.random().toString(36).substring(2, 9);
@@ -159,28 +216,38 @@ class ProxyService {
                 port: parseInt(url.port)
             };
 
+            const params = new URLSearchParams(url.search);
+
+            // Common params
+            if (params.get('sni')) config.sni = params.get('sni');
+            if (params.get('security')) config.security = params.get('security');
+            if (params.get('type')) config.transport = params.get('type');
+            if (params.get('path')) config.wsPath = params.get('path');
+            if (params.get('host')) config.wsHost = params.get('host');
+            if (params.get('fp')) config.fp = params.get('fp');
+            if (params.get('pbk')) config.pbk = params.get('pbk');
+            if (params.get('sid')) config.sid = params.get('sid');
+            if (params.get('spx')) config.spx = params.get('spx');
+
             if (protocol === 'vless') {
                 config.uuid = url.username;
-                const params = new URLSearchParams(url.search);
-                if (params.get('sni')) config.sni = params.get('sni');
             } else if (protocol === 'trojan') {
                 config.password = url.username;
-                const params = new URLSearchParams(url.search);
-                if (params.get('sni')) config.sni = params.get('sni');
             } else if (protocol === 'ss') {
                 // ss://base64(method:password)@host:port
-                const auth = atob(url.username);
+                let auth = url.username;
+                try {
+                    auth = Buffer.from(auth, 'base64').toString('utf-8');
+                } catch (e) { }
                 const [method, password] = auth.split(':');
                 config.type = 'shadowsocks';
                 config.password = password;
-                // Note: sing-box shadowsocks might need method, but our UI currently uses password-only logic
-                // We'll stick to basic fields for now.
+                // sing-box shadowsocks needs method, we might need to store it
+                config.method = method;
             } else if (protocol === 'tuic' || protocol === 'hysteria2') {
                 config.password = url.username;
-                const params = new URLSearchParams(url.search);
-                if (params.get('sni')) config.sni = params.get('sni');
             } else if (protocol === 'socks' || protocol === 'http') {
-                // Already handled by base config
+                // Base handled
             } else {
                 return null;
             }

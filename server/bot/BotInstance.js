@@ -61,7 +61,8 @@ export class BotInstance {
       pterodactyl: config.pterodactyl || null, // 翼龙面板配置
       sftp: config.sftp || null, // SFTP 配置
       fileAccessType: config.fileAccessType || 'pterodactyl', // 文件访问方式: 'pterodactyl' | 'sftp' | 'none'
-      autoOp: config.autoOp !== false // 默认启用自动OP
+      autoOp: config.autoOp !== false, // 默认启用自动OP
+      autoReconnect: config.autoReconnect || false // 对有需要的节点开启持久重连
     };
 
     // 从配置加载模式设置 (确保所有模式都有默认值)
@@ -232,7 +233,12 @@ export class BotInstance {
     this.status.connected = false;
     this.reconnectAttempts++;
 
-    this.log('warning', `连接异常 (${reason})，${10}秒后重连 (第${this.reconnectAttempts}次)...`, '🔄');
+    // 计算下一次等待时间 (指数退避)
+    // 10s, 20s, 40s, 80s, 160s, 最大 300s (5分钟)
+    const backoff = Math.min(10000 * Math.pow(2, Math.min(this.reconnectAttempts - 1, 5)), 300000);
+    const delaySeconds = Math.floor(backoff / 1000);
+
+    this.log('warning', `连接异常 (${reason})，${delaySeconds}秒后重连 (第${this.reconnectAttempts}次)...`, '🔄');
 
     // 彻底清理旧连接
     this.cleanup();
@@ -241,7 +247,6 @@ export class BotInstance {
       this.onStatusChange(this.id, this.getStatus());
     }
 
-    // 固定10秒后重连，不要立即重试
     this.reconnectTimeout = setTimeout(async () => {
       if (this.destroyed) {
         this.isRepairing = false;
@@ -252,13 +257,17 @@ export class BotInstance {
         await this.connect();
         this.log('success', '重连成功', '✅');
         this.reconnectAttempts = 0;
+        this.isRepairing = false;
       } catch (err) {
         this.log('error', `重连失败: ${err.message}`, '✗');
-        // 失败后继续尝试，但间隔会更长
-      }
+        this.isRepairing = false;
 
-      this.isRepairing = false;
-    }, 10000);
+        // 如果开启了自动持久重连，则再次触发重连逻辑
+        if (this.status.autoReconnect && !this.destroyed) {
+          this.attemptRepair(`重试失败: ${err.message}`);
+        }
+      }
+    }, backoff);
   }
 
   /**
@@ -564,7 +573,8 @@ export class BotInstance {
         pterodactyl: this.status.pterodactyl || {},
         sftp: this.status.sftp || {},
         fileAccessType: this.status.fileAccessType || 'pterodactyl',
-        autoOp: this.status.autoOp
+        autoOp: this.status.autoOp,
+        autoReconnect: this.status.autoReconnect
       });
       this.log('info', '配置已保存', '💾');
     } catch (error) {

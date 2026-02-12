@@ -607,6 +607,8 @@ app.put('/api/bots/:id', async (req, res) => {
     if (username !== undefined) updates.username = username;
     if (host !== undefined) updates.host = host;
     if (port !== undefined) updates.port = parseInt(port) || 25565;
+    if (req.body.proxyNodeId !== undefined) updates.proxyNodeId = req.body.proxyNodeId;
+    if (req.body.autoReconnect !== undefined) updates.autoReconnect = !!req.body.autoReconnect;
 
     const updatedConfig = configManager.updateServer(id, updates);
 
@@ -625,6 +627,13 @@ app.put('/api/bots/:id', async (req, res) => {
       }
       if (host !== undefined) bot.config.host = host;
       if (port !== undefined) bot.config.port = parseInt(port) || 25565;
+
+      // Update proxy and autoReconnect
+      if (req.body.proxyNodeId !== undefined) bot.config.proxyNodeId = req.body.proxyNodeId;
+      if (req.body.autoReconnect !== undefined) {
+        bot.status.autoReconnect = !!req.body.autoReconnect;
+        bot.config.autoReconnect = !!req.body.autoReconnect;
+      }
 
       // 对于纯面板服务器，如果 host/port 更新了，刷新状态检查
       if ((host !== undefined || port !== undefined) && bot.refreshStatusCheck) {
