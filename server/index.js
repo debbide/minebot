@@ -606,7 +606,7 @@ app.put('/api/bots/:id', async (req, res) => {
     if (name !== undefined) updates.name = name;
     if (username !== undefined) updates.username = username;
     if (host !== undefined) updates.host = host;
-    if (port !== undefined) updates.port = parseInt(port) || 25565;
+    if (port !== undefined) updates.port = parseInt(port); // Allow 0 for SRV/Auto
     if (req.body.proxyNodeId !== undefined) updates.proxyNodeId = req.body.proxyNodeId;
     if (req.body.autoReconnect !== undefined) updates.autoReconnect = !!req.body.autoReconnect;
 
@@ -626,7 +626,7 @@ app.put('/api/bots/:id', async (req, res) => {
         }
       }
       if (host !== undefined) bot.config.host = host;
-      if (port !== undefined) bot.config.port = parseInt(port) || 25565;
+      if (port !== undefined) bot.config.port = parseInt(port); // Allow 0
 
       // Update proxy and autoReconnect
       if (req.body.proxyNodeId !== undefined) bot.config.proxyNodeId = req.body.proxyNodeId;

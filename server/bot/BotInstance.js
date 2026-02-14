@@ -307,7 +307,8 @@ export class BotInstance {
 
     // 只使用手动配置的地址，不使用面板API获取的地址
     const host = this.config.host;
-    const port = this.config.port || 25565;
+    // 如果端口为0或未定义，传undefined给mineflayer，让其处理默认值(25565)和SRV解析
+    const port = (this.config.port && this.config.port > 0) ? this.config.port : undefined;
 
     if (!host) {
       this.log('error', '未配置服务器地址，请在设置中配置 host', '❌');
@@ -370,7 +371,7 @@ export class BotInstance {
 
         this.bot.once('spawn', () => {
           this.status.connected = true;
-          this.status.serverAddress = `${host}:${port}`;
+          this.status.serverAddress = `${host}${port ? `:${port}` : ''}`;
           this.status.version = this.bot.version;
 
           // 记录出生点用于巡逻

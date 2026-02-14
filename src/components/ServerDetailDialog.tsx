@@ -79,7 +79,7 @@ export function ServerDetailDialog({
       setEditForm({
         name: server.name || "",
         host: server.host || "",
-        port: String(server.port || 25565),
+        port: server.port ? String(server.port) : "",
         username: server.username || "",
       });
     }
@@ -141,7 +141,7 @@ export function ServerDetailDialog({
       await api.updateServer(server.id, {
         name: editForm.name || undefined,
         host: editForm.host || undefined,
-        port: parseInt(editForm.port) || 25565,
+        port: editForm.port ? parseInt(editForm.port) : 0,
         username: editForm.username || undefined,
       });
       toast({ title: "成功", description: "服务器配置已更新" });
@@ -275,7 +275,7 @@ export function ServerDetailDialog({
                       <span className="font-mono font-medium">
                         {isPanel && server.serverHost
                           ? `${server.serverHost}:${server.serverPort}`
-                          : `${server.host}:${server.port}`}
+                          : `${server.host}${server.port ? `:${server.port}` : ''}`}
                       </span>
                     </div>
                     {!isPanel && server.username && (
@@ -396,7 +396,7 @@ export function ServerDetailDialog({
                             <Input
                               value={editForm.port}
                               onChange={(e) => setEditForm({ ...editForm, port: e.target.value })}
-                              placeholder="25565"
+                              placeholder="25565 (留空支持域名解析)"
                               className="bg-background/50 font-mono"
                             />
                           </div>
@@ -431,7 +431,7 @@ export function ServerDetailDialog({
                           )}
                           <div className="grid grid-cols-3">
                             <dt className="text-muted-foreground">连接地址</dt>
-                            <dd className="col-span-2 font-mono">{server.host}:{server.port}</dd>
+                            <dd className="col-span-2 font-mono">{server.host}{server.port ? `:${server.port}` : ''}</dd>
                           </div>
                         </dl>
                       </div>

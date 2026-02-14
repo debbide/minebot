@@ -316,7 +316,7 @@ export function MultiServerPanel() {
         type: newServer.type,
         name: newServer.name || `Server ${Object.keys(servers).length + 1}`,
         host: newServer.type === "minecraft" ? newServer.host : "",
-        port: newServer.type === "minecraft" ? (parseInt(newServer.port) || 25565) : 0,
+        port: newServer.type === "minecraft" ? (newServer.port ? parseInt(newServer.port) : 0) : 0,
         username: newServer.type === "minecraft" ? (newServer.username || undefined) : undefined,
       });
       toast({ title: "成功", description: newServer.type === "panel" ? "面板服务器已添加" : "服务器已添加并开始连接", variant: "success" });
@@ -562,7 +562,7 @@ export function MultiServerPanel() {
                             <div className="space-y-1">
                               <Label>端口</Label>
                               <Input
-                                placeholder="25565"
+                                placeholder="25565 (留空自动解析)"
                                 value={newServer.port}
                                 onChange={(e) => setNewServer({ ...newServer, port: e.target.value })}
                               />
