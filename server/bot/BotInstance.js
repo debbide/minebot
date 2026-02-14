@@ -188,24 +188,29 @@ export class BotInstance {
       this.behaviors = null;
     }
 
+    this.status.connected = false;
+    this.status.position = null;
+    this.status.health = 0;
+    this.status.food = 0;
+    this.status.players = [];
+
     if (this.bot) {
       try {
         this.bot.removeAllListeners();
         if (this.bot._client) {
           this.bot._client.removeAllListeners();
         }
-        if (typeof this.bot.quit === 'function') {
-          this.bot.quit();
-        } else if (typeof this.bot.end === 'function') {
+        // Force end the connection
+        if (typeof this.bot.end === 'function') {
           this.bot.end();
+        } else if (typeof this.bot.quit === 'function') {
+          this.bot.quit();
         }
       } catch (e) {
-        // Ignore
+        // Ignore errors during cleanup
       }
       this.bot = null;
     }
-
-    this.status.connected = false;
   }
 
   startActivityMonitor() {
@@ -236,9 +241,12 @@ export class BotInstance {
     this.reconnectAttempts++;
 
     // 计算下一次等待时间 (指数退避)
-    // 10s, 20s, 40s, 80s, 160s, 最大 300s (5分钟)
-    const backoff = Math.min(10000 * Math.pow(2, Math.min(this.reconnectAttempts - 1, 5)), 300000);
-    const delaySeconds = Math.floor(backoff / 1000);
+    // 5s for first attempt, then 10s, 20s... max 60s
+    let delaySeconds = 5;
+    if (this.reconnectAttempts > 1) {
+      delaySeconds = Math.min(5 * Math.pow(2, Math.min(this.reconnectAttempts - 1, 5)), 60);
+    }
+    const backoff = delaySeconds * 1000;
 
     this.log('warning', `连接异常 (${reason})，${delaySeconds}秒后重连 (第${this.reconnectAttempts}次)...`, '🔄');
 
@@ -448,7 +456,7 @@ export class BotInstance {
         });
 
         this.bot.on('move', () => {
-          if (this.bot?.entity) {
+          if (this.bot?.entity && this.status.connected) {
             this.status.position = this.bot.entity.position;
             this.updateActivity();
           }
