@@ -310,6 +310,9 @@ export class BotInstance {
       this.cleanup();
     }
 
+    // 重置手动停止标志，允许后续自动重连
+    this.destroyed = false;
+
     // 缩短等待时间
     await new Promise(r => setTimeout(r, 200));
 
