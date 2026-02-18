@@ -25,28 +25,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const savedUsername = localStorage.getItem('username');
 
     if (savedToken) {
-      // Verify token
-      fetch(`${API_BASE}/api/auth/check`, {
-        headers: {
-          'Authorization': `Bearer ${savedToken}`
-        }
-      })
-        .then(res => res.json())
-        .then(data => {
+      // Verify token with retry logic
+      const verifyToken = async (retries = 3): Promise<void> => {
+        try {
+          const res = await fetch(`${API_BASE}/api/auth/check`, {
+            headers: { 'Authorization': `Bearer ${savedToken}` }
+          });
+          const data = await res.json();
+
           if (data.authenticated) {
             setToken(savedToken);
             setUsername(savedUsername);
             setIsAuthenticated(true);
           } else {
+            // Token is genuinely invalid (401) — clear it
             localStorage.removeItem('token');
             localStorage.removeItem('username');
           }
-        })
-        .catch(() => {
-          localStorage.removeItem('token');
-          localStorage.removeItem('username');
-        })
-        .finally(() => setLoading(false));
+        } catch {
+          // Network error — do NOT clear token, retry if possible
+          if (retries > 0) {
+            await new Promise(r => setTimeout(r, 2000));
+            return verifyToken(retries - 1);
+          }
+          // After all retries failed, keep token and assume still logged in
+          setToken(savedToken);
+          setUsername(savedUsername);
+          setIsAuthenticated(true);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      verifyToken();
     } else {
       setLoading(false);
     }
