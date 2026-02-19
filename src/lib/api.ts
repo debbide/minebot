@@ -87,6 +87,7 @@ export interface LogEntry {
   type: 'info' | 'success' | 'warning' | 'error' | 'chat';
   icon?: string;
   message: string;
+  serverId?: string; // 所属服务器ID
 }
 
 export interface Config {

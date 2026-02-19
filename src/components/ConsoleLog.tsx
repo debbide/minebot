@@ -1,5 +1,5 @@
 import { Terminal, Trash2, Pause, Play } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useWebSocket } from "@/hooks/useBot";
@@ -14,11 +14,18 @@ interface LogEntry {
 
 interface ConsoleLogProps {
   externalLogs?: LogEntry[];
+  serverId?: string; // 可选的服务器ID过滤器
 }
 
-export function ConsoleLog({ externalLogs }: ConsoleLogProps) {
+export function ConsoleLog({ externalLogs, serverId }: ConsoleLogProps) {
   const { logs: wsLogs, setLogs } = useWebSocket();
-  const logs = externalLogs || wsLogs;
+  const rawLogs = externalLogs || wsLogs;
+
+  // 如果提供了 serverId，则过滤日志
+  const logs = useMemo(() => {
+    if (!serverId) return rawLogs;
+    return rawLogs.filter(log => log.serverId === serverId);
+  }, [rawLogs, serverId]);
   const [isPaused, setIsPaused] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -68,13 +75,13 @@ export function ConsoleLog({ externalLogs }: ConsoleLogProps) {
       </div>
 
       {/* Log Entries */}
-      <div 
+      <div
         ref={scrollRef}
         className="h-64 overflow-y-auto p-3 font-mono text-sm space-y-1 scrollbar-thin"
       >
         {logs.map((log) => (
-          <div 
-            key={log.id} 
+          <div
+            key={log.id}
             className={cn(
               "flex items-start gap-2 py-0.5 animate-in fade-in duration-300",
               typeStyles[log.type]

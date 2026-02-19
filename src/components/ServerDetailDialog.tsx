@@ -78,8 +78,11 @@ export function ServerDetailDialog({
     }
   }, [server]);
 
-  // 优化日志显示（使用 useMemo 避免重复计算）
-  const displayLogs = useMemo(() => logs.slice(-100), [logs]);
+  // 优化日志显示（只显示当前服务器的日志）
+  const displayLogs = useMemo(() => {
+    if (!server) return [];
+    return logs.filter(log => log.serverId === server.id).slice(-100);
+  }, [logs, server]);
 
   // 清空日志
   const clearLogs = async () => {

@@ -25,7 +25,7 @@ function getMemoryStatus() {
         const limit = fs.readFileSync('/sys/fs/cgroup/memory.max', 'utf8').trim();
         if (limit !== 'max') total = parseInt(limit);
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   const percent = ((used / total) * 100).toFixed(1);
@@ -65,10 +65,10 @@ export class BotPool {
 
       if (percent >= 80) {
         console.warn(`[内存警告] 使用率 ${status.percent}% (${status.used}/${status.total} MB)`);
-        
+
         // 清理协议缓存
         BotInstance.clearCache();
-        
+
         // 紧急修剪日志
         this.logs = this.logs.slice(-20);
         this.bots.forEach(bot => {
@@ -174,12 +174,13 @@ export class BotPool {
     });
   }
 
-  onLog(entry) {
-    this.logs.push(entry);
+  onLog(botId, entry) {
+    const logEntry = { ...entry, serverId: botId };
+    this.logs.push(logEntry);
     if (this.logs.length > this.maxLogs) {
       this.logs.shift();
     }
-    this.broadcast('log', entry);
+    this.broadcast('log', logEntry);
   }
 
   onStatusChange(botId, status) {
