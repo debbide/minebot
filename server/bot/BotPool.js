@@ -62,6 +62,8 @@ export class BotPool {
     setInterval(() => {
       const status = getMemoryStatus();
       const percent = parseFloat(status.percent);
+      // 广播给前端
+      this.broadcast('system_status', status);
 
       if (percent >= 80) {
         console.warn(`[内存警告] 使用率 ${status.percent}% (${status.used}/${status.total} MB)`);
