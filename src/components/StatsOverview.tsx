@@ -1,7 +1,6 @@
 import { Server, Wifi, WifiOff, Users, HardDrive } from "lucide-react";
 import { StatusCard } from "./StatusCard";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useWebSocketContext } from "@/contexts/WebSocketContext";
 
 interface StatsOverviewProps {
     status: any;
@@ -9,23 +8,7 @@ interface StatsOverviewProps {
 }
 
 export function StatsOverview({ status, connected }: StatsOverviewProps) {
-    const [memory, setMemory] = useState<{ used: string; total: string; percent: string } | null>(null);
-
-    // 获取内存状态
-    useEffect(() => {
-        const fetchMemory = async () => {
-            try {
-                const data = await api.getMemoryStatus();
-                setMemory(data);
-            } catch (error) {
-                console.error('获取内存状态失败:', error);
-            }
-        };
-
-        fetchMemory();
-        const interval = setInterval(fetchMemory, 30000); // 每30秒刷新
-        return () => clearInterval(interval);
-    }, []);
+    const { systemStatus } = useWebSocketContext();
 
     // 计算所有服务器的总玩家数
     const totalPlayers = status?.botList?.reduce((sum: number, bot: any) => {
@@ -33,7 +16,7 @@ export function StatsOverview({ status, connected }: StatsOverviewProps) {
     }, 0) || status?.players?.length || 0;
 
     // 内存状态颜色
-    const memoryPercent = memory ? parseFloat(memory.percent) : 0;
+    const memoryPercent = systemStatus ? parseFloat(systemStatus.percent) : 0;
     const memoryStatus = memoryPercent >= 80 ? "error" : memoryPercent >= 60 ? "warning" : "online";
 
     return (
@@ -59,8 +42,8 @@ export function StatsOverview({ status, connected }: StatsOverviewProps) {
             {/* Memory Status */}
             <StatusCard
                 title="内存监测"
-                value={memory ? `${memory.percent}%` : '-'}
-                description={memory ? `${memory.used} / ${memory.total} MB` : "获取中..."}
+                value={systemStatus ? `${systemStatus.percent}%` : '-'}
+                description={systemStatus ? `${systemStatus.used} / ${systemStatus.total} MB` : "获取中..."}
                 icon={HardDrive}
                 status={memoryStatus}
             />

@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useWebSocketContext } from "@/contexts/WebSocketContext";
 import {
   Server,
   Plus,
@@ -236,6 +237,7 @@ export function MultiServerPanel() {
   const [selectedServer, setSelectedServer] = useState<ServerConfig | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const { toast } = useToast();
+  const { botUpdates } = useWebSocketContext();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -277,11 +279,32 @@ export function MultiServerPanel() {
 
   useEffect(() => {
     fetchServers();
-    const interval = setInterval(fetchServers, 10000);
-    return () => clearInterval(interval);
   }, []);
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  useEffect(() => {
+    if (botUpdates.size > 0) {
+      setServers(prev => {
+        const updated = { ...prev };
+        botUpdates.forEach((botData, botId) => {
+          updated[botId] = botData;
+        });
+        return updated;
+      });
+
+      setOrderedIds(prevIds => {
+        const newIds = Array.from(botUpdates.keys());
+        const existingIds = prevIds.filter(id => newIds.includes(id));
+        const addedIds = newIds.filter(id => !prevIds.includes(id));
+        return [...existingIds, ...addedIds];
+      });
+
+      if (selectedServer && botUpdates.has(selectedServer.id)) {
+        setSelectedServer(botUpdates.get(selectedServer.id));
+      }
+    }
+  }, [botUpdates]);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
@@ -298,9 +321,9 @@ export function MultiServerPanel() {
         console.error("Failed to save order:", error);
       }
     }
-  };
+  }, [orderedIds]);
 
-  const handleAddServer = async () => {
+  const handleAddServer = useCallback(async () => {
     if (newServer.type === "minecraft" && !newServer.host) {
       toast({ title: "错误", description: "请输入服务器地址", variant: "destructive" });
       return;
@@ -328,9 +351,9 @@ export function MultiServerPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [newServer, servers, toast]);
 
-  const handleRemoveServer = async (id: string) => {
+  const handleRemoveServer = useCallback(async (id: string) => {
     if (!confirm("确定要删除这个服务器吗？")) return;
     setLoading(true);
     try {
@@ -342,9 +365,9 @@ export function MultiServerPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
-  const handleRestartServer = async (id: string) => {
+  const handleRestartServer = useCallback(async (id: string) => {
     setLoading(true);
     try {
       await api.restartBot(id);
@@ -355,7 +378,7 @@ export function MultiServerPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const handleConnectAll = async () => {
     setLoading(true);
@@ -408,11 +431,18 @@ export function MultiServerPanel() {
     setDetailOpen(true);
   };
 
-  // 按顺序获取服务器列表
-  const serverList = orderedIds
-    .map(id => servers[id])
-    .filter(Boolean) as ServerConfig[];
-  const connectedCount = serverList.filter((s) => s.connected).length;
+  // 按顺序获取服务器列表（使用 useMemo 避免不必要的重新计算）
+  const serverList = useMemo(() =>
+    orderedIds
+      .map(id => servers[id])
+      .filter(Boolean) as ServerConfig[],
+    [orderedIds, servers]
+  );
+
+  const connectedCount = useMemo(() =>
+    serverList.filter((s) => s.connected).length,
+    [serverList]
+  );
 
   // 获取服务器状态颜色
   const getStatusColor = (server: ServerConfig) => {

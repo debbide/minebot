@@ -6,6 +6,8 @@ interface WebSocketContextType {
   logs: LogEntry[];
   connected: boolean;
   setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>;
+  systemStatus: any;
+  botUpdates: Map<string, any>;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -23,8 +25,13 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [connected, setConnected] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
+  const [botUpdates, setBotUpdates] = useState<Map<string, any>>(new Map());
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 10;
+  const baseReconnectDelay = 1000; // 1 秒
 
   const connect = useCallback(() => {
     const token = localStorage.getItem('token');
@@ -41,6 +48,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
       ws.onopen = () => {
         setConnected(true);
+        reconnectAttemptsRef.current = 0; // 重置重连计数
         console.log('WebSocket connected');
       };
 
@@ -49,6 +57,26 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           const data = JSON.parse(event.data);
 
           switch (data.type) {
+            case 'bot_update':
+              // 机器人状态更新
+              setStatus(data.data);
+              setBotUpdates(prev => new Map(prev).set(data.data.id, data.data));
+              if (data.data.logs) {
+                setLogs(data.data.logs.slice(0, 100)); // 限制日志最多 100 条
+              }
+              break;
+            case 'bot_deleted':
+              // 机器人被删除，从 Map 中移除
+              setBotUpdates(prev => {
+                const updated = new Map(prev);
+                updated.delete(data.id);
+                return updated;
+              });
+              break;
+            case 'system_status':
+              // 系统状态更新（内存等）
+              setSystemStatus(data.data);
+              break;
             case 'status':
               setStatus(data.data);
               break;
@@ -56,7 +84,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               setLogs(prev => [...prev.slice(-99), data.data]);
               break;
             case 'logs':
-              setLogs(data.data);
+              setLogs(data.data.slice(0, 100)); // 限制日志最多 100 条
               break;
           }
         } catch (error) {
@@ -70,11 +98,20 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
         // Don't reconnect if unauthorized
         if (event.code === 1008) {
+          reconnectAttemptsRef.current = 0;
           return;
         }
 
-        // Reconnect after delay
-        reconnectTimeoutRef.current = window.setTimeout(connect, 3000);
+        // 指数退避重试
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+          const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
+          reconnectAttemptsRef.current++;
+          console.log(`[WebSocket] 第 ${reconnectAttemptsRef.current} 次重连，延迟 ${delay}ms`);
+          reconnectTimeoutRef.current = window.setTimeout(connect, delay);
+        } else {
+          console.error('[WebSocket] 达到最大重连次数，停止重连');
+          reconnectAttemptsRef.current = 0;
+        }
       };
 
       ws.onerror = (error) => {
@@ -82,7 +119,12 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       };
     } catch (error) {
       console.error('WebSocket connection error:', error);
-      reconnectTimeoutRef.current = window.setTimeout(connect, 3000);
+      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+        const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
+        reconnectAttemptsRef.current++;
+        console.log(`[WebSocket] 连接失败，第 ${reconnectAttemptsRef.current} 次重连，延迟 ${delay}ms`);
+        reconnectTimeoutRef.current = window.setTimeout(connect, delay);
+      }
     }
   }, []);
 
@@ -111,7 +153,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   }, [connect]);
 
   return (
-    <WebSocketContext.Provider value={{ status, logs, connected, setLogs }}>
+    <WebSocketContext.Provider value={{ status, logs, connected, setLogs, systemStatus, botUpdates }}>
       {children}
     </WebSocketContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -28,14 +28,7 @@ import { formatUptime } from "@/lib/utils";
 import { BotControlPanel } from "./BotControlPanel";
 import { BotSettingsPanel } from "./BotSettingsPanel";
 import { FileManager } from "./FileManager";
-
-interface LogEntry {
-  id: number;
-  timestamp: string;
-  type: "info" | "success" | "warning" | "error" | "chat";
-  icon?: string;
-  message: string;
-}
+import { useWebSocketContext } from "@/contexts/WebSocketContext";
 
 // 使用从 api.ts 导入的 BotStatus 作为 ServerConfig 的别名
 type ServerConfig = BotStatus;
@@ -61,10 +54,10 @@ export function ServerDetailDialog({
     port: "25565",
     username: "",
   });
-  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [activeTab, setActiveTab] = useState("control");
   const contentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { logs } = useWebSocketContext();
 
   // 切换标签时重置滚动位置
   useEffect(() => {
@@ -85,34 +78,14 @@ export function ServerDetailDialog({
     }
   }, [server]);
 
-  // 获取日志
-  const fetchLogs = async () => {
-    if (!server) return;
-    try {
-      const result = await api.getBotLogs(server.id);
-      if (result.success) {
-        setLogs(result.logs);
-      }
-    } catch (error) {
-      console.error("Failed to fetch logs:", error);
-    }
-  };
-
-  // 自动刷新日志
-  useEffect(() => {
-    if (open && server && activeTab === "logs") {
-      fetchLogs();
-      const interval = setInterval(fetchLogs, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [open, server, activeTab]);
+  // 优化日志显示（使用 useMemo 避免重复计算）
+  const displayLogs = useMemo(() => logs.slice(-100), [logs]);
 
   // 清空日志
   const clearLogs = async () => {
     if (!server) return;
     try {
       await api.clearBotLogs(server.id);
-      setLogs([]);
       toast({ title: "成功", description: "日志已清空" });
     } catch (error) {
       toast({ title: "错误", description: String(error), variant: "destructive" });
@@ -475,7 +448,7 @@ export function ServerDetailDialog({
                         <p>暂无日志记录</p>
                       </div>
                     ) : (
-                      logs.slice(-100).map((log) => (
+                      displayLogs.map((log) => (
                         <div
                           key={log.id}
                           className={`flex items-start gap-3 py-0.5 ${log.type === "error" ? "text-red-400" :
