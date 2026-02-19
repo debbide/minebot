@@ -71,7 +71,7 @@ export class PanelInstance {
     }
 
     console.log(`[${timestamp}] [${this.status.serverName}] ${icon} ${message}`);
-    if (this.onLog) this.onLog(entry);
+    if (this.onLog) this.onLog(this.id, entry);
   }
 
   getLogs() {
