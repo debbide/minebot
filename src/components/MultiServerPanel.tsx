@@ -292,10 +292,9 @@ export function MultiServerPanel() {
       });
 
       setOrderedIds(prevIds => {
-        const newIds = Array.from(botUpdates.keys());
-        const existingIds = prevIds.filter(id => newIds.includes(id));
-        const addedIds = newIds.filter(id => !prevIds.includes(id));
-        return [...existingIds, ...addedIds];
+        const incomingIds = Array.from(botUpdates.keys());
+        const addedIds = incomingIds.filter(id => !prevIds.includes(id));
+        return [...prevIds, ...addedIds];
       });
 
       if (selectedServer && botUpdates.has(selectedServer.id)) {
