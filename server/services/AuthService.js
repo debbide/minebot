@@ -5,10 +5,7 @@ import crypto from 'crypto';
 // 安全配置
 // ============================================================================
 
-const JWT_SECRET = process.env.JWT_SECRET || (() => {
-  console.warn('⚠️  JWT_SECRET not set in environment, using temporary random secret');
-  return crypto.randomBytes(32).toString('hex');
-})();
+const JWT_SECRET = process.env.JWT_SECRET || 'c7b4e2a1f9c04d7fbd8a8c3a6f1b2d7e6a9c4b1f3d8e2c7a9b4f1d6e8c2a7b5f';
 
 const TOKEN_EXPIRY = '24h';
 

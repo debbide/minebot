@@ -34,8 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const data = await res.json();
 
           if (data.authenticated) {
+            const resolvedUsername = savedUsername || data.user?.username || null;
             setToken(savedToken);
-            setUsername(savedUsername);
+            setUsername(resolvedUsername);
             setIsAuthenticated(true);
           } else {
             // Token is genuinely invalid (401) — clear it
@@ -78,10 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error || '登录失败');
     }
 
+    const resolvedUsername = data.user?.username || data.username || username;
     localStorage.setItem('token', data.token);
-    localStorage.setItem('username', data.username);
+    localStorage.setItem('username', resolvedUsername);
     setToken(data.token);
-    setUsername(data.username);
+    setUsername(resolvedUsername);
     setIsAuthenticated(true);
   };
 

@@ -58,13 +58,18 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
           switch (data.type) {
             case 'bot_update':
+            case 'botStatus': {
               // 机器人状态更新
-              setStatus(data.data);
-              setBotUpdates(prev => new Map(prev).set(data.data.id, data.data));
-              if (data.data.logs) {
-                setLogs(data.data.logs.slice(0, 100)); // 限制日志最多 100 条
+              const botData = data.data || data.status || data;
+              if (!botData) break;
+              if (botData.id) {
+                setBotUpdates(prev => new Map(prev).set(botData.id, botData));
+              }
+              if (botData.logs) {
+                setLogs(botData.logs.slice(0, 100)); // 限制日志最多 100 条
               }
               break;
+            }
             case 'bot_deleted':
               // 机器人被删除，从 Map 中移除
               setBotUpdates(prev => {

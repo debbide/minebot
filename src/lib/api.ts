@@ -135,62 +135,6 @@ export interface TelegramConfig {
   chatId: string;
 }
 
-export interface RenewalConfig {
-  id: string;
-  name: string;
-  url: string;
-  interval: number;
-  enabled: boolean;
-
-  // 续期模式：'http' | 'autoLoginHttp' | 'browserClick'
-  mode?: 'http' | 'autoLoginHttp' | 'browserClick';
-
-  // HTTP 模式配置
-  method: 'GET' | 'POST';
-  headers: Record<string, string>;
-  body: string;
-  useProxy: boolean;
-  proxyUrl: string;
-
-  // 登录配置（autoLoginHttp 和 browserClick 模式）
-  loginUrl: string;
-  panelUsername: string;
-  panelPassword: string;
-
-  // 浏览器点击配置（browserClick 模式）
-  renewButtonSelector: string;
-
-  // 浏览器代理配置（browserClick 模式）
-  browserProxy?: string;  // 格式: socks5://127.0.0.1:1080
-
-  // 状态
-  lastRun: string | null;
-  lastResult: RenewalResult | null;
-  running?: boolean;
-
-  // 兼容旧配置（已废弃）
-  autoLogin?: boolean;
-  useBrowserClick?: boolean;
-  renewPageUrl?: string;
-
-
-
-  // Bypass Service 配置
-  useBypassService?: boolean;
-  bypassMode?: string; // default, seleniumbase
-
-  // 手动 Cookie 配置
-  manualCookies?: string;
-}
-
-export interface RenewalResult {
-  success: boolean;
-  status?: number;
-  message: string;
-  response?: string;
-  error?: string;
-  timestamp: string;
-}
 
 export interface FileInfo {
   name: string;
@@ -270,7 +214,11 @@ class ApiService {
       throw new Error(error.error || 'Login failed');
     }
 
-    return response.json();
+    const data = await response.json();
+    return {
+      ...data,
+      username: data.user?.username || data.username || username
+    };
   }
 
   async checkAuth(): Promise<{ authenticated: boolean; username?: string }> {
@@ -578,63 +526,6 @@ class ApiService {
   // Get bot config
   async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean } }> {
     return this.request(`/api/bots/${id}/config`);
-  }
-
-  // ==================== 续期 API ====================
-
-  async getRenewals(): Promise<RenewalConfig[]> {
-    return this.request('/api/renewals');
-  }
-
-  async addRenewal(renewal: Partial<RenewalConfig>): Promise<{ success: boolean; renewal: RenewalConfig }> {
-    return this.request('/api/renewals', {
-      method: 'POST',
-      body: JSON.stringify(renewal),
-    });
-  }
-
-  async updateRenewal(id: string, updates: Partial<RenewalConfig>): Promise<{ success: boolean; renewal: RenewalConfig }> {
-    return this.request(`/api/renewals/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
-  }
-
-  async deleteRenewal(id: string): Promise<{ success: boolean }> {
-    return this.request(`/api/renewals/${id}`, { method: 'DELETE' });
-  }
-
-  async testRenewal(id: string): Promise<{ success: boolean; result: RenewalResult }> {
-    return this.request(`/api/renewals/${id}/test`, { method: 'POST' });
-  }
-
-  async testProxy(proxyUrl: string, testUrl?: string): Promise<{ success: boolean; result: { success: boolean; message: string; response?: string; error?: string } }> {
-    return this.request('/api/renewals/test-proxy', {
-      method: 'POST',
-      body: JSON.stringify({ proxyUrl, testUrl }),
-    });
-  }
-
-
-
-  async startRenewal(id: string): Promise<{ success: boolean }> {
-    return this.request(`/api/renewals/${id}/start`, { method: 'POST' });
-  }
-
-  async stopRenewal(id: string): Promise<{ success: boolean }> {
-    return this.request(`/api/renewals/${id}/stop`, { method: 'POST' });
-  }
-
-  async getRenewalLogs(): Promise<LogEntry[]> {
-    return this.request('/api/renewals/logs');
-  }
-
-  async getRenewalLogsById(id: string): Promise<LogEntry[]> {
-    return this.request(`/api/renewals/${id}/logs`);
-  }
-
-  async clearRenewalLogs(id: string): Promise<{ success: boolean }> {
-    return this.request(`/api/renewals/${id}/logs`, { method: 'DELETE' });
   }
 
   // ==================== 文件管理 API ====================

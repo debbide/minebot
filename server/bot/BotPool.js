@@ -186,7 +186,10 @@ export class BotPool {
   }
 
   onStatusChange(botId, status) {
-    this.broadcast('botStatus', { botId, status });
+    const payload = status?.id ? status : { ...status, id: botId };
+    this.broadcast('bot_update', payload);
+    // Backward compatibility
+    this.broadcast('botStatus', { botId, status: payload });
     this.broadcast('status', this.getOverallStatus());
   }
 
@@ -289,6 +292,7 @@ export class BotPool {
     if (bot) {
       bot.disconnect();
       this.bots.delete(id);
+      this.broadcast('bot_deleted', { id });
       return true;
     }
     return false;

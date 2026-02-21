@@ -356,20 +356,6 @@ app.get('/api/status', (req, res) => {
   res.json(botManager.getStatus());
 });
 
-// Check captcha balance
-app.post('/api/captcha/balance', async (req, res) => {
-  try {
-    const { key } = req.body;
-    if (!key) {
-      return res.status(400).json({ error: 'API Key is required' });
-    }
-    const balance = await renewalService.checkNopechaBalance(key);
-    res.json(balance);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Get all configuration
 app.get('/api/config', (req, res) => {
   res.json(configManager.getConfig());
@@ -1015,117 +1001,6 @@ app.get('/api/bots/:id/config', (req, res) => {
   }
 });
 
-// ==================== 续期 API ====================
-
-// 获取所有续期配置
-app.get('/api/renewals', (req, res) => {
-  try {
-    res.json(renewalService.getStatus());
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 添加续期配置
-app.post('/api/renewals', (req, res) => {
-  try {
-    const renewal = renewalService.addRenewal(req.body);
-    res.json({ success: true, renewal });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 更新续期配置
-app.put('/api/renewals/:id', (req, res) => {
-  try {
-    const renewal = renewalService.updateRenewal(req.params.id, req.body);
-    res.json({ success: true, renewal });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 删除续期配置
-app.delete('/api/renewals/:id', (req, res) => {
-  try {
-    const success = renewalService.removeRenewal(req.params.id);
-    res.json({ success });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 测试续期
-app.post('/api/renewals/:id/test', async (req, res) => {
-  try {
-    const result = await renewalService.testRenewal(req.params.id, req.body);
-    res.json({ success: true, result });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 测试代理连接
-app.post('/api/renewals/test-proxy', async (req, res) => {
-  try {
-    const { proxyUrl, testUrl } = req.body;
-    const result = await renewalService.testProxy(proxyUrl, testUrl);
-    res.json({ success: result.success, result });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 启动续期
-app.post('/api/renewals/:id/start', (req, res) => {
-  try {
-    const success = renewalService.startRenewal(req.params.id);
-    res.json({ success });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 停止续期
-app.post('/api/renewals/:id/stop', (req, res) => {
-  try {
-    const success = renewalService.stopRenewal(req.params.id);
-    res.json({ success });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 获取续期日志
-app.get('/api/renewals/logs', (req, res) => {
-  try {
-    res.json(renewalService.getLogs());
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 获取单个续期的日志
-app.get('/api/renewals/:id/logs', (req, res) => {
-  try {
-    const logs = renewalService.getRenewalLogs(req.params.id);
-    res.json(logs);
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
-// 清除单个续期的日志
-app.delete('/api/renewals/:id/logs', (req, res) => {
-  try {
-    renewalService.clearRenewalLogs(req.params.id);
-    res.json({ success: true });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
-});
-
 // ==================== 文件管理 API ====================
 
 // 列出目录文件
@@ -1541,20 +1416,6 @@ app.post('/api/webhooks/trigger', async (req, res) => {
       timestamp: new Date().toLocaleTimeString()
     });
     res.status(500).json({ error: error.message });
-  }
-});
-
-// 检查 Captcha 余额
-app.post('/api/captcha/balance', async (req, res) => {
-  try {
-    const { key } = req.body;
-    if (!key) {
-      return res.status(400).json({ success: false, error: 'Key is required' });
-    }
-    const result = await renewalService.checkNopechaBalance(key);
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
   }
 });
 
