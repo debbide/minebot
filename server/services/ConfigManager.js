@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 
 const CONFIG_FILE = path.join(__dirname, '../data/config.json');
 const CREDENTIALS_FILE = path.join(__dirname, '../data/credentials.json');
+const MASTER_KEY_FILE = path.join(__dirname, '../data/master.key');
 
 // ============================================================================
 // 加密工具函数 (Encryption Infrastructure)
@@ -84,7 +85,16 @@ function decryptConfig(encrypted, masterKey) {
  * @returns {string|null}
  */
 function getMasterPassword() {
-  return process.env.MASTER_PASSWORD || null;
+  if (process.env.MASTER_PASSWORD) return process.env.MASTER_PASSWORD;
+  try {
+    if (fs.existsSync(MASTER_KEY_FILE)) {
+      const stored = fs.readFileSync(MASTER_KEY_FILE, 'utf-8').trim();
+      return stored || null;
+    }
+  } catch (error) {
+    console.error('❌ Error reading master key file:', error.message);
+  }
+  return null;
 }
 
 /**
@@ -262,7 +272,17 @@ export class ConfigManager {
   saveConfig() {
     try {
       this.ensureDataDir();
-      const masterPassword = getMasterPassword();
+      let masterPassword = getMasterPassword();
+      if (!masterPassword) {
+        masterPassword = crypto.randomBytes(32).toString('base64');
+        try {
+          fs.writeFileSync(MASTER_KEY_FILE, masterPassword, { mode: 0o600 });
+          console.log('✅ Generated master key and saved to data/master.key');
+        } catch (error) {
+          console.error('❌ Failed to persist master key:', error.message);
+          throw error;
+        }
+      }
 
       if (masterPassword) {
         // 加密配置
