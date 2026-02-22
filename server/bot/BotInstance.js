@@ -682,6 +682,7 @@ export class BotInstance {
       ...this.autoChatConfig,
       ...config
     };
+    this.config.autoChat = this.autoChatConfig;
     // 如果正在运行，重启以应用新配置
     if (this.modes.autoChat) {
       this.startAutoChat();
@@ -697,7 +698,8 @@ export class BotInstance {
     if (!this.configManager) return;
 
     try {
-      this.configManager.updateServer(this.id, {
+      const nextConfig = {
+        ...this.config,
         modes: this.modes,
         commandSettings: this.commandSettings,
         autoChat: this.autoChatConfig,
@@ -714,7 +716,9 @@ export class BotInstance {
         autoReconnect: this.status.autoReconnect,
         agentId: this.status.agentId,
         behaviorSettings: this.behaviorSettings
-      });
+      };
+      this.config = { ...this.config, ...nextConfig };
+      this.configManager.updateServer(this.id, nextConfig);
       this.log('info', '配置已保存', '💾');
     } catch (error) {
       this.log('warning', `保存配置失败: ${error.message}`, '⚠');
@@ -788,6 +792,7 @@ export class BotInstance {
   setMode(mode, enabled) {
     if (mode in this.modes) {
       this.modes[mode] = enabled;
+      this.config.modes = { ...this.modes };
       if (mode === 'autoChat') {
         if (enabled) {
           this.startAutoChat();
@@ -876,6 +881,11 @@ export class BotInstance {
       this.log('info', '定时重启已禁用', '⏰');
     }
 
+    this.config.restartTimer = {
+      enabled: this.status.restartTimer?.enabled || false,
+      intervalMinutes: this.status.restartTimer?.intervalMinutes || 0,
+      command: this.status.restartTimer?.command || '/restart'
+    };
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     // 保存配置
     this.saveConfig();
@@ -1072,6 +1082,7 @@ export class BotInstance {
 
     if (!url && !apiKey && !cookie && !serverId) {
       this.status.pterodactyl = null;
+      this.config.pterodactyl = null;
       this.log('info', '翼龙面板配置已清除', '🔑');
     } else {
       this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, serverId };
@@ -1084,6 +1095,7 @@ export class BotInstance {
       } else if (oldPterodactyl?.autoRestart) {
         this.status.pterodactyl.autoRestart = oldPterodactyl.autoRestart;
       }
+      this.config.pterodactyl = this.status.pterodactyl;
       this.log('info', `翼龙面板配置已更新 [${authType === 'cookie' ? 'Cookie' : 'API Key'}]`, '🔑');
     }
 
@@ -1104,9 +1116,11 @@ export class BotInstance {
 
     if (!enabled && !host && !password) {
       this.status.rcon = { enabled: false, host: '', port: 25575, password: '' };
+      this.config.rcon = this.status.rcon;
       this.log('info', 'RCON 配置已清除', '🛰️');
     } else {
       this.status.rcon = { enabled, host, port, password };
+      this.config.rcon = this.status.rcon;
       this.log('info', `RCON 配置已更新 [${enabled ? '启用' : '停用'}]`, '🛰️');
     }
 
@@ -1117,6 +1131,7 @@ export class BotInstance {
 
   setAgentId(agentId) {
     this.status.agentId = agentId || null;
+    this.config.agentId = this.status.agentId;
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     this.saveConfig();
     return this.status.agentId;
@@ -1711,6 +1726,7 @@ export class BotInstance {
     }
 
     this.behaviorSettings = next;
+    this.config.behaviorSettings = next;
     this.saveConfig();
     return this.behaviorSettings;
   }
@@ -1736,6 +1752,7 @@ export class BotInstance {
     };
 
     this.commandSettings = next;
+    this.config.commandSettings = next;
     this.saveConfig();
     return this.commandSettings;
   }
@@ -2003,6 +2020,7 @@ export class BotInstance {
       privateKey: config.privateKey || '',
       basePath: config.basePath || '/' // 基础路径，用于限制访问范围
     };
+    this.config.sftp = this.status.sftp;
     this.log('info', 'SFTP 配置已更新', '🔑');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     this.saveConfig();
@@ -2019,6 +2037,7 @@ export class BotInstance {
       return { success: false, message: `无效的文件访问方式，可选: ${validTypes.join(', ')}` };
     }
     this.status.fileAccessType = type;
+    this.config.fileAccessType = type;
     this.log('info', `文件访问方式已设置为: ${type}`, '📁');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     this.saveConfig();
