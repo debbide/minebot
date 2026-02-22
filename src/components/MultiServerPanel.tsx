@@ -116,19 +116,11 @@ function SortableServerCard({
         <div className="flex items-center gap-2">
           <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor(server)}`} />
           <Badge
-            variant={server.connected || (server.type === "panel" && server.tcpOnline) ? "default" : "secondary"}
+            variant={server.connected || (server.type === "panel" && server.tcpOnline) || agentOnline ? "default" : "secondary"}
             className="text-xs"
           >
             {getStatusText(server)}
           </Badge>
-          {server.agentId && (
-            <Badge
-              variant={agentOnline ? "default" : "secondary"}
-              className="text-xs"
-            >
-              {agentOnline ? "探针在线" : "探针离线"}
-            </Badge>
-          )}
         </div>
         {server.type === "panel" && server.panelServerStats && (
           <Badge variant="secondary" className="text-xs bg-secondary/30 font-mono font-normal">

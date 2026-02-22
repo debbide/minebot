@@ -207,17 +207,12 @@ export function ServerDetailDialog({
               )}
             </SheetTitle>
             <div className="flex items-center gap-2">
-              <Badge variant={server.connected || (isPanel && server.tcpOnline) ? "default" : "outline"} className="h-6">
+              <Badge variant={server.connected || (isPanel && server.tcpOnline) || server.agentStatus?.connected ? "default" : "outline"} className="h-6">
                 {server.connected ? "在线" :
                   isPanel && server.tcpOnline ? "TCP在线" :
                     isPanel && server.panelServerState === "running" ? "运行中" :
-                      "离线"}
+                      server.agentStatus?.connected ? "在线" : "离线"}
               </Badge>
-              {server.agentId && (
-                <Badge variant={server.agentStatus?.connected ? "default" : "secondary"} className="h-6">
-                  {server.agentStatus?.connected ? "探针在线" : "探针离线"}
-                </Badge>
-              )}
               {!isPanel && (
                 <Button
                   variant="outline"
