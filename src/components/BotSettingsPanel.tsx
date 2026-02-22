@@ -201,6 +201,20 @@ export function BotSettingsPanel({
         setAutoReconnect(autoReconnectProp);
     }, [botId, restartTimer, autoChatProp, pterodactyl, sftpProp, fileAccessTypeProp, proxyNodeIdProp, autoReconnectProp]);
 
+    // Load proxy nodes once
+    useEffect(() => {
+        api.getProxyNodes().then(setProxyNodes).catch(console.error);
+    }, []);
+
+    const loadAgents = useCallback(async () => {
+        try {
+            const result = await api.listAgents();
+            setAgentList(result.agents || []);
+        } catch (error) {
+            console.error("Failed to load agents:", error);
+        }
+    }, []);
+
     useEffect(() => {
         let active = true;
         api.getBotConfig(botId)
@@ -243,26 +257,13 @@ export function BotSettingsPanel({
                         ? String(cmdSettings.maxPerMinute)
                         : "20"
                 );
+                loadAgents();
             })
             .catch(() => {});
         return () => {
             active = false;
         };
-    }, [botId]);
-
-    // Load proxy nodes once
-    useEffect(() => {
-        api.getProxyNodes().then(setProxyNodes).catch(console.error);
-    }, []);
-
-    const loadAgents = useCallback(async () => {
-        try {
-            const result = await api.listAgents();
-            setAgentList(result.agents || []);
-        } catch (error) {
-            console.error("Failed to load agents:", error);
-        }
-    }, []);
+    }, [botId, loadAgents]);
 
     useEffect(() => {
         loadAgents();
@@ -619,6 +620,10 @@ export function BotSettingsPanel({
         return items.join(", ");
     };
 
+    const resolvedAgentList = agentId && !agentList.some(agent => agent.agentId === agentId)
+        ? [...agentList, { agentId, name: agentId }]
+        : agentList;
+
     const getAgentConfigText = () => {
         const origin = window.location.origin;
         const wsOrigin = origin.replace(/^http/, "ws");
@@ -971,7 +976,7 @@ export function BotSettingsPanel({
                         disabled={loading === "agentBind"}
                     >
                         <option value="">未绑定</option>
-                        {agentList.map(agent => (
+                        {resolvedAgentList.map(agent => (
                             <option key={agent.agentId} value={agent.agentId}>
                                 {agent.name} ({agent.status?.connected ? "在线" : "离线"})
                             </option>
