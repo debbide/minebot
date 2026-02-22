@@ -400,6 +400,12 @@ export class ConfigManager {
       fileAccessType: serverConfig.fileAccessType || 'pterodactyl',
       // 是否自动OP
       autoOp: serverConfig.autoOp !== false,
+      rcon: serverConfig.rcon || {
+        enabled: false,
+        host: '',
+        port: 25575,
+        password: ''
+      },
       commandSettings: serverConfig.commandSettings || {
         allowAll: false,
         cooldownSeconds: 3,
@@ -441,6 +447,7 @@ export class ConfigManager {
       restartTimer: { ...current.restartTimer, ...(updates.restartTimer || {}) },
       pterodactyl: { ...current.pterodactyl, ...(updates.pterodactyl || {}) },
       sftp: { ...current.sftp, ...(updates.sftp || {}) },
+      rcon: { ...current.rcon, ...(updates.rcon || {}) },
       commandSettings: { ...current.commandSettings, ...(updates.commandSettings || {}) },
       behaviorSettings: { ...current.behaviorSettings, ...(updates.behaviorSettings || {}) },
       proxyNodeId: updates.proxyNodeId !== undefined ? updates.proxyNodeId : current.proxyNodeId

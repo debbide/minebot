@@ -59,6 +59,7 @@ export class BotInstance {
         command: '/restart'
       },
       pterodactyl: config.pterodactyl || null, // 翼龙面板配置
+      rcon: config.rcon || { enabled: false, host: '', port: 25575, password: '' },
       sftp: config.sftp || null, // SFTP 配置
       fileAccessType: config.fileAccessType || 'pterodactyl', // 文件访问方式: 'pterodactyl' | 'sftp' | 'none'
       autoOp: config.autoOp !== false, // 默认启用自动OP
@@ -705,6 +706,7 @@ export class BotInstance {
           command: this.status.restartTimer?.command || '/restart'
         },
         pterodactyl: this.status.pterodactyl || {},
+        rcon: this.status.rcon || {},
         sftp: this.status.sftp || {},
         fileAccessType: this.status.fileAccessType || 'pterodactyl',
         autoOp: this.status.autoOp,
@@ -895,8 +897,9 @@ export class BotInstance {
    */
   async sendPanelCommand(command) {
     const panel = this.status.pterodactyl;
-    if (!panel || !panel.url || !panel.apiKey || !panel.serverId) {
-      return { success: false, message: '翼龙面板未配置' };
+    const hasPanel = panel && panel.url && panel.apiKey && panel.serverId;
+    if (!hasPanel) {
+      return this.sendRconCommand(command);
     }
 
     try {
@@ -934,7 +937,36 @@ export class BotInstance {
       }
 
       this.log('error', `面板命令失败 [${status}]: ${errMsg}${hint}`, '✗');
+      if (this.status.rcon?.enabled) {
+        this.log('warning', '面板命令失败，尝试使用 RCON...', '⚠');
+        return this.sendRconCommand(command);
+      }
       return { success: false, message: `${errMsg}${hint}` };
+    }
+  }
+
+  async sendRconCommand(command) {
+    const rcon = this.status.rcon;
+    if (!rcon || !rcon.enabled || !rcon.host || !rcon.port || !rcon.password) {
+      return { success: false, message: 'RCON 未配置' };
+    }
+
+    try {
+      const { Rcon } = await import('rcon-client');
+      const client = await Rcon.connect({
+        host: rcon.host,
+        port: rcon.port,
+        password: rcon.password,
+        timeout: 8000
+      });
+      const response = await client.send(command);
+      await client.end();
+      this.log('success', `RCON 命令已发送: ${command}`, '🛰️');
+      return { success: true, message: response || `已发送: ${command}` };
+    } catch (error) {
+      const errMsg = error?.message || 'RCON 命令失败';
+      this.log('error', `RCON 命令失败: ${errMsg}`, '✗');
+      return { success: false, message: errMsg };
     }
   }
 
@@ -1034,6 +1066,28 @@ export class BotInstance {
     // 保存配置
     this.saveConfig();
     return this.status.pterodactyl;
+  }
+
+  /**
+   * 设置 RCON 配置
+   */
+  setRconConfig(config) {
+    const host = (config.host || '').trim();
+    const port = Number(config.port) || 25575;
+    const password = config.password || '';
+    const enabled = config.enabled === true || config.enabled === 'true';
+
+    if (!enabled && !host && !password) {
+      this.status.rcon = { enabled: false, host: '', port: 25575, password: '' };
+      this.log('info', 'RCON 配置已清除', '🛰️');
+    } else {
+      this.status.rcon = { enabled, host, port, password };
+      this.log('info', `RCON 配置已更新 [${enabled ? '启用' : '停用'}]`, '🛰️');
+    }
+
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+    this.saveConfig();
+    return this.status.rcon;
   }
 
   /**

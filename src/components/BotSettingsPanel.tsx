@@ -132,6 +132,10 @@ export function BotSettingsPanel({
     const [panelServerId, setPanelServerId] = useState(pterodactyl?.serverId || "");
     const [autoRestartEnabled, setAutoRestartEnabled] = useState(pterodactyl?.autoRestart?.enabled || false);
     const [maxRetries, setMaxRetries] = useState(pterodactyl?.autoRestart?.maxRetries || 3);
+    const [rconEnabled, setRconEnabled] = useState(false);
+    const [rconHost, setRconHost] = useState("");
+    const [rconPort, setRconPort] = useState<string>("25575");
+    const [rconPassword, setRconPassword] = useState("");
 
     const [attackWhitelistText, setAttackWhitelistText] = useState<string>("");
     const [attackMinHealth, setAttackMinHealth] = useState<string>("6");
@@ -196,6 +200,11 @@ export function BotSettingsPanel({
         api.getBotConfig(botId)
             .then(result => {
                 if (!active || !result?.config) return;
+                const rcon = result.config.rcon;
+                setRconEnabled(!!rcon?.enabled);
+                setRconHost(rcon?.host || "");
+                setRconPort(rcon?.port ? String(rcon.port) : "25575");
+                setRconPassword(rcon?.password || "");
                 const settings = result.config.behaviorSettings || {};
                 setAttackWhitelistText((settings.attack?.whitelist || []).join("\n"));
                 setAttackMinHealth(
@@ -414,6 +423,24 @@ export function BotSettingsPanel({
                 title: enabled ? "持久化重连已开启" : "持久化重连已关闭",
                 description: enabled ? "当连接断开且重连失败时，将持续尝试直到成功" : "仅在断开时尝试一次重连"
             });
+            onUpdate?.();
+        } catch (error) {
+            toast({ title: "错误", description: String(error), variant: "destructive" });
+        } finally {
+            setLoading(null);
+        }
+    };
+
+    const handleSaveRcon = async () => {
+        setLoading("rcon");
+        try {
+            await api.setRcon(botId, {
+                enabled: rconEnabled,
+                host: rconHost,
+                port: parseInt(rconPort) || 25575,
+                password: rconPassword
+            });
+            toast({ title: "RCON 配置已保存" });
             onUpdate?.();
         } catch (error) {
             toast({ title: "错误", description: String(error), variant: "destructive" });
@@ -914,6 +941,53 @@ export function BotSettingsPanel({
                     保存面板配置
                 </Button>
 
+                <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <Label>启用 RCON</Label>
+                        <Switch
+                            checked={rconEnabled}
+                            onCheckedChange={setRconEnabled}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>RCON 主机</Label>
+                        <Input
+                            value={rconHost}
+                            onChange={(e) => setRconHost(e.target.value)}
+                            placeholder="127.0.0.1"
+                            disabled={!rconEnabled}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>RCON 端口</Label>
+                        <Input
+                            type="number"
+                            value={rconPort}
+                            onChange={(e) => setRconPort(e.target.value)}
+                            placeholder="25575"
+                            disabled={!rconEnabled}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>RCON 密码</Label>
+                        <Input
+                            type="password"
+                            value={rconPassword}
+                            onChange={(e) => setRconPassword(e.target.value)}
+                            placeholder="RCON 密码"
+                            disabled={!rconEnabled}
+                        />
+                    </div>
+                    <Button
+                        onClick={handleSaveRcon}
+                        disabled={loading === "rcon"}
+                        className="w-full"
+                    >
+                        {loading === "rcon" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                        保存 RCON 配置
+                    </Button>
+                </div>
+
                 <div className="pt-2 border-t">
                     <Label className="text-sm text-muted-foreground mb-2 block">服务器电源控制</Label>
                     <div className="grid grid-cols-2 gap-2">
@@ -959,7 +1033,7 @@ export function BotSettingsPanel({
                     <Button
                         variant="outline"
                         onClick={handleAutoOp}
-                        disabled={loading === "autoOp" || !panelUrl}
+                        disabled={loading === "autoOp" || (!panelUrl && !rconEnabled)}
                         className="flex-1"
                     >
                         {loading === "autoOp" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Crown className="h-4 w-4 mr-1" />}
@@ -968,7 +1042,7 @@ export function BotSettingsPanel({
                     <Button
                         variant="outline"
                         onClick={handlePanelRestart}
-                        disabled={loading === "panelRestart" || !panelUrl}
+                        disabled={loading === "panelRestart" || (!panelUrl && !rconEnabled)}
                         className="flex-1"
                     >
                         {loading === "panelRestart" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}

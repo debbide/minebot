@@ -894,6 +894,20 @@ app.post('/api/bots/:id/sftp', (req, res) => {
   }
 });
 
+// Set RCON config for a bot
+app.post('/api/bots/:id/rcon', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const result = bot.setRconConfig(req.body || {});
+    res.json({ success: true, rcon: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Set file access type for a bot
 app.post('/api/bots/:id/file-access-type', (req, res) => {
   try {
@@ -1025,6 +1039,7 @@ app.get('/api/bots/:id/config', (req, res) => {
         autoChat: bot.autoChatConfig,
         restartTimer: bot.status.restartTimer,
         pterodactyl: bot.status.pterodactyl,
+        rcon: bot.status.rcon,
         sftp: bot.status.sftp,
         fileAccessType: bot.status.fileAccessType,
         autoOp: bot.status.autoOp,

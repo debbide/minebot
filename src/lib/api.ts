@@ -524,7 +524,7 @@ class ApiService {
   }
 
   // Get bot config
-  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean; behaviorSettings?: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } } | null; commandSettings?: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean; globalCooldownSeconds?: number; maxPerMinute?: number } | null } }> {
+  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; rcon?: { enabled: boolean; host: string; port: number; password: string } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean; behaviorSettings?: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } } | null; commandSettings?: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean; globalCooldownSeconds?: number; maxPerMinute?: number } | null } }> {
     return this.request(`/api/bots/${id}/config`);
   }
 
@@ -533,6 +533,14 @@ class ApiService {
     return this.request(`/api/bots/${id}/command-settings`, {
       method: 'POST',
       body: JSON.stringify(settings)
+    });
+  }
+
+  // Set RCON config for a bot
+  async setRcon(id: string, config: { enabled: boolean; host: string; port: number; password: string }): Promise<{ success: boolean; rcon: { enabled: boolean; host: string; port: number; password: string } }> {
+    return this.request(`/api/bots/${id}/rcon`, {
+      method: 'POST',
+      body: JSON.stringify(config)
     });
   }
 
