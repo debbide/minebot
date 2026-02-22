@@ -706,7 +706,7 @@ export class BotInstance {
           intervalMinutes: this.status.restartTimer?.intervalMinutes || 0,
           command: this.status.restartTimer?.command || '/restart'
         },
-        pterodactyl: this.status.pterodactyl || {},
+        pterodactyl: this.status.pterodactyl === null ? null : (this.status.pterodactyl || {}),
         rcon: this.status.rcon || {},
         sftp: this.status.sftp || {},
         fileAccessType: this.status.fileAccessType || 'pterodactyl',

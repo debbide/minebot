@@ -446,7 +446,9 @@ export class ConfigManager {
       modes: { ...current.modes, ...(updates.modes || {}) },
       autoChat: { ...current.autoChat, ...(updates.autoChat || {}) },
       restartTimer: { ...current.restartTimer, ...(updates.restartTimer || {}) },
-      pterodactyl: { ...current.pterodactyl, ...(updates.pterodactyl || {}) },
+      pterodactyl: updates.pterodactyl === null
+        ? null
+        : { ...current.pterodactyl, ...(updates.pterodactyl || {}) },
       sftp: { ...current.sftp, ...(updates.sftp || {}) },
       rcon: { ...current.rcon, ...(updates.rcon || {}) },
       agentId: updates.agentId !== undefined ? updates.agentId : current.agentId,
