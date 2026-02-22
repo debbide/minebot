@@ -519,7 +519,7 @@ export function ServerDetailDialog({
               </TabsContent>
 
               {/* 探针监控 */}
-              <TabsContent value="agent" className="mt-0 space-y-4 animate-in slide-in-from-bottom-2 duration-300">
+              <TabsContent value="agent" className="mt-0 flex-1 h-full space-y-4 animate-in slide-in-from-bottom-2 duration-300">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-medium">探针监控</h3>
