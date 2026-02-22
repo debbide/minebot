@@ -249,7 +249,9 @@ app.post('/api/auth/logout', (req, res) => {
 
 // Serve static files
 app.use((req, res, next) => {
-  if (req.path === '/' || req.path.endsWith('.html')) {
+  const isHtml = req.path === '/' || req.path.endsWith('.html');
+  const isAsset = req.path.startsWith('/assets/') && (req.path.endsWith('.js') || req.path.endsWith('.css'));
+  if (isHtml || isAsset) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
