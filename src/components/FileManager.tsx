@@ -406,10 +406,9 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
 
       const token = localStorage.getItem('token');
 
-      // 上传文件
-      for (const file of Array.from(fileList)) {
-        if (result.type === 'sftp') {
-          // SFTP 模式：直接上传到后端
+      if (result.type === 'sftp') {
+        // SFTP 模式：逐个上传到后端
+        for (const file of Array.from(fileList)) {
           const uploadUrl = `${result.endpoint}?directory=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`;
           const headers: Record<string, string> = {
             'Content-Type': 'application/octet-stream',
@@ -427,24 +426,26 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
             const errorData = await response.json().catch(() => ({}));
             throw new Error(errorData.error || `上传失败: ${response.statusText}`);
           }
-        } else {
-          // 翼龙面板模式
-          if (!result.url) {
-            throw new Error("无法获取上传链接");
-          }
-          const formData = new FormData();
+        }
+      } else {
+        // 翼龙面板模式：同一次请求上传多个文件
+        if (!result.url) {
+          throw new Error("无法获取上传链接");
+        }
+        const formData = new FormData();
+        Array.from(fileList).forEach(file => {
           formData.append("files", file);
+        });
 
-          const uploadUrl = `${result.url}&directory=${encodeURIComponent(currentPath)}`;
-          const response = await fetch(uploadUrl, {
-            method: "POST",
-            body: formData,
-          });
+        const uploadUrl = `${result.url}&directory=${encodeURIComponent(currentPath)}`;
+        const response = await fetch(uploadUrl, {
+          method: "POST",
+          body: formData,
+        });
 
-          // 翼龙面板上传成功返回 204 No Content
-          if (!response.ok && response.status !== 204) {
-            throw new Error(`上传失败: ${response.statusText}`);
-          }
+        // 翼龙面板上传成功返回 204 No Content
+        if (!response.ok && response.status !== 204) {
+          throw new Error(`上传失败: ${response.statusText}`);
         }
       }
 
