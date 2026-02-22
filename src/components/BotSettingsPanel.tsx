@@ -605,13 +605,11 @@ export function BotSettingsPanel({
     const getAgentConfigText = () => {
         const origin = window.location.origin;
         const wsOrigin = origin.replace(/^http/, "ws");
-        const config = {
-            serverUrl: origin,
-            wsUrl: `${wsOrigin}/agent/ws`,
-            agentId: agentId || "",
-            token: agentToken || ""
-        };
-        return JSON.stringify(config, null, 2);
+        const wsUrl = `${wsOrigin}/agent/ws`;
+        return `agentId: "${agentId || ""}"
+token: "${agentToken || ""}"
+wsUrl: "${wsUrl}"
+serverUrl: "${origin}"`;
     };
 
     const handleCopyAgentConfig = async () => {
