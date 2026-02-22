@@ -475,14 +475,16 @@ export function BotSettingsPanel({
     };
 
     const handleCreateAgent = async () => {
-        if (!newAgentId || !newAgentToken) {
+        const agentIdValue = newAgentId.trim();
+        const tokenValue = newAgentToken.trim();
+        if (!agentIdValue || !tokenValue) {
             toast({ title: "错误", description: "agentId 和 token 必填", variant: "destructive" });
             return;
         }
         setLoading("agentCreate");
         try {
-            const result = await api.createAgent(newAgentId, newAgentToken, newAgentName || undefined);
-            toast({ title: "探针已注册", description: result.agent?.name || newAgentId });
+            const result = await api.createAgent(agentIdValue, tokenValue, newAgentName.trim() || undefined);
+            toast({ title: "探针已注册", description: result.agent?.name || agentIdValue });
             setNewAgentId("");
             setNewAgentName("");
             setNewAgentToken("");
