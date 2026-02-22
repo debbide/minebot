@@ -1,0 +1,38 @@
+name: Agent Go Build
+
+on:
+  push:
+    paths:
+      - "agent-go/**"
+      - ".github/workflows/agent-go-build.yml"
+  pull_request:
+    paths:
+      - "agent-go/**"
+      - ".github/workflows/agent-go-build.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent-go
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+
+      - name: Go mod tidy
+        run: go mod tidy
+
+      - name: Build agent
+        run: go build -o minebot-agent ./cmd/agent
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: minebot-agent-linux
+          path: agent-go/minebot-agent
