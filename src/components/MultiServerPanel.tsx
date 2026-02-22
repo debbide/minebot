@@ -448,6 +448,7 @@ export function MultiServerPanel() {
   // 获取服务器状态颜色
   const getStatusColor = (server: ServerConfig) => {
     if (server.connected) return "bg-green-500";
+    if (server.agentStatus?.connected) return "bg-green-500";
     if (server.type === "panel" && server.tcpOnline) return "bg-green-500";
     if (server.type === "panel" && server.panelServerState === "running") return "bg-yellow-500";
     return "bg-gray-400";
@@ -456,6 +457,7 @@ export function MultiServerPanel() {
   // 获取服务器状态文字
   const getStatusText = (server: ServerConfig) => {
     if (server.connected) return "在线";
+    if (server.agentStatus?.connected) return "在线";
     if (server.type === "panel" && server.tcpOnline) return "TCP在线";
     if (server.type === "panel" && server.panelServerState === "running") return "运行中";
     if (server.type === "panel" && server.panelServerState === "starting") return "启动中";
