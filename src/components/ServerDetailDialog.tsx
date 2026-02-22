@@ -257,14 +257,16 @@ export function ServerDetailDialog({
                 <Terminal className="h-4 w-4" />
                 日志
               </TabsTrigger>
-              <TabsTrigger
-                value="agent"
-                className="gap-2 px-0 pb-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all"
-              >
-                <Activity className="h-4 w-4" />
-                探针
-              </TabsTrigger>
-              {(server.agentStatus?.connected || server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
+              {server.agentId && (
+                <TabsTrigger
+                  value="agent"
+                  className="gap-2 px-0 pb-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all"
+                >
+                  <Activity className="h-4 w-4" />
+                  探针
+                </TabsTrigger>
+              )}
+              {(server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp') || (server.agentId && server.agentStatus?.connected)) && (
                 <TabsTrigger
                   value="files"
                   className="gap-2 px-0 pb-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all"
@@ -277,7 +279,7 @@ export function ServerDetailDialog({
           </div>
 
           {/* 文件管理 - 完全独立的层，覆盖其他内容 */}
-          {activeTab === 'files' && (server.agentStatus?.connected || server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
+          {activeTab === 'files' && (server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp') || (server.agentId && server.agentStatus?.connected)) && (
             <div className="flex-1 overflow-y-auto p-6">
               <FileManager
                 serverId={server.id}
