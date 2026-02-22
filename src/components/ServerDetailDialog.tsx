@@ -73,7 +73,6 @@ export function ServerDetailDialog({
     netRx: number;
     netTx: number;
   }>(null);
-  const [processList, setProcessList] = useState<Array<{ pid: number; name: string; cpu: number; mem: number }>>([]);
   const contentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { logs } = useWebSocketContext();
@@ -168,12 +167,8 @@ export function ServerDetailDialog({
     if (!server?.agentId) return;
     setAgentLoading(true);
     try {
-      const [statsResult, processResult] = await Promise.all([
-        api.getAgentHostStats(server.agentId),
-        api.getAgentProcesses(server.agentId, 30)
-      ]);
+      const statsResult = await api.getAgentHostStats(server.agentId);
       setAgentStats(statsResult.data || null);
-      setProcessList(processResult.data || []);
     } catch (error) {
       toast({ title: "错误", description: String(error), variant: "destructive" });
     } finally {
@@ -529,11 +524,11 @@ export function ServerDetailDialog({
               </TabsContent>
 
               {/* 探针监控 */}
-              <TabsContent value="agent" className="mt-0 space-y-6 animate-in slide-in-from-bottom-2 duration-300">
+              <TabsContent value="agent" className="mt-0 space-y-4 animate-in slide-in-from-bottom-2 duration-300">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-lg font-medium">探针监控</h3>
-                    <p className="text-xs text-muted-foreground">节点级别监控与进程列表</p>
+                    <p className="text-xs text-muted-foreground">节点级别监控</p>
                   </div>
                   <Button variant="outline" size="sm" onClick={loadAgentData} disabled={agentLoading || !server.agentId}>
                     {agentLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
@@ -548,69 +543,46 @@ export function ServerDetailDialog({
                 )}
 
                 {server.agentId && (
-                  <div className="grid gap-4">
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-                        <div className="text-xs text-muted-foreground">主机</div>
-                        <div className="mt-1 font-mono text-sm">{agentStats?.hostname || "-"}</div>
-                      </div>
-                      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-                        <div className="text-xs text-muted-foreground">运行时间</div>
-                        <div className="mt-1 font-mono text-sm">
-                          {agentStats ? formatUptime(agentStats.uptime * 1000) : "-"}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-                        <div className="text-xs text-muted-foreground">CPU</div>
-                        <div className="mt-1 font-mono text-sm">
-                          {agentStats ? `${agentStats.cpu.toFixed(1)}%` : "-"}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-                        <div className="text-xs text-muted-foreground">内存</div>
-                        <div className="mt-1 font-mono text-sm">
-                          {agentStats ? `${formatSize(agentStats.memUsed)} / ${formatSize(agentStats.memTotal)} (${agentStats.memUsedPct.toFixed(1)}%)` : "-"}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-                        <div className="text-xs text-muted-foreground">磁盘</div>
-                        <div className="mt-1 font-mono text-sm">
-                          {agentStats ? `${formatSize(agentStats.diskUsed)} / ${formatSize(agentStats.diskTotal)} (${agentStats.diskUsedPct.toFixed(1)}%)` : "-"}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-                        <div className="text-xs text-muted-foreground">负载</div>
-                        <div className="mt-1 font-mono text-sm">
-                          {agentStats ? `${agentStats.load1.toFixed(2)} / ${agentStats.load5.toFixed(2)} / ${agentStats.load15.toFixed(2)}` : "-"}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-                        <div className="text-xs text-muted-foreground">网络</div>
-                        <div className="mt-1 font-mono text-sm">
-                          {agentStats ? `${formatSize(agentStats.netRx)} ↓ / ${formatSize(agentStats.netTx)} ↑` : "-"}
-                        </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+                      <div className="text-xs text-muted-foreground">主机</div>
+                      <div className="mt-1 font-mono text-sm">{agentStats?.hostname || "-"}</div>
+                    </div>
+                    <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+                      <div className="text-xs text-muted-foreground">运行时间</div>
+                      <div className="mt-1 font-mono text-sm">
+                        {agentStats ? formatUptime(agentStats.uptime * 1000) : "-"}
                       </div>
                     </div>
-
                     <div className="rounded-xl border border-border/50 bg-card/50 p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-medium">进程列表</h4>
-                        <span className="text-xs text-muted-foreground">Top {processList.length}</span>
+                      <div className="text-xs text-muted-foreground">CPU</div>
+                      <div className="mt-1 font-mono text-sm">
+                        {agentStats ? `${agentStats.cpu.toFixed(1)}%` : "-"}
                       </div>
-                      {processList.length === 0 ? (
-                        <div className="text-xs text-muted-foreground">暂无进程数据</div>
-                      ) : (
-                        <div className="space-y-2">
-                          {processList.map(proc => (
-                            <div key={proc.pid} className="flex items-center justify-between text-xs font-mono">
-                              <div className="flex-1 truncate">{proc.name || "unknown"}</div>
-                              <div className="w-16 text-right">{proc.cpu.toFixed(1)}%</div>
-                              <div className="w-16 text-right">{proc.mem.toFixed(1)}%</div>
-                              <div className="w-12 text-right">{proc.pid}</div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    </div>
+                    <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+                      <div className="text-xs text-muted-foreground">内存</div>
+                      <div className="mt-1 font-mono text-sm">
+                        {agentStats ? `${formatSize(agentStats.memUsed)} / ${formatSize(agentStats.memTotal)} (${agentStats.memUsedPct.toFixed(1)}%)` : "-"}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+                      <div className="text-xs text-muted-foreground">磁盘</div>
+                      <div className="mt-1 font-mono text-sm">
+                        {agentStats ? `${formatSize(agentStats.diskUsed)} / ${formatSize(agentStats.diskTotal)} (${agentStats.diskUsedPct.toFixed(1)}%)` : "-"}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+                      <div className="text-xs text-muted-foreground">负载</div>
+                      <div className="mt-1 font-mono text-sm">
+                        {agentStats ? `${agentStats.load1.toFixed(2)} / ${agentStats.load5.toFixed(2)} / ${agentStats.load15.toFixed(2)}` : "-"}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-border/50 bg-card/50 p-4">
+                      <div className="text-xs text-muted-foreground">网络</div>
+                      <div className="mt-1 font-mono text-sm">
+                        {agentStats ? `${formatSize(agentStats.netRx)} ↓ / ${formatSize(agentStats.netTx)} ↑` : "-"}
+                      </div>
                     </div>
                   </div>
                 )}
