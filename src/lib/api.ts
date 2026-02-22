@@ -82,6 +82,12 @@ export interface BotStatus {
   agentId?: string | null;
 }
 
+export interface AgentInfo {
+  agentId: string;
+  name: string;
+  status?: { connected: boolean; lastSeen: number | null };
+}
+
 export interface LogEntry {
   id: number;
   timestamp: string;

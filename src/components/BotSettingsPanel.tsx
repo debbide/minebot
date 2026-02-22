@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api, ProxyNode } from "@/lib/api";
+import { api, ProxyNode, AgentInfo } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface BotSettingsPanelProps {
@@ -158,6 +158,11 @@ export function BotSettingsPanel({
     const [proxyNodeId, setProxyNodeId] = useState(proxyNodeIdProp || "");
     const [autoReconnect, setAutoReconnect] = useState(autoReconnectProp);
     const [proxyNodes, setProxyNodes] = useState<ProxyNode[]>([]);
+    const [agentList, setAgentList] = useState<AgentInfo[]>([]);
+    const [agentId, setAgentId] = useState<string>("");
+    const [newAgentId, setNewAgentId] = useState<string>("");
+    const [newAgentName, setNewAgentName] = useState<string>("");
+    const [newAgentToken, setNewAgentToken] = useState<string>("");
 
     const fetchBehaviorStatus = useCallback(async () => {
         setBehaviorLoading(true);
@@ -200,6 +205,7 @@ export function BotSettingsPanel({
         api.getBotConfig(botId)
             .then(result => {
                 if (!active || !result?.config) return;
+                setAgentId(result.config.agentId || "");
                 const rcon = result.config.rcon;
                 setRconEnabled(!!rcon?.enabled);
                 setRconHost(rcon?.host || "");
@@ -246,6 +252,19 @@ export function BotSettingsPanel({
     useEffect(() => {
         api.getProxyNodes().then(setProxyNodes).catch(console.error);
     }, []);
+
+    const loadAgents = useCallback(async () => {
+        try {
+            const result = await api.listAgents();
+            setAgentList(result.agents || []);
+        } catch (error) {
+            console.error("Failed to load agents:", error);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadAgents();
+    }, [loadAgents]);
 
     useEffect(() => {
         fetchBehaviorStatus();
@@ -449,6 +468,45 @@ export function BotSettingsPanel({
         }
     };
 
+    const generateToken = () => {
+        const bytes = new Uint8Array(32);
+        window.crypto.getRandomValues(bytes);
+        setNewAgentToken(Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join(""));
+    };
+
+    const handleCreateAgent = async () => {
+        if (!newAgentId || !newAgentToken) {
+            toast({ title: "错误", description: "agentId 和 token 必填", variant: "destructive" });
+            return;
+        }
+        setLoading("agentCreate");
+        try {
+            const result = await api.createAgent(newAgentId, newAgentToken, newAgentName || undefined);
+            toast({ title: "探针已注册", description: result.agent?.name || newAgentId });
+            setNewAgentId("");
+            setNewAgentName("");
+            setNewAgentToken("");
+            loadAgents();
+        } catch (error) {
+            toast({ title: "错误", description: String(error), variant: "destructive" });
+        } finally {
+            setLoading(null);
+        }
+    };
+
+    const handleBindAgent = async () => {
+        setLoading("agentBind");
+        try {
+            await api.bindAgent(botId, agentId || null);
+            toast({ title: "探针绑定已更新" });
+            onUpdate?.();
+        } catch (error) {
+            toast({ title: "错误", description: String(error), variant: "destructive" });
+        } finally {
+            setLoading(null);
+        }
+    };
+
     const handleTestRcon = async () => {
         setLoading("rconTest");
         try {
@@ -553,11 +611,12 @@ export function BotSettingsPanel({
 
     return (
         <Tabs defaultValue="restart" className="w-full">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
                 <TabsTrigger value="restart">通用</TabsTrigger>
                 <TabsTrigger value="chat">喊话</TabsTrigger>
                 <TabsTrigger value="behavior">行为</TabsTrigger>
                 <TabsTrigger value="command">指令</TabsTrigger>
+                <TabsTrigger value="agent">探针</TabsTrigger>
                 <TabsTrigger value="network">网络</TabsTrigger>
                 <TabsTrigger value="panel">面板</TabsTrigger>
                 <TabsTrigger value="sftp">SFTP</TabsTrigger>
@@ -847,6 +906,80 @@ export function BotSettingsPanel({
                     {loading === "command" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                     保存指令设置
                 </Button>
+            </TabsContent>
+
+            <TabsContent value="agent" className="space-y-4 pt-4">
+                <div className="space-y-2">
+                    <Label>绑定探针 (Agent)</Label>
+                    <select
+                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        value={agentId}
+                        onChange={(e) => setAgentId(e.target.value)}
+                        disabled={loading === "agentBind"}
+                    >
+                        <option value="">未绑定</option>
+                        {agentList.map(agent => (
+                            <option key={agent.agentId} value={agent.agentId}>
+                                {agent.name} ({agent.status?.connected ? "在线" : "离线"})
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                        绑定后将优先使用探针执行控制台、电源、文件等操作。
+                    </p>
+                    <Button
+                        onClick={handleBindAgent}
+                        disabled={loading === "agentBind"}
+                        className="w-full"
+                    >
+                        {loading === "agentBind" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                        保存绑定
+                    </Button>
+                </div>
+
+                <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h4 className="text-sm font-medium">注册新探针</h4>
+                            <p className="text-xs text-muted-foreground">在面板登记 agentId 与 token</p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={generateToken}>
+                            生成 Token
+                        </Button>
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Agent ID</Label>
+                        <Input
+                            value={newAgentId}
+                            onChange={(e) => setNewAgentId(e.target.value)}
+                            placeholder="node-001"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>名称 (可选)</Label>
+                        <Input
+                            value={newAgentName}
+                            onChange={(e) => setNewAgentName(e.target.value)}
+                            placeholder="VPS-1"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Token</Label>
+                        <Input
+                            value={newAgentToken}
+                            onChange={(e) => setNewAgentToken(e.target.value)}
+                            placeholder="生成或粘贴 token"
+                        />
+                    </div>
+                    <Button
+                        onClick={handleCreateAgent}
+                        disabled={loading === "agentCreate"}
+                        className="w-full"
+                    >
+                        {loading === "agentCreate" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                        注册探针
+                    </Button>
+                </div>
             </TabsContent>
 
             <TabsContent value="panel" className="space-y-4 pt-4">
