@@ -972,6 +972,34 @@ app.post('/api/bots/:id/agent-binding', (req, res) => {
   }
 });
 
+// Reset agent credentials for a bot
+app.post('/api/bots/:id/agent-reset', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+
+    const oldAgentId = bot.status.agentId;
+    if (oldAgentId) {
+      agentRegistry.remove(oldAgentId);
+    }
+
+    const generated = generateAgentCredentials();
+    configManager.updateServer(bot.id, { agentId: generated.agentId });
+    agentRegistry.upsert({ agentId: generated.agentId, token: generated.token, name: bot.status.serverName || generated.agentId });
+    if (typeof bot.setAgentId === 'function') {
+      bot.setAgentId(generated.agentId);
+    } else {
+      bot.status.agentId = generated.agentId;
+    }
+
+    res.json({ success: true, agentId: generated.agentId, token: generated.token });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Test RCON connection for a bot
 app.post('/api/bots/:id/rcon-test', async (req, res) => {
   try {

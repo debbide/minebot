@@ -555,6 +555,12 @@ class ApiService {
     });
   }
 
+  async resetAgent(botId: string): Promise<{ success: boolean; agentId: string; token: string }> {
+    return this.request(`/api/bots/${botId}/agent-reset`, {
+      method: 'POST'
+    });
+  }
+
   // Update command settings for a bot
   async setCommandSettings(id: string, settings: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean; globalCooldownSeconds?: number; maxPerMinute?: number }): Promise<{ success: boolean; commandSettings: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean; globalCooldownSeconds?: number; maxPerMinute?: number } }> {
     return this.request(`/api/bots/${id}/command-settings`, {

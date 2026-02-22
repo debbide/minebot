@@ -161,9 +161,6 @@ export function BotSettingsPanel({
     const [agentList, setAgentList] = useState<AgentInfo[]>([]);
     const [agentId, setAgentId] = useState<string>("");
     const [agentToken, setAgentToken] = useState<string>("");
-    const [newAgentId, setNewAgentId] = useState<string>("");
-    const [newAgentName, setNewAgentName] = useState<string>("");
-    const [newAgentToken, setNewAgentToken] = useState<string>("");
 
     const fetchBehaviorStatus = useCallback(async () => {
         setBehaviorLoading(true);
@@ -471,32 +468,13 @@ export function BotSettingsPanel({
         }
     };
 
-    const generateToken = () => {
-        const bytes = new Uint8Array(32);
-        window.crypto.getRandomValues(bytes);
-        setNewAgentToken(Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join(""));
-    };
-
-    const generateAgentId = () => {
-        const bytes = new Uint8Array(4);
-        window.crypto.getRandomValues(bytes);
-        return `node-${Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("")}`;
-    };
-
-    const handleCreateAgent = async () => {
-        const agentIdValue = newAgentId.trim() || generateAgentId();
-        const tokenValue = newAgentToken.trim();
-        if (!tokenValue) {
-            toast({ title: "错误", description: "agentId 和 token 必填", variant: "destructive" });
-            return;
-        }
-        setLoading("agentCreate");
+    const handleResetAgent = async () => {
+        setLoading("agentReset");
         try {
-            const result = await api.createAgent(agentIdValue, tokenValue, newAgentName.trim() || undefined);
-            toast({ title: "探针已注册", description: result.agent?.name || agentIdValue });
-            setNewAgentId("");
-            setNewAgentName("");
-            setNewAgentToken("");
+            const result = await api.resetAgent(botId);
+            setAgentId(result.agentId || "");
+            setAgentToken(result.token || "");
+            toast({ title: "探针已重置", description: result.agentId });
             loadAgents();
         } catch (error) {
             toast({ title: "错误", description: String(error), variant: "destructive" });
@@ -996,46 +974,18 @@ export function BotSettingsPanel({
                 </div>
 
                 <div className="border-t pt-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h4 className="text-sm font-medium">注册新探针</h4>
-                            <p className="text-xs text-muted-foreground">在面板登记 agentId 与 token</p>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={generateToken}>
-                            生成 Token
-                        </Button>
-                    </div>
                     <div className="space-y-2">
-                        <Label>Agent ID</Label>
-                        <Input
-                            value={newAgentId}
-                            onChange={(e) => setNewAgentId(e.target.value)}
-                            placeholder="node-001"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>名称 (可选)</Label>
-                        <Input
-                            value={newAgentName}
-                            onChange={(e) => setNewAgentName(e.target.value)}
-                            placeholder="VPS-1"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Token</Label>
-                        <Input
-                            value={newAgentToken}
-                            onChange={(e) => setNewAgentToken(e.target.value)}
-                            placeholder="生成或粘贴 token"
-                        />
+                        <h4 className="text-sm font-medium">重置探针</h4>
+                        <p className="text-xs text-muted-foreground">重新生成 agentId 和 token，并同步到部署配置</p>
                     </div>
                     <Button
-                        onClick={handleCreateAgent}
-                        disabled={loading === "agentCreate"}
+                        variant="outline"
+                        onClick={handleResetAgent}
+                        disabled={loading === "agentReset"}
                         className="w-full"
                     >
-                        {loading === "agentCreate" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
-                        注册探针
+                        {loading === "agentReset" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                        重置探针
                     </Button>
                 </div>
             </TabsContent>
