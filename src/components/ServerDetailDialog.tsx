@@ -164,8 +164,6 @@ export function ServerDetailDialog({
     }
   };
 
-  if (!server) return null;
-
   const loadAgentData = useCallback(async () => {
     if (!server?.agentId) return;
     setAgentLoading(true);
@@ -188,6 +186,8 @@ export function ServerDetailDialog({
       loadAgentData();
     }
   }, [activeTab, loadAgentData]);
+
+  if (!server) return null;
 
   const isPanel = server.type === "panel";
 
