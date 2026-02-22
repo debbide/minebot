@@ -51,6 +51,9 @@ func Load(path string) (*Config, error) {
 	if cfg.VolumeMap == nil {
 		cfg.VolumeMap = map[string]string{}
 	}
+	if cfg.FileRoot == "" {
+		cfg.FileRoot = "/"
+	}
 
 	return &cfg, nil
 }
