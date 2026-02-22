@@ -160,6 +160,7 @@ export function BotSettingsPanel({
     const [proxyNodes, setProxyNodes] = useState<ProxyNode[]>([]);
     const [agentList, setAgentList] = useState<AgentInfo[]>([]);
     const [agentId, setAgentId] = useState<string>("");
+    const [agentToken, setAgentToken] = useState<string>("");
     const [newAgentId, setNewAgentId] = useState<string>("");
     const [newAgentName, setNewAgentName] = useState<string>("");
     const [newAgentToken, setNewAgentToken] = useState<string>("");
@@ -206,6 +207,7 @@ export function BotSettingsPanel({
             .then(result => {
                 if (!active || !result?.config) return;
                 setAgentId(result.config.agentId || "");
+                setAgentToken(result.config.agentToken || "");
                 const rcon = result.config.rcon;
                 setRconEnabled(!!rcon?.enabled);
                 setRconHost(rcon?.host || "");
@@ -617,6 +619,27 @@ export function BotSettingsPanel({
         return items.join(", ");
     };
 
+    const getAgentConfigText = () => {
+        const origin = window.location.origin;
+        const wsOrigin = origin.replace(/^http/, "ws");
+        const config = {
+            serverUrl: origin,
+            wsUrl: `${wsOrigin}/agent/ws`,
+            agentId: agentId || "",
+            token: agentToken || ""
+        };
+        return JSON.stringify(config, null, 2);
+    };
+
+    const handleCopyAgentConfig = async () => {
+        try {
+            await navigator.clipboard.writeText(getAgentConfigText());
+            toast({ title: "已复制", description: "探针配置已复制" });
+        } catch (error) {
+            toast({ title: "错误", description: String(error), variant: "destructive" });
+        }
+    };
+
     return (
         <Tabs defaultValue="restart" className="w-full">
             <TabsList className="grid w-full grid-cols-8">
@@ -917,6 +940,28 @@ export function BotSettingsPanel({
             </TabsContent>
 
             <TabsContent value="agent" className="space-y-4 pt-4">
+                <div className="space-y-2">
+                    <Label>探针部署配置</Label>
+                    <Textarea
+                        value={getAgentConfigText()}
+                        readOnly
+                        rows={6}
+                        className="font-mono text-xs"
+                    />
+                    <div className="flex gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={handleCopyAgentConfig}
+                            className="flex-1"
+                        >
+                            复制配置
+                        </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        将以上配置写入探针配置文件即可连接。
+                    </p>
+                </div>
+
                 <div className="space-y-2">
                     <Label>绑定探针 (Agent)</Label>
                     <select

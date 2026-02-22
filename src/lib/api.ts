@@ -80,6 +80,7 @@ export interface BotStatus {
   proxyNodeId?: string;
   autoReconnect?: boolean;
   agentId?: string | null;
+  agentToken?: string | null;
 }
 
 export interface AgentInfo {
@@ -531,8 +532,27 @@ class ApiService {
   }
 
   // Get bot config
-  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; rcon?: { enabled: boolean; host: string; port: number; password: string } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean; agentId?: string | null; behaviorSettings?: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } } | null; commandSettings?: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean; globalCooldownSeconds?: number; maxPerMinute?: number } | null } }> {
+  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; rcon?: { enabled: boolean; host: string; port: number; password: string } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean; agentId?: string | null; agentToken?: string | null; behaviorSettings?: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } } | null; commandSettings?: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean; globalCooldownSeconds?: number; maxPerMinute?: number } | null } }> {
     return this.request(`/api/bots/${id}/config`);
+  }
+
+  // Agent registry
+  async listAgents(): Promise<{ success: boolean; agents: AgentInfo[] }> {
+    return this.request('/api/agents');
+  }
+
+  async createAgent(agentId: string, token: string, name?: string): Promise<{ success: boolean; agent?: { agentId: string; name: string } }> {
+    return this.request('/api/agents', {
+      method: 'POST',
+      body: JSON.stringify({ agentId, token, name })
+    });
+  }
+
+  async bindAgent(botId: string, agentId: string | null): Promise<{ success: boolean; agentId: string | null }> {
+    return this.request(`/api/bots/${botId}/agent-binding`, {
+      method: 'POST',
+      body: JSON.stringify({ agentId })
+    });
   }
 
   // Update command settings for a bot
