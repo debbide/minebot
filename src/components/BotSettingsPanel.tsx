@@ -611,16 +611,7 @@ token: "${agentToken || ""}"
 wsUrl: "${wsUrl}"
 serverUrl: "${origin}"
 
-dockerBin: "docker"
-containerLabelKey: "minebot.serverId"
-
-volumeMap:
-  "${botId}": "volume_uuid"
-
-containerMap:
-  "${botId}": "container_name_or_id"
-
-fileRoot: "/srv/pterodactyl/volumes"
+fileRoot: "/"
 
 rcon:
   enabled: false
