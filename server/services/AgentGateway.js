@@ -2,12 +2,18 @@ import crypto from 'crypto';
 import { WebSocketServer } from 'ws';
 
 export class AgentGateway {
-  constructor(server, registry) {
+  constructor(registry) {
     this.registry = registry;
     this.connections = new Map();
     this.pending = new Map();
-    this.wss = new WebSocketServer({ server, path: '/agent/ws' });
+    this.wss = new WebSocketServer({ noServer: true });
     this.wss.on('connection', (ws) => this.handleConnection(ws));
+  }
+
+  handleUpgrade(req, socket, head) {
+    this.wss.handleUpgrade(req, socket, head, (ws) => {
+      this.wss.emit('connection', ws, req);
+    });
   }
 
   getStatus(agentId) {

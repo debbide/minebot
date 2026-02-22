@@ -83,7 +83,7 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const server = createServer(app);
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer: true });
 
 // Middleware
 app.use(cors());
@@ -107,7 +107,7 @@ const systemService = new SystemService();
 const auditService = new AuditService();
 const botManager = new BotManager(configManager, aiService, broadcast);
 const agentRegistry = new AgentRegistry();
-const agentGateway = new AgentGateway(server, agentRegistry);
+const agentGateway = new AgentGateway(agentRegistry);
 
 const getAgentIdForBot = (bot) => {
   const agentId = bot?.status?.agentId;
@@ -254,6 +254,16 @@ app.use('/api/screenshots', express.static(join(process.cwd(), 'data', 'screensh
 
 // WebSocket connections
 const clients = new Set();
+
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  if (url.pathname === '/agent/ws') {
+    return agentGateway.handleUpgrade(req, socket, head);
+  }
+  return wss.handleUpgrade(req, socket, head, (ws) => {
+    wss.emit('connection', ws, req);
+  });
+});
 
 wss.on('connection', (ws, req) => {
   // Verify token for WebSocket connections
