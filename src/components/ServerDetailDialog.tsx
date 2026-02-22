@@ -77,12 +77,17 @@ export function ServerDetailDialog({
   const { toast } = useToast();
   const { logs } = useWebSocketContext();
 
-  // 切换标签时重置滚动位置
+  // 切换标签或打开面板时重置滚动位置
   useEffect(() => {
     if (contentRef.current) {
       contentRef.current.scrollTop = 0;
     }
-  }, [activeTab]);
+    requestAnimationFrame(() => {
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0;
+      }
+    });
+  }, [activeTab, open, server?.id]);
 
   // 初始化编辑表单
   useEffect(() => {
