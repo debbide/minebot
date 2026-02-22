@@ -78,19 +78,49 @@ func GetHost(fileRoot string) (*HostStats, error) {
 		cpuVal = cpuPercent[0]
 	}
 
+	hostname := ""
+	uptime := uint64(0)
+	if h != nil {
+		hostname = h.Hostname
+		uptime = h.Uptime
+	}
+
+	load1, load5, load15 := 0.0, 0.0, 0.0
+	if loadAvg != nil {
+		load1 = loadAvg.Load1
+		load5 = loadAvg.Load5
+		load15 = loadAvg.Load15
+	}
+
+	memTotal, memUsed := uint64(0), uint64(0)
+	memUsedPct := 0.0
+	if memInfo != nil {
+		memTotal = memInfo.Total
+		memUsed = memInfo.Used
+		memUsedPct = memInfo.UsedPercent
+	}
+
+	diskTotal, diskUsed := uint64(0), uint64(0)
+	diskUsedPct := 0.0
+	if diskInfo != nil {
+		diskTotal = diskInfo.Total
+		diskUsed = diskInfo.Used
+		diskUsedPct = diskInfo.UsedPercent
+	}
+
 	return &HostStats{
-		Hostname:    h.Hostname,
-		Uptime:      h.Uptime,
-		Load1:       loadAvg.Load1,
-		Load5:       loadAvg.Load5,
-		Load15:      loadAvg.Load15,
+		Hostname:    hostname,
+		Uptime:      uptime,
+		Load1:       load1,
+		Load5:       load5,
+		Load15:      load15,
 		CPU:         cpuVal,
-		MemTotal:    memInfo.Total,
-		MemUsed:     memInfo.Used,
-		MemUsedPct:  memInfo.UsedPercent,
-		DiskTotal:   diskInfo.Total,
-		DiskUsed:    diskInfo.Used,
-		DiskUsedPct: diskInfo.UsedPercent,
+		MemTotal:    memTotal,
+		MemUsed:     memUsed,
+		MemUsedPct:  memUsedPct,
+		DiskTotal:   diskTotal,
+		DiskUsed:    diskUsed,
+		DiskUsedPct: diskUsedPct,
 		NetRx:       rx,
 		NetTx:       tx,
 	}, nil
