@@ -1172,6 +1172,16 @@ app.get('/api/bots/:id/config', (req, res) => {
     if (!bot) {
       return res.status(404).json({ success: false, error: 'Bot not found' });
     }
+    if (!bot.status.agentId) {
+      const generated = generateAgentCredentials();
+      configManager.updateServer(bot.id, { agentId: generated.agentId });
+      agentRegistry.upsert({ agentId: generated.agentId, token: generated.token, name: bot.status.serverName || generated.agentId });
+      if (typeof bot.setAgentId === 'function') {
+        bot.setAgentId(generated.agentId);
+      } else {
+        bot.status.agentId = generated.agentId;
+      }
+    }
     const agentToken = bot.status.agentId
       ? agentRegistry.get(bot.status.agentId)?.token || null
       : null;
