@@ -474,10 +474,16 @@ export function BotSettingsPanel({
         setNewAgentToken(Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join(""));
     };
 
+    const generateAgentId = () => {
+        const bytes = new Uint8Array(4);
+        window.crypto.getRandomValues(bytes);
+        return `node-${Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("")}`;
+    };
+
     const handleCreateAgent = async () => {
-        const agentIdValue = newAgentId.trim();
+        const agentIdValue = newAgentId.trim() || generateAgentId();
         const tokenValue = newAgentToken.trim();
-        if (!agentIdValue || !tokenValue) {
+        if (!tokenValue) {
             toast({ title: "错误", description: "agentId 和 token 必填", variant: "destructive" });
             return;
         }
