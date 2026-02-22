@@ -108,7 +108,15 @@ const systemService = new SystemService();
 const auditService = new AuditService();
 const botManager = new BotManager(configManager, aiService, broadcast);
 const agentRegistry = new AgentRegistry();
-const agentGateway = new AgentGateway(agentRegistry);
+const agentGateway = new AgentGateway(agentRegistry, (agentId, status) => {
+  const serverIds = [];
+  botManager.bots.forEach((bot) => {
+    if (bot?.status?.agentId === agentId) {
+      serverIds.push(bot.id);
+    }
+  });
+  broadcast('agent_status', { agentId, status, serverIds });
+});
 
 const generateAgentCredentials = () => ({
   agentId: `agent_${crypto.randomUUID()}`,
@@ -560,7 +568,14 @@ app.get('/api/logs', (req, res) => {
 
 // Get all bots status
 app.get('/api/bots', (req, res) => {
-  res.json(botManager.getAllStatus());
+  const statuses = botManager.getAllStatus();
+  const enriched = {};
+  Object.entries(statuses).forEach(([id, status]) => {
+    const agentId = status?.agentId;
+    const agentStatus = agentId ? agentGateway.getStatus(agentId) : null;
+    enriched[id] = { ...status, agentStatus };
+  });
+  res.json(enriched);
 });
 
 // Add new server
@@ -1249,8 +1264,12 @@ app.get('/api/bots/:id/files', async (req, res) => {
     const directory = req.query.directory || '/';
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const result = await agentGateway.request(agentId, 'LIST', { serverId: bot.id, path: directory });
-      return res.json({ success: result.success !== false, files: result.data || [], directory });
+      try {
+        const result = await agentGateway.request(agentId, 'LIST', { serverId: bot.id, path: directory });
+        return res.json({ success: result.success !== false, files: result.data || [], directory, channel: 'agent' });
+      } catch (error) {
+        // fallback to configured file access type
+      }
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1260,7 +1279,7 @@ app.get('/api/bots/:id/files', async (req, res) => {
     } else {
       result = await bot.listFiles(directory);
     }
-    res.json(result);
+    res.json({ ...result, channel: fileAccessType === 'sftp' ? 'sftp' : 'pterodactyl' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1279,8 +1298,12 @@ app.get('/api/bots/:id/files/contents', async (req, res) => {
     }
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const result = await agentGateway.request(agentId, 'READ', { serverId: bot.id, path: file });
-      return res.json({ success: result.success !== false, content: result.data?.content || '' });
+      try {
+        const result = await agentGateway.request(agentId, 'READ', { serverId: bot.id, path: file });
+        return res.json({ success: result.success !== false, content: result.data?.content || '', channel: 'agent' });
+      } catch (error) {
+        // fallback to configured file access type
+      }
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1290,7 +1313,7 @@ app.get('/api/bots/:id/files/contents', async (req, res) => {
     } else {
       result = await bot.getFileContents(file);
     }
-    res.json(result);
+    res.json({ ...result, channel: fileAccessType === 'sftp' ? 'sftp' : 'pterodactyl' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1309,8 +1332,12 @@ app.post('/api/bots/:id/files/write', express.text({ limit: '50mb' }), async (re
     }
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const result = await agentGateway.request(agentId, 'WRITE', { serverId: bot.id, path: file, content: req.body || '' });
-      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+      try {
+        const result = await agentGateway.request(agentId, 'WRITE', { serverId: bot.id, path: file, content: req.body || '' });
+        return res.json({ success: result.success !== false, message: result.message || 'ok', channel: 'agent' });
+      } catch (error) {
+        // fallback to configured file access type
+      }
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1320,7 +1347,7 @@ app.post('/api/bots/:id/files/write', express.text({ limit: '50mb' }), async (re
     } else {
       result = await bot.writeFile(file, req.body);
     }
-    res.json(result);
+    res.json({ ...result, channel: fileAccessType === 'sftp' ? 'sftp' : 'pterodactyl' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1339,27 +1366,31 @@ app.get('/api/bots/:id/files/download', async (req, res) => {
     }
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const init = await agentGateway.request(agentId, 'DOWNLOAD_INIT', { serverId: bot.id, path: file });
-      const downloadId = init.data?.downloadId;
-      if (!downloadId) {
-        return res.status(400).json({ success: false, error: init.message || '下载失败' });
-      }
-      const fileName = file.split('/').pop();
-      res.setHeader('Content-Type', 'application/octet-stream');
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-
-      let index = 0;
-      while (true) {
-        const chunk = await agentGateway.request(agentId, 'DOWNLOAD_CHUNK', { downloadId, index });
-        const data = chunk.data?.data || '';
-        if (data) {
-          res.write(Buffer.from(data, 'base64'));
+      try {
+        const init = await agentGateway.request(agentId, 'DOWNLOAD_INIT', { serverId: bot.id, path: file });
+        const downloadId = init.data?.downloadId;
+        if (!downloadId) {
+          return res.status(400).json({ success: false, error: init.message || '下载失败' });
         }
-        if (chunk.data?.done) break;
-        index += 1;
+        const fileName = file.split('/').pop();
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+
+        let index = 0;
+        while (true) {
+          const chunk = await agentGateway.request(agentId, 'DOWNLOAD_CHUNK', { downloadId, index });
+          const data = chunk.data?.data || '';
+          if (data) {
+            res.write(Buffer.from(data, 'base64'));
+          }
+          if (chunk.data?.done) break;
+          index += 1;
+        }
+        res.end();
+        return;
+      } catch (error) {
+        // fallback to configured file access type
       }
-      res.end();
-      return;
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1490,8 +1521,12 @@ app.post('/api/bots/:id/files/folder', async (req, res) => {
     }
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const result = await agentGateway.request(agentId, 'MKDIR', { serverId: bot.id, root: root || '/', name });
-      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+      try {
+        const result = await agentGateway.request(agentId, 'MKDIR', { serverId: bot.id, root: root || '/', name });
+        return res.json({ success: result.success !== false, message: result.message || 'ok', channel: 'agent' });
+      } catch (error) {
+        // fallback to configured file access type
+      }
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1501,7 +1536,7 @@ app.post('/api/bots/:id/files/folder', async (req, res) => {
     } else {
       result = await bot.createFolder(root || '/', name);
     }
-    res.json(result);
+    res.json({ ...result, channel: fileAccessType === 'sftp' ? 'sftp' : 'pterodactyl' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1520,8 +1555,12 @@ app.post('/api/bots/:id/files/delete', async (req, res) => {
     }
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const result = await agentGateway.request(agentId, 'DELETE', { serverId: bot.id, root: root || '/', files });
-      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+      try {
+        const result = await agentGateway.request(agentId, 'DELETE', { serverId: bot.id, root: root || '/', files });
+        return res.json({ success: result.success !== false, message: result.message || 'ok', channel: 'agent' });
+      } catch (error) {
+        // fallback to configured file access type
+      }
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1531,7 +1570,7 @@ app.post('/api/bots/:id/files/delete', async (req, res) => {
     } else {
       result = await bot.deleteFiles(root || '/', files);
     }
-    res.json(result);
+    res.json({ ...result, channel: fileAccessType === 'sftp' ? 'sftp' : 'pterodactyl' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1550,8 +1589,12 @@ app.post('/api/bots/:id/files/rename', async (req, res) => {
     }
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const result = await agentGateway.request(agentId, 'RENAME', { serverId: bot.id, root: root || '/', from, to });
-      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+      try {
+        const result = await agentGateway.request(agentId, 'RENAME', { serverId: bot.id, root: root || '/', from, to });
+        return res.json({ success: result.success !== false, message: result.message || 'ok', channel: 'agent' });
+      } catch (error) {
+        // fallback to configured file access type
+      }
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1561,7 +1604,7 @@ app.post('/api/bots/:id/files/rename', async (req, res) => {
     } else {
       result = await bot.renameFile(root || '/', from, to);
     }
-    res.json(result);
+    res.json({ ...result, channel: fileAccessType === 'sftp' ? 'sftp' : 'pterodactyl' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1580,8 +1623,12 @@ app.post('/api/bots/:id/files/copy', async (req, res) => {
     }
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const result = await agentGateway.request(agentId, 'COPY', { serverId: bot.id, location });
-      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+      try {
+        const result = await agentGateway.request(agentId, 'COPY', { serverId: bot.id, location });
+        return res.json({ success: result.success !== false, message: result.message || 'ok', channel: 'agent' });
+      } catch (error) {
+        // fallback to configured file access type
+      }
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1591,7 +1638,7 @@ app.post('/api/bots/:id/files/copy', async (req, res) => {
     } else {
       result = await bot.copyFile(location);
     }
-    res.json(result);
+    res.json({ ...result, channel: fileAccessType === 'sftp' ? 'sftp' : 'pterodactyl' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1610,8 +1657,12 @@ app.post('/api/bots/:id/files/compress', async (req, res) => {
     }
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const result = await agentGateway.request(agentId, 'COMPRESS', { serverId: bot.id, root: root || '/', files });
-      return res.json({ success: result.success !== false, archive: result.data?.archive, message: result.message || 'ok' });
+      try {
+        const result = await agentGateway.request(agentId, 'COMPRESS', { serverId: bot.id, root: root || '/', files });
+        return res.json({ success: result.success !== false, archive: result.data?.archive, message: result.message || 'ok', channel: 'agent' });
+      } catch (error) {
+        // fallback to configured file access type
+      }
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1619,7 +1670,7 @@ app.post('/api/bots/:id/files/compress', async (req, res) => {
       return res.status(400).json({ success: false, error: 'SFTP 模式不支持压缩功能' });
     }
     const result = await bot.compressFiles(root || '/', files);
-    res.json(result);
+    res.json({ ...result, channel: 'pterodactyl' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1638,8 +1689,12 @@ app.post('/api/bots/:id/files/decompress', async (req, res) => {
     }
     const agentId = getAgentIdForBot(bot);
     if (agentId) {
-      const result = await agentGateway.request(agentId, 'DECOMPRESS', { serverId: bot.id, root: root || '/', file });
-      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+      try {
+        const result = await agentGateway.request(agentId, 'DECOMPRESS', { serverId: bot.id, root: root || '/', file });
+        return res.json({ success: result.success !== false, message: result.message || 'ok', channel: 'agent' });
+      } catch (error) {
+        // fallback to configured file access type
+      }
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1647,7 +1702,7 @@ app.post('/api/bots/:id/files/decompress', async (req, res) => {
       return res.status(400).json({ success: false, error: 'SFTP 模式不支持解压功能' });
     }
     const result = await bot.decompressFile(root || '/', file);
-    res.json(result);
+    res.json({ ...result, channel: 'pterodactyl' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }

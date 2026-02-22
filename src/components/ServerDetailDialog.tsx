@@ -218,6 +218,11 @@ export function ServerDetailDialog({
                     isPanel && server.panelServerState === "running" ? "运行中" :
                       "离线"}
               </Badge>
+              {server.agentId && (
+                <Badge variant={server.agentStatus?.connected ? "default" : "secondary"} className="h-6">
+                  {server.agentStatus?.connected ? "探针在线" : "探针离线"}
+                </Badge>
+              )}
               {!isPanel && (
                 <Button
                   variant="outline"

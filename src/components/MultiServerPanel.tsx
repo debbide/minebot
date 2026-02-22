@@ -91,6 +91,7 @@ function SortableServerCard({
   };
 
   const isPanel = server.type === "panel";
+  const agentOnline = server.agentStatus?.connected;
 
   return (
     <div
@@ -120,6 +121,14 @@ function SortableServerCard({
           >
             {getStatusText(server)}
           </Badge>
+          {server.agentId && (
+            <Badge
+              variant={agentOnline ? "default" : "secondary"}
+              className="text-xs"
+            >
+              {agentOnline ? "探针在线" : "探针离线"}
+            </Badge>
+          )}
         </div>
         {server.type === "panel" && server.panelServerStats && (
           <Badge variant="secondary" className="text-xs bg-secondary/30 font-mono font-normal">
@@ -285,7 +294,7 @@ export function MultiServerPanel() {
       setServers(prev => {
         const updated = { ...prev };
         botUpdates.forEach((botData, botId) => {
-          updated[botId] = botData;
+          updated[botId] = { ...(updated[botId] || {}), ...botData };
         });
         return updated;
       });
@@ -299,7 +308,7 @@ export function MultiServerPanel() {
       setSelectedServer(prev => {
         if (!prev) return prev;
         if (!botUpdates.has(prev.id)) return prev;
-        return botUpdates.get(prev.id) || prev;
+        return { ...prev, ...(botUpdates.get(prev.id) || {}) };
       });
     }
   }, [botUpdates]);

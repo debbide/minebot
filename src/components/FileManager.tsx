@@ -76,6 +76,7 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [pathHistory, setPathHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [activeChannel, setActiveChannel] = useState<'agent' | 'sftp' | 'pterodactyl' | null>(null);
 
   // 对话框状态
   const [newFolderOpen, setNewFolderOpen] = useState(false);
@@ -106,6 +107,9 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
         });
         setFiles(sorted);
         setSelectedFiles(new Set());
+        if (result.channel) {
+          setActiveChannel(result.channel);
+        }
       } else {
         toast({
           title: "加载失败",
@@ -123,6 +127,14 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
       setLoading(false);
     }
   }, [serverId, currentPath, toast]);
+
+  const channelLabel = activeChannel === 'agent'
+    ? '探针'
+    : activeChannel === 'sftp'
+      ? 'SFTP'
+      : activeChannel === 'pterodactyl'
+        ? '翼龙面板'
+        : null;
 
   useEffect(() => {
     loadFiles();
@@ -578,6 +590,11 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
             <div className="flex-1 px-3 py-1.5 bg-muted rounded-md text-sm font-mono truncate">
               {currentPath}
             </div>
+            {channelLabel && (
+              <div className="px-2 py-1 rounded-md bg-muted/60 text-[10px] font-medium text-muted-foreground">
+                通道: {channelLabel}
+              </div>
+            )}
 
             <div className="flex items-center gap-1">
               <label>
@@ -903,6 +920,11 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
           <div className="flex-1 px-3 py-1.5 bg-muted rounded-md text-sm font-mono truncate">
             {currentPath}
           </div>
+          {channelLabel && (
+            <div className="px-2 py-1 rounded-md bg-muted/60 text-[10px] font-medium text-muted-foreground">
+              通道: {channelLabel}
+            </div>
+          )}
 
           <div className="flex items-center gap-1">
             <label>

@@ -2,8 +2,9 @@ import crypto from 'crypto';
 import { WebSocketServer } from 'ws';
 
 export class AgentGateway {
-  constructor(registry) {
+  constructor(registry, onStatusChange = null) {
     this.registry = registry;
+    this.onStatusChange = onStatusChange;
     this.connections = new Map();
     this.pending = new Map();
     this.wss = new WebSocketServer({ noServer: true });
@@ -86,7 +87,12 @@ export class AgentGateway {
     });
 
     ws.on('close', () => {
-      if (authedAgentId) this.connections.delete(authedAgentId);
+      if (authedAgentId) {
+        this.connections.delete(authedAgentId);
+        if (this.onStatusChange) {
+          this.onStatusChange(authedAgentId, this.getStatus(authedAgentId));
+        }
+      }
     });
   }
 
@@ -102,6 +108,9 @@ export class AgentGateway {
 
     this.connections.set(agentId, { ws, lastSeen: Date.now() });
     ws.send(JSON.stringify({ type: 'RES', id: 'auth', payload: { success: true } }));
+    if (this.onStatusChange) {
+      this.onStatusChange(agentId, this.getStatus(agentId));
+    }
     return true;
   }
 }

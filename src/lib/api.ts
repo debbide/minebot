@@ -81,6 +81,7 @@ export interface BotStatus {
   autoReconnect?: boolean;
   agentId?: string | null;
   agentToken?: string | null;
+  agentStatus?: { connected: boolean; lastSeen: number | null } | null;
 }
 
 export interface AgentInfo {
@@ -602,7 +603,7 @@ class ApiService {
 
   // ==================== 文件管理 API ====================
 
-  async listFiles(id: string, directory: string = '/'): Promise<{ success: boolean; files?: FileInfo[]; directory?: string; error?: string }> {
+  async listFiles(id: string, directory: string = '/'): Promise<{ success: boolean; files?: FileInfo[]; directory?: string; channel?: 'agent' | 'sftp' | 'pterodactyl'; error?: string }> {
     return this.request(`/api/bots/${id}/files?directory=${encodeURIComponent(directory)}`);
   }
 

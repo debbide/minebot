@@ -129,6 +129,21 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             case 'log':
               setLogs(prev => [...prev.slice(-99), data.data as LogEntry]);
               break;
+            case 'agent_status': {
+              const payload = data.data as { serverIds?: string[]; status?: { connected: boolean; lastSeen: number | null } };
+              const serverIds = payload?.serverIds || [];
+              if (serverIds.length === 0) break;
+              setBotUpdates(prev => {
+                const updated = new Map(prev);
+                serverIds.forEach((serverId) => {
+                  const existing = updated.get(serverId);
+                  const base = existing || ({ id: serverId } as BotStatus);
+                  updated.set(serverId, { ...base, agentStatus: payload.status || null });
+                });
+                return updated;
+              });
+              break;
+            }
             case 'logs':
               if (Array.isArray(data.data)) {
                 setLogs((data.data as LogEntry[]).slice(0, 100)); // 限制日志最多 100 条
