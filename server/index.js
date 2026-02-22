@@ -1,6 +1,7 @@
 import express from 'express';
 import axios from 'axios';
 import cors from 'cors';
+import crypto from 'crypto';
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
 import { fileURLToPath } from 'url';
@@ -108,6 +109,11 @@ const auditService = new AuditService();
 const botManager = new BotManager(configManager, aiService, broadcast);
 const agentRegistry = new AgentRegistry();
 const agentGateway = new AgentGateway(agentRegistry);
+
+const generateAgentCredentials = () => ({
+  agentId: `agent_${crypto.randomUUID()}`,
+  token: crypto.randomBytes(32).toString('hex')
+});
 
 const getAgentIdForBot = (bot) => {
   const agentId = bot?.status?.agentId;
@@ -562,15 +568,26 @@ app.post('/api/bots/add', async (req, res) => {
   try {
     // 尝试保存到配置（如果已存在会抛出错误）
     let serverConfig;
+    let created = false;
+    let agentPayload = null;
     try {
       serverConfig = configManager.addServer(req.body);
+      created = true;
     } catch (e) {
       // 配置已存在，使用现有配置
       const servers = configManager.getServers();
       serverConfig = servers.find(s => s.id === req.body.id) || req.body;
     }
+
+    if (created && !serverConfig.agentId) {
+      const generated = generateAgentCredentials();
+      configManager.updateServer(serverConfig.id, { agentId: generated.agentId });
+      agentRegistry.upsert({ agentId: generated.agentId, token: generated.token, name: generated.agentId });
+      agentPayload = generated;
+      serverConfig = { ...serverConfig, agentId: generated.agentId };
+    }
     const result = await botManager.addServer(serverConfig);
-    res.json({ success: true, ...result });
+    res.json({ success: true, ...result, agent: agentPayload });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1155,6 +1172,9 @@ app.get('/api/bots/:id/config', (req, res) => {
     if (!bot) {
       return res.status(404).json({ success: false, error: 'Bot not found' });
     }
+    const agentToken = bot.status.agentId
+      ? agentRegistry.get(bot.status.agentId)?.token || null
+      : null;
     res.json({
       success: true,
       config: {
@@ -1169,6 +1189,7 @@ app.get('/api/bots/:id/config', (req, res) => {
         fileAccessType: bot.status.fileAccessType,
         autoOp: bot.status.autoOp,
         agentId: bot.status.agentId,
+        agentToken,
         behaviorSettings: bot.behaviorSettings || null,
         commandSettings: bot.commandSettings || null
       }
