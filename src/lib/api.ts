@@ -524,8 +524,24 @@ class ApiService {
   }
 
   // Get bot config
-  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean } }> {
+  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean; behaviorSettings?: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } } | null; commandSettings?: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean } | null } }> {
     return this.request(`/api/bots/${id}/config`);
+  }
+
+  // Update command settings for a bot
+  async setCommandSettings(id: string, settings: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean }): Promise<{ success: boolean; commandSettings: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean } }> {
+    return this.request(`/api/bots/${id}/command-settings`, {
+      method: 'POST',
+      body: JSON.stringify(settings)
+    });
+  }
+
+  // Update behavior settings for a bot
+  async setBehaviorSettings(id: string, settings: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } }): Promise<{ success: boolean; behaviorSettings: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } } }> {
+    return this.request(`/api/bots/${id}/behavior-settings`, {
+      method: 'POST',
+      body: JSON.stringify(settings)
+    });
   }
 
   // ==================== 文件管理 API ====================

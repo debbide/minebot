@@ -250,7 +250,7 @@ export function MultiServerPanel() {
     })
   );
 
-  const fetchServers = async () => {
+  const fetchServers = useCallback(async () => {
     try {
       const data = await api.getBots();
       setServers(data);
@@ -266,20 +266,19 @@ export function MultiServerPanel() {
       });
 
       // 更新选中的服务器数据
-      if (selectedServer) {
-        const updated = data[selectedServer.id];
-        if (updated) {
-          setSelectedServer(updated);
-        }
-      }
+      setSelectedServer(prev => {
+        if (!prev) return prev;
+        const updated = data[prev.id];
+        return updated || prev;
+      });
     } catch (error) {
       console.error("Failed to fetch servers:", error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchServers();
-  }, []);
+  }, [fetchServers]);
 
   useEffect(() => {
     if (botUpdates.size > 0) {
@@ -297,9 +296,11 @@ export function MultiServerPanel() {
         return [...prevIds, ...addedIds];
       });
 
-      if (selectedServer && botUpdates.has(selectedServer.id)) {
-        setSelectedServer(botUpdates.get(selectedServer.id));
-      }
+      setSelectedServer(prev => {
+        if (!prev) return prev;
+        if (!botUpdates.has(prev.id)) return prev;
+        return botUpdates.get(prev.id) || prev;
+      });
     }
   }, [botUpdates]);
 
@@ -350,7 +351,7 @@ export function MultiServerPanel() {
     } finally {
       setLoading(false);
     }
-  }, [newServer, servers, toast]);
+  }, [newServer, servers, toast, fetchServers]);
 
   const handleRemoveServer = useCallback(async (id: string) => {
     if (!confirm("确定要删除这个服务器吗？")) return;
@@ -364,7 +365,7 @@ export function MultiServerPanel() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, fetchServers]);
 
   const handleRestartServer = useCallback(async (id: string) => {
     setLoading(true);
@@ -377,7 +378,7 @@ export function MultiServerPanel() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, fetchServers]);
 
   const handleConnectAll = async () => {
     setLoading(true);

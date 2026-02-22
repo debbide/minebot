@@ -1,13 +1,20 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { BotStatus, LogEntry } from '@/lib/api';
+
+interface SystemStatus {
+  percent: string;
+  used: string;
+  total: string;
+}
 
 interface WebSocketContextType {
   status: BotStatus | null;
   logs: LogEntry[];
   connected: boolean;
   setLogs: React.Dispatch<React.SetStateAction<LogEntry[]>>;
-  systemStatus: any;
-  botUpdates: Map<string, any>;
+  systemStatus: SystemStatus | null;
+  botUpdates: Map<string, BotStatus>;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -25,8 +32,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<BotStatus | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [connected, setConnected] = useState(false);
-  const [systemStatus, setSystemStatus] = useState<any>(null);
-  const [botUpdates, setBotUpdates] = useState<Map<string, any>>(new Map());
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
+  const [botUpdates, setBotUpdates] = useState<Map<string, BotStatus>>(new Map());
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -54,19 +61,19 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
       ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const data = JSON.parse(event.data) as Record<string, unknown>;
+          const type = data.type as string | undefined;
 
-          switch (data.type) {
+          switch (type) {
             case 'bot_update':
             case 'botStatus': {
               // 机器人状态更新
-              const botData = data.data || data.status || data;
+              const payload = (data.data ?? data.status ?? data) as Partial<BotStatus> & { logs?: LogEntry[]; id?: string };
+              const botData = payload.id ? (payload as BotStatus) : null;
               if (!botData) break;
-              if (botData.id) {
-                setBotUpdates(prev => new Map(prev).set(botData.id, botData));
-              }
-              if (botData.logs) {
-                setLogs(botData.logs.slice(0, 100)); // 限制日志最多 100 条
+              setBotUpdates(prev => new Map(prev).set(botData.id, botData));
+              if (Array.isArray(payload.logs)) {
+                setLogs(payload.logs.slice(0, 100)); // 限制日志最多 100 条
               }
               break;
             }
@@ -74,22 +81,26 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
               // 机器人被删除，从 Map 中移除
               setBotUpdates(prev => {
                 const updated = new Map(prev);
-                updated.delete(data.id);
+                if (typeof data.id === 'string') {
+                  updated.delete(data.id);
+                }
                 return updated;
               });
               break;
             case 'system_status':
               // 系统状态更新（内存等）
-              setSystemStatus(data.data);
+              setSystemStatus(data.data as SystemStatus);
               break;
             case 'status':
-              setStatus(data.data);
+              setStatus(data.data as BotStatus);
               break;
             case 'log':
-              setLogs(prev => [...prev.slice(-99), data.data]);
+              setLogs(prev => [...prev.slice(-99), data.data as LogEntry]);
               break;
             case 'logs':
-              setLogs(data.data.slice(0, 100)); // 限制日志最多 100 条
+              if (Array.isArray(data.data)) {
+                setLogs((data.data as LogEntry[]).slice(0, 100)); // 限制日志最多 100 条
+              }
               break;
           }
         } catch (error) {

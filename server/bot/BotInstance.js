@@ -77,12 +77,45 @@ export class BotInstance {
     };
     this.modes = { ...defaultModes, ...(config.modes || {}) };
 
+    this.behaviorSettings = {
+      attack: {
+        whitelist: [],
+        minHealth: 6,
+        ...(config.behaviorSettings?.attack || {})
+      },
+      patrol: {
+        waypoints: Array.isArray(config.behaviorSettings?.patrol?.waypoints)
+          ? config.behaviorSettings.patrol.waypoints
+          : []
+      }
+    };
+
+    this.commandSettings = {
+      allowAll: false,
+      cooldownSeconds: 3,
+      whitelist: [],
+      silentReject: false,
+      ...(config.commandSettings || {})
+    };
+    this.commandCooldowns = new Map();
+
     // 自动喊话配置
     this.autoChatConfig = config.autoChat || {
       enabled: false,
       interval: 60000,
       messages: ['Hello!']
     };
+
+
+    this.usernameSettings = {
+      prefix: typeof config.usernameSettings?.prefix === 'string' ? config.usernameSettings.prefix : '',
+      suffix: typeof config.usernameSettings?.suffix === 'string' ? config.usernameSettings.suffix : '',
+      blacklist: Array.isArray(config.usernameSettings?.blacklist) ? config.usernameSettings.blacklist : [],
+      maxAttempts: Number.isFinite(config.usernameSettings?.maxAttempts) ? Math.max(1, config.usernameSettings.maxAttempts) : 5,
+      retryOnConflict: config.usernameSettings?.retryOnConflict !== false
+    };
+    this.usernameRetryCount = 0;
+    this.nextUsername = null;
 
     this.commands = {
       '!help': this.cmdHelp.bind(this),
@@ -138,10 +171,72 @@ export class BotInstance {
   generateUsername() {
     const adjectives = ['Clever', 'Swift', 'Brave', 'Happy', 'Mighty', 'Wise', 'Quick', 'Sneaky'];
     const animals = ['Fox', 'Wolf', 'Bear', 'Tiger', 'Eagle', 'Panda', 'Otter', 'Raccoon'];
-    const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
-    const animal = animals[Math.floor(Math.random() * animals.length)];
-    const num = Math.floor(Math.random() * 999);
-    return `${adj}${animal}${num}`;
+    const prefix = this.usernameSettings.prefix || '';
+    const suffix = this.usernameSettings.suffix || '';
+
+    for (let i = 0; i < this.usernameSettings.maxAttempts; i++) {
+      const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+      const animal = animals[Math.floor(Math.random() * animals.length)];
+      const secondAdj = adjectives[Math.floor(Math.random() * adjectives.length)];
+      const rawName = `${prefix}${adj}${animal}${secondAdj}${suffix}`;
+      const candidate = this.normalizeUsername(rawName);
+      if (!this.isUsernameBlacklisted(candidate)) {
+        return candidate;
+      }
+    }
+
+    const fallback = `${prefix}Bot${adjectives[Math.floor(Math.random() * adjectives.length)]}${suffix}`;
+    return this.normalizeUsername(fallback);
+  }
+
+  normalizeUsername(rawName) {
+    const cleaned = String(rawName).replace(/[^a-zA-Z0-9_]/g, '');
+    let name = cleaned.slice(0, 16);
+    if (name.length < 3) {
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const pad = letters[Math.floor(Math.random() * letters.length)] +
+        letters[Math.floor(Math.random() * letters.length)] +
+        letters[Math.floor(Math.random() * letters.length)];
+      name = (name + pad).slice(0, 3);
+    }
+    return name;
+  }
+
+
+  isUsernameBlacklisted(name) {
+    const lower = String(name).toLowerCase();
+    return this.usernameSettings.blacklist
+      .map(item => String(item).toLowerCase().trim())
+      .filter(item => item)
+      .some(item => lower.includes(item));
+  }
+
+  shouldRetryWithNewUsername(reason) {
+    if (this.config.username) return false;
+    if (!this.usernameSettings.retryOnConflict) return false;
+    if (!reason) return false;
+    const text = String(reason).toLowerCase();
+    return (
+      text.includes('already') ||
+      text.includes('in use') ||
+      text.includes('logged in') ||
+      text.includes('name') ||
+      text.includes('用户名') ||
+      text.includes('已登录') ||
+      text.includes('已在线') ||
+      text.includes('重复') ||
+      text.includes('重名')
+    );
+  }
+
+  prepareNextUsername(reason) {
+    if (!this.shouldRetryWithNewUsername(reason)) return false;
+    if (this.usernameRetryCount >= this.usernameSettings.maxAttempts) {
+      return false;
+    }
+    this.usernameRetryCount += 1;
+    this.nextUsername = this.generateUsername();
+    return true;
   }
 
   getStatus() {
@@ -240,6 +335,13 @@ export class BotInstance {
     this.status.connected = false;
     this.reconnectAttempts++;
 
+    if (!this.nextUsername) {
+      const prepared = this.prepareNextUsername(reason);
+      if (prepared) {
+        this.log('warning', `用户名冲突，尝试更换为 ${this.nextUsername} 重连`, '🔁');
+      }
+    }
+
     // 计算下一次等待时间 (指数退避)
     // 5s for first attempt, then 10s, 20s... max 60s
     let delaySeconds = 5;
@@ -326,7 +428,8 @@ export class BotInstance {
       throw new Error('未配置服务器地址');
     }
 
-    const username = this.config.username || this.generateUsername();
+    const username = this.config.username || this.nextUsername || this.generateUsername();
+    this.nextUsername = null;
     const version = this.config.version || false;
 
     // Handle Proxy
@@ -372,6 +475,7 @@ export class BotInstance {
           clearTimeout(this.connectionTimeout);
           this.isRepairing = false;
           this.reconnectAttempts = 0;
+          this.usernameRetryCount = 0;
           this.updateActivity();
           this.startActivityMonitor();
 
@@ -399,7 +503,7 @@ export class BotInstance {
           }
 
           // 初始化行为管理器，传递日志函数以便巡逻等行为输出坐标
-          this.behaviors = new BehaviorManager(this.bot, goals, this.log.bind(this));
+          this.behaviors = new BehaviorManager(this.bot, goals, this.log.bind(this), this.handleBehaviorAutoStop.bind(this));
 
           this.log('success', `进入世界 (版本: ${this.bot.version})`, '✓');
 
@@ -455,6 +559,11 @@ export class BotInstance {
           if (this.bot?.entity) {
             this.spawnPosition = this.bot.entity.position.clone();
           }
+          if (this.modes.invincible) {
+            setTimeout(() => {
+              this.applyInvincibleMode();
+            }, 500);
+          }
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
         });
 
@@ -476,6 +585,11 @@ export class BotInstance {
         this.bot.on('playerLeft', (player) => {
           if (this.bot) {
             this.status.players = Object.keys(this.bot.players);
+            if (this.modes.follow && this.behaviors?.follow?.getStatus?.().target === player.username) {
+              this.behaviors.follow.stop();
+              this.modes.follow = false;
+              this.bot.chat('跟随目标离开，停止跟随');
+            }
             if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
           }
         });
@@ -497,11 +611,12 @@ export class BotInstance {
         });
 
         this.bot.on('kicked', (reason) => {
-          this.log('error', `被踢出: ${reason}`, '👢');
+          const reasonText = typeof reason === 'string' ? reason : JSON.stringify(reason);
+          this.log('error', `被踢出: ${reasonText}`, '👢');
           this.status.connected = false;
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
           // 被踢出后重连
-          this.attemptRepair('被踢出');
+          this.attemptRepair(reasonText);
         });
 
         this.bot.on('end', () => {
@@ -578,6 +693,7 @@ export class BotInstance {
     try {
       this.configManager.updateServer(this.id, {
         modes: this.modes,
+        commandSettings: this.commandSettings,
         autoChat: this.autoChatConfig,
         restartTimer: {
           enabled: this.status.restartTimer?.enabled || false,
@@ -588,7 +704,8 @@ export class BotInstance {
         sftp: this.status.sftp || {},
         fileAccessType: this.status.fileAccessType || 'pterodactyl',
         autoOp: this.status.autoOp,
-        autoReconnect: this.status.autoReconnect
+        autoReconnect: this.status.autoReconnect,
+        behaviorSettings: this.behaviorSettings
       });
       this.log('info', '配置已保存', '💾');
     } catch (error) {
@@ -684,6 +801,7 @@ export class BotInstance {
       // 巡逻模式
       if (mode === 'patrol' && this.behaviors) {
         if (enabled) {
+          this.stopConflictingModes('patrol');
           // 使用出生点作为巡逻中心
           if (this.spawnPosition) {
             this.behaviors.patrol.centerPos = this.spawnPosition.clone();
@@ -862,19 +980,20 @@ export class BotInstance {
     if (!this.bot || !this.status.username) return;
 
     const username = this.status.username;
+    const fallbackMode = 'survival';
 
     // 优先尝试通过面板控制台发送命令
     if (this.status.pterodactyl?.url && this.status.pterodactyl?.apiKey) {
-      const result = await this.sendPanelCommand(`gamemode survival ${username}`);
+      const result = await this.sendPanelCommand(`gamemode ${fallbackMode} ${username}`);
       if (result.success) {
-        this.log('success', '无敌模式已关闭 (生存模式 - 通过面板)', '🛡️');
+        this.log('success', `无敌模式已关闭 (${fallbackMode} - 通过面板)`, '🛡️');
         return;
       }
     }
 
     // 回退：通过机器人聊天发送命令
-    this.bot.chat('/gamemode survival');
-    this.log('info', '无敌模式已关闭 (生存模式)', '🛡️');
+    this.bot.chat(`/gamemode ${fallbackMode}`);
+    this.log('info', `无敌模式已关闭 (${fallbackMode})`, '🛡️');
   }
 
   /**
@@ -1336,11 +1455,158 @@ export class BotInstance {
 
     if (this.commands[cmd]) {
       try {
+        if (!this.isCommandAllowed(username)) {
+          if (this.bot && !this.commandSettings.silentReject) {
+            this.bot.chat('你没有权限使用指令');
+          }
+          return;
+        }
+        if (this.isCommandOnCooldown(username, cmd)) {
+          if (this.bot && !this.commandSettings.silentReject) {
+            this.bot.chat('指令冷却中，请稍后再试');
+          }
+          return;
+        }
         await this.commands[cmd](username, args);
       } catch (error) {
         this.log('error', `指令失败: ${error.message}`, '✗');
       }
     }
+  }
+
+  isCommandAllowed(username) {
+    if (this.commandSettings.allowAll) return true;
+    const whitelist = Array.isArray(this.commandSettings.whitelist) ? this.commandSettings.whitelist : [];
+    const lowered = whitelist.map(name => String(name).toLowerCase());
+    return lowered.includes(String(username).toLowerCase());
+  }
+
+  isCommandOnCooldown(username, cmd) {
+    const cooldown = Number(this.commandSettings.cooldownSeconds) || 0;
+    if (cooldown <= 0) return false;
+    const key = `${username}:${cmd}`;
+    const now = Date.now();
+    const last = this.commandCooldowns.get(key) || 0;
+    if (now - last < cooldown * 1000) {
+      return true;
+    }
+    this.commandCooldowns.set(key, now);
+    return false;
+  }
+
+  stopMode(mode) {
+    if (!this.behaviors) return;
+    switch (mode) {
+      case 'follow':
+        this.behaviors.follow.stop();
+        this.modes.follow = false;
+        break;
+      case 'attack':
+        this.behaviors.attack.stop();
+        this.modes.autoAttack = false;
+        break;
+      case 'patrol':
+        this.behaviors.patrol.stop();
+        this.modes.patrol = false;
+        break;
+      case 'mining':
+        this.behaviors.mining.stop();
+        this.modes.mining = false;
+        break;
+      default:
+        return;
+    }
+  }
+
+  stopConflictingModes(target) {
+    const conflicts = {
+      follow: ['patrol', 'mining'],
+      patrol: ['follow', 'mining', 'attack'],
+      mining: ['follow', 'patrol', 'attack'],
+      attack: ['patrol', 'mining']
+    };
+
+    const toStop = conflicts[target] || [];
+    toStop.forEach(mode => {
+      if (mode === 'follow' && this.modes.follow) this.stopMode('follow');
+      if (mode === 'patrol' && this.modes.patrol) this.stopMode('patrol');
+      if (mode === 'mining' && this.modes.mining) this.stopMode('mining');
+      if (mode === 'attack' && this.modes.autoAttack) this.stopMode('attack');
+    });
+  }
+
+  handleBehaviorAutoStop(behavior, reason) {
+    const messages = {
+      follow: { target_lost: '跟随目标已离开，自动停止跟随' },
+      attack: { low_health: '生命值过低，自动停止攻击' },
+      mining: { inventory_full: '背包已满，自动停止挖矿' }
+    };
+
+    if (behavior === 'follow') this.modes.follow = false;
+    if (behavior === 'attack') this.modes.autoAttack = false;
+    if (behavior === 'mining') this.modes.mining = false;
+
+    const msg = messages[behavior]?.[reason];
+    if (msg && this.bot) {
+      this.bot.chat(msg);
+    }
+    if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+  }
+
+  updateBehaviorSettings(settings = {}) {
+    const next = {
+      attack: { ...(this.behaviorSettings.attack || {}) },
+      patrol: { ...(this.behaviorSettings.patrol || {}) }
+    };
+
+    if (settings.attack) {
+      if (Array.isArray(settings.attack.whitelist)) {
+        next.attack.whitelist = settings.attack.whitelist
+          .map(name => String(name).trim())
+          .filter(name => name);
+      }
+      if (settings.attack.minHealth !== undefined) {
+        const minHealth = Number(settings.attack.minHealth);
+        if (!Number.isNaN(minHealth) && minHealth >= 0) {
+          next.attack.minHealth = minHealth;
+        }
+      }
+    }
+
+    if (settings.patrol) {
+      if (Array.isArray(settings.patrol.waypoints)) {
+        next.patrol.waypoints = settings.patrol.waypoints
+          .map(point => ({
+            x: Number(point.x),
+            y: Number(point.y),
+            z: Number(point.z)
+          }))
+          .filter(point => !Number.isNaN(point.x) && !Number.isNaN(point.y) && !Number.isNaN(point.z));
+      }
+    }
+
+    this.behaviorSettings = next;
+    this.saveConfig();
+    return this.behaviorSettings;
+  }
+
+  updateCommandSettings(settings = {}) {
+    const next = {
+      allowAll: !!settings.allowAll,
+      cooldownSeconds: Number.isFinite(settings.cooldownSeconds)
+        ? Math.max(0, settings.cooldownSeconds)
+        : this.commandSettings.cooldownSeconds,
+      whitelist: Array.isArray(settings.whitelist)
+        ? settings.whitelist.map(name => String(name).trim()).filter(Boolean)
+        : this.commandSettings.whitelist,
+      silentReject: typeof settings.silentReject === 'boolean'
+        ? settings.silentReject
+        : this.commandSettings.silentReject
+    };
+
+    this.commandSettings = next;
+    this.saveConfig();
+    return this.commandSettings;
   }
 
   cmdHelp() {
@@ -1384,6 +1650,7 @@ export class BotInstance {
       this.modes.follow = false;
       this.bot.chat('停止跟随');
     } else {
+      this.stopConflictingModes('follow');
       const result = this.behaviors.follow.start(targetName);
       if (result.success) {
         this.modes.follow = true;
@@ -1423,8 +1690,9 @@ export class BotInstance {
       this.modes.autoAttack = false;
       this.bot.chat('停止攻击');
     } else {
+      this.stopConflictingModes('attack');
       const mode = args[0] || 'hostile';
-      const result = this.behaviors.attack.start(mode);
+      const result = this.behaviors.attack.start(mode, this.behaviorSettings.attack || {});
       this.modes.autoAttack = true;
       this.bot.chat(result.message);
     }
@@ -1439,9 +1707,16 @@ export class BotInstance {
       this.modes.patrol = false;
       this.bot.chat('停止巡逻');
     } else {
-      const result = this.behaviors.patrol.start();
-      this.modes.patrol = true;
-      this.bot.chat(result.message);
+      this.stopConflictingModes('patrol');
+      const waypoints = this.behaviorSettings.patrol?.waypoints || null;
+      const result = this.behaviors.patrol.start(waypoints);
+      if (result.success) {
+        this.modes.patrol = true;
+        this.bot.chat(result.message);
+      } else {
+        this.modes.patrol = false;
+        this.bot.chat(`巡逻启动失败: ${result.message || '未知错误'}`);
+      }
     }
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
   }
@@ -1470,6 +1745,7 @@ export class BotInstance {
       this.modes.mining = false;
       this.bot.chat('停止挖矿');
     } else {
+      this.stopConflictingModes('mining');
       const result = this.behaviors.mining.start();
       this.modes.mining = true;
       this.bot.chat(result.message);
@@ -1512,7 +1788,8 @@ export class BotInstance {
     switch (behavior) {
       case 'follow':
         if (enabled) {
-          result = this.behaviors.follow.start(options.target);
+          this.stopConflictingModes('follow');
+          result = this.behaviors.follow.start(options.target, options);
           this.modes.follow = result.success;
         } else {
           result = this.behaviors.follow.stop();
@@ -1521,7 +1798,9 @@ export class BotInstance {
         break;
       case 'attack':
         if (enabled) {
-          result = this.behaviors.attack.start(options.mode || 'hostile');
+          this.stopConflictingModes('attack');
+          const attackOptions = { ...(this.behaviorSettings.attack || {}), ...(options || {}) };
+          result = this.behaviors.attack.start(options.mode || 'hostile', attackOptions);
           this.modes.autoAttack = true;
         } else {
           result = this.behaviors.attack.stop();
@@ -1530,7 +1809,9 @@ export class BotInstance {
         break;
       case 'patrol':
         if (enabled) {
-          result = this.behaviors.patrol.start(options.waypoints);
+          this.stopConflictingModes('patrol');
+          const patrolOptions = { ...(this.behaviorSettings.patrol || {}), ...(options || {}) };
+          result = this.behaviors.patrol.start(patrolOptions.waypoints);
           this.modes.patrol = true;
         } else {
           result = this.behaviors.patrol.stop();
@@ -1539,7 +1820,8 @@ export class BotInstance {
         break;
       case 'mining':
         if (enabled) {
-          result = this.behaviors.mining.start(options.blocks);
+          this.stopConflictingModes('mining');
+          result = this.behaviors.mining.start(options.blocks, options);
           this.modes.mining = true;
         } else {
           result = this.behaviors.mining.stop();

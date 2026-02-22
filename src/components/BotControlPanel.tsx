@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   UserPlus,
   Sword,
@@ -94,6 +94,49 @@ interface BotControlPanelProps {
   onUpdate?: () => void;
 }
 
+interface BehaviorStatus {
+  follow?: {
+    active: boolean;
+    target: string | null;
+    minDistance?: number;
+    maxDistance?: number;
+    lostTicks?: number;
+  };
+  attack?: {
+    active: boolean;
+    mode?: string;
+    range?: number;
+    minHealth?: number;
+    whitelistCount?: number;
+    lastTarget?: string | null;
+  };
+  patrol?: {
+    active: boolean;
+    isMoving?: boolean;
+    radius?: number;
+    waypointsCount?: number;
+    nextWaypointIndex?: number | null;
+    centerPos?: { x: number; y: number; z: number } | null;
+  };
+  mining?: {
+    active: boolean;
+    targetBlocks?: string[];
+    range?: number;
+    stopOnFull?: boolean;
+    minEmptySlots?: number;
+    lastTargetBlock?: string | null;
+  };
+  action?: {
+    looping?: boolean;
+    actionsCount?: number;
+  };
+  aiView?: {
+    active: boolean;
+    range?: number;
+    lastTarget?: string | null;
+  };
+}
+
 export function BotControlPanel({
   botId,
   botName,
@@ -130,6 +173,11 @@ export function BotControlPanel({
   const [panelUrl, setPanelUrl] = useState(pterodactyl?.url || "");
   const [panelApiKey, setPanelApiKey] = useState(pterodactyl?.apiKey || "");
   const [panelServerId, setPanelServerId] = useState(pterodactyl?.serverId || "");
+  const [attackWhitelistText, setAttackWhitelistText] = useState<string>("");
+  const [attackMinHealth, setAttackMinHealth] = useState<string>("6");
+  const [patrolWaypointsText, setPatrolWaypointsText] = useState<string>("");
+  const [behaviorStatus, setBehaviorStatus] = useState<BehaviorStatus | null>(null);
+  const [behaviorLoading, setBehaviorLoading] = useState(false);
 
   // SFTP 配置状态
   const [sftpHost, setSftpHost] = useState(sftpProp?.host || "");
@@ -138,6 +186,26 @@ export function BotControlPanel({
   const [sftpPassword, setSftpPassword] = useState(sftpProp?.password || "");
   const [sftpBasePath, setSftpBasePath] = useState(sftpProp?.basePath || "/");
   const [fileAccessType, setFileAccessType] = useState<'pterodactyl' | 'sftp' | 'none'>(fileAccessTypeProp);
+
+  const fetchBehaviorStatus = useCallback(async () => {
+    if (!connected) return;
+    setBehaviorLoading(true);
+    try {
+      const result = await api.getBehaviors(botId) as { behaviors?: BehaviorStatus | null };
+      setBehaviorStatus(result.behaviors || null);
+    } catch (error) {
+      console.error("Failed to fetch behavior status:", error);
+    } finally {
+      setBehaviorLoading(false);
+    }
+  }, [botId, connected]);
+
+  useEffect(() => {
+    if (!connected || !isOpen) return;
+    fetchBehaviorStatus();
+    const intervalId = window.setInterval(fetchBehaviorStatus, 3000);
+    return () => window.clearInterval(intervalId);
+  }, [connected, isOpen, fetchBehaviorStatus]);
 
   // 打开设置对话框时获取最新配置
   const handleOpenSettings = async () => {
@@ -161,6 +229,16 @@ export function BotControlPanel({
         setSftpPassword(cfg.sftp?.password || "");
         setSftpBasePath(cfg.sftp?.basePath || "/");
         setFileAccessType(cfg.fileAccessType || 'pterodactyl');
+        setAttackWhitelistText((cfg.behaviorSettings?.attack?.whitelist || []).join("\n"));
+        setAttackMinHealth(
+          cfg.behaviorSettings?.attack?.minHealth !== undefined
+            ? String(cfg.behaviorSettings.attack.minHealth)
+            : "6"
+        );
+        const waypoints = cfg.behaviorSettings?.patrol?.waypoints || [];
+        setPatrolWaypointsText(
+          waypoints.map((point: { x: number; y: number; z: number }) => `${point.x} ${point.y} ${point.z}`).join("\n")
+        );
       }
     } catch (error) {
       console.error("Failed to load bot config:", error);
@@ -204,6 +282,21 @@ export function BotControlPanel({
     } finally {
       setLoading(null);
     }
+  };
+
+  const formatPos = (pos?: { x: number; y: number; z: number } | null) => {
+    if (!pos) return "未知";
+    return `${pos.x} ${pos.y} ${pos.z}`;
+  };
+
+  const formatValue = (value: string | number | null | undefined, fallback = "无") => {
+    if (value === null || value === undefined || value === "") return fallback;
+    return String(value);
+  };
+
+  const formatList = (items?: string[]) => {
+    if (!items || items.length === 0) return "无";
+    return items.join(", ");
   };
 
   const handleStopAll = async () => {
@@ -289,6 +382,50 @@ export function BotControlPanel({
         messages
       });
       toast({ title: "自动喊话配置已保存" });
+      onUpdate?.();
+    } catch (error) {
+      toast({ title: "错误", description: String(error), variant: "destructive" });
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const parseWaypoints = (raw: string): { x: number; y: number; z: number }[] => {
+    return raw
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line)
+      .map(line => line.replace(/,/g, " ").split(/\s+/))
+      .filter(parts => parts.length >= 3)
+      .map(parts => ({
+        x: Number(parts[0]),
+        y: Number(parts[1]),
+        z: Number(parts[2])
+      }))
+      .filter(point => !Number.isNaN(point.x) && !Number.isNaN(point.y) && !Number.isNaN(point.z));
+  };
+
+  const handleSaveBehaviorSettings = async () => {
+    setLoading("behavior");
+    try {
+      const whitelist = attackWhitelistText
+        .split("\n")
+        .map(name => name.trim())
+        .filter(name => name);
+      const minHealth = Number(attackMinHealth);
+      const waypoints = parseWaypoints(patrolWaypointsText);
+
+      await api.setBehaviorSettings(botId, {
+        attack: {
+          whitelist,
+          minHealth: Number.isNaN(minHealth) ? 6 : minHealth
+        },
+        patrol: {
+          waypoints
+        }
+      });
+
+      toast({ title: "行为设置已保存" });
       onUpdate?.();
     } catch (error) {
       toast({ title: "错误", description: String(error), variant: "destructive" });
@@ -483,9 +620,10 @@ export function BotControlPanel({
               <DialogDescription>配置此服务器的独立设置</DialogDescription>
             </DialogHeader>
             <Tabs defaultValue="restart" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="restart">定时重启</TabsTrigger>
                 <TabsTrigger value="chat">自动喊话</TabsTrigger>
+                <TabsTrigger value="behavior">行为设置</TabsTrigger>
                 <TabsTrigger value="panel">翼龙面板</TabsTrigger>
                 <TabsTrigger value="sftp">SFTP</TabsTrigger>
               </TabsList>
@@ -566,6 +704,55 @@ export function BotControlPanel({
                 >
                   {loading === "autoChat" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                   保存自动喊话设置
+                </Button>
+              </TabsContent>
+
+              {/* 行为设置 */}
+              <TabsContent value="behavior" className="space-y-4 h-[60vh] overflow-y-auto pr-2">
+                <div className="space-y-2">
+                  <Label>攻击白名单 (每行一个玩家名)</Label>
+                  <Textarea
+                    value={attackWhitelistText}
+                    onChange={(e) => setAttackWhitelistText(e.target.value)}
+                    placeholder="friend1\nfriend2"
+                    rows={4}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    白名单中的玩家不会被自动攻击。
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>攻击最低生命值</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={attackMinHealth}
+                    onChange={(e) => setAttackMinHealth(e.target.value)}
+                    placeholder="6"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    低于该生命值自动停止攻击。
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label>巡逻路径点 (每行 x y z)</Label>
+                  <Textarea
+                    value={patrolWaypointsText}
+                    onChange={(e) => setPatrolWaypointsText(e.target.value)}
+                    placeholder="0 64 0\n10 64 10"
+                    rows={4}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    留空时使用随机巡逻，填入后按路径点循环。
+                  </p>
+                </div>
+                <Button
+                  onClick={handleSaveBehaviorSettings}
+                  disabled={loading === "behavior"}
+                  className="w-full"
+                >
+                  {loading === "behavior" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                  保存行为设置
                 </Button>
               </TabsContent>
 
@@ -881,6 +1068,36 @@ export function BotControlPanel({
                 >
                   {loading === "stop" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4" />}
                 </Button>
+              </div>
+
+              <div className="rounded-md border p-2 text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">行为状态</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={fetchBehaviorStatus}
+                    disabled={behaviorLoading}
+                    className="h-6 px-2 text-xs"
+                  >
+                    {behaviorLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RotateCcw className="h-3 w-3 mr-1" />}
+                    刷新
+                  </Button>
+                </div>
+                {!behaviorStatus ? (
+                  <p className="text-muted-foreground">暂无行为状态</p>
+                ) : (
+                  <div className="space-y-1">
+                    <div>跟随: {behaviorStatus.follow?.active ? `目标 ${formatValue(behaviorStatus.follow.target)} | 距离 ${formatValue(behaviorStatus.follow.minDistance)}-${formatValue(behaviorStatus.follow.maxDistance)} | 丢失 ${formatValue(behaviorStatus.follow.lostTicks)}` : "未开启"}</div>
+                    <div>攻击: {behaviorStatus.attack?.active ? `模式 ${formatValue(behaviorStatus.attack.mode)} | 范围 ${formatValue(behaviorStatus.attack.range)} | 血线 ${formatValue(behaviorStatus.attack.minHealth)} | 白名单 ${formatValue(behaviorStatus.attack.whitelistCount)} | 目标 ${formatValue(behaviorStatus.attack.lastTarget)}` : "未开启"}</div>
+                    <div>巡逻: {behaviorStatus.patrol?.active ? `移动中 ${behaviorStatus.patrol.isMoving ? "是" : "否"} | 半径 ${formatValue(behaviorStatus.patrol.radius)} | 路径点 ${formatValue(behaviorStatus.patrol.waypointsCount)} | 下一个 ${formatValue(behaviorStatus.patrol.nextWaypointIndex)}` : "未开启"}</div>
+                    <div>巡逻中心: {formatPos(behaviorStatus.patrol?.centerPos)}</div>
+                    <div>挖矿: {behaviorStatus.mining?.active ? `范围 ${formatValue(behaviorStatus.mining.range)} | 停满 ${behaviorStatus.mining.stopOnFull ? "是" : "否"} | 空位 ${formatValue(behaviorStatus.mining.minEmptySlots)} | 目标 ${formatValue(behaviorStatus.mining.lastTargetBlock)}` : "未开启"}</div>
+                    <div>挖矿目标: {formatList(behaviorStatus.mining?.targetBlocks)}</div>
+                    <div>AI视角: {behaviorStatus.aiView?.active ? `范围 ${formatValue(behaviorStatus.aiView.range)} | 目标 ${formatValue(behaviorStatus.aiView.lastTarget)}` : "未开启"}</div>
+                    <div>动作: {behaviorStatus.action?.looping ? `循环中 | 动作数 ${formatValue(behaviorStatus.action.actionsCount)}` : "未开启"}</div>
+                  </div>
+                )}
               </div>
             </CollapsibleContent>
           </Collapsible>

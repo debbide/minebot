@@ -803,6 +803,40 @@ app.post('/api/bots/:id/restart-timer', (req, res) => {
   }
 });
 
+// Update behavior settings for a specific bot
+app.post('/api/bots/:id/behavior-settings', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    if (typeof bot.updateBehaviorSettings !== 'function') {
+      return res.status(400).json({ success: false, error: 'Bot does not support behavior settings' });
+    }
+    const result = bot.updateBehaviorSettings(req.body || {});
+    res.json({ success: true, behaviorSettings: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Update command settings for a specific bot
+app.post('/api/bots/:id/command-settings', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    if (typeof bot.updateCommandSettings !== 'function') {
+      return res.status(400).json({ success: false, error: 'Bot does not support command settings' });
+    }
+    const result = bot.updateCommandSettings(req.body || {});
+    res.json({ success: true, commandSettings: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Send /restart command immediately
 app.post('/api/bots/:id/restart-command', (req, res) => {
   try {
@@ -993,7 +1027,9 @@ app.get('/api/bots/:id/config', (req, res) => {
         pterodactyl: bot.status.pterodactyl,
         sftp: bot.status.sftp,
         fileAccessType: bot.status.fileAccessType,
-        autoOp: bot.status.autoOp
+        autoOp: bot.status.autoOp,
+        behaviorSettings: bot.behaviorSettings || null,
+        commandSettings: bot.commandSettings || null
       }
     });
   } catch (error) {

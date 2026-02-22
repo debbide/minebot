@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
     Loader2,
     RotateCcw,
@@ -57,6 +57,49 @@ interface BotSettingsPanelProps {
     onUpdate?: () => void;
 }
 
+interface BehaviorStatus {
+    follow?: {
+        active: boolean;
+        target: string | null;
+        minDistance?: number;
+        maxDistance?: number;
+        lostTicks?: number;
+    };
+    attack?: {
+        active: boolean;
+        mode?: string;
+        range?: number;
+        minHealth?: number;
+        whitelistCount?: number;
+        lastTarget?: string | null;
+    };
+    patrol?: {
+        active: boolean;
+        isMoving?: boolean;
+        radius?: number;
+        waypointsCount?: number;
+        nextWaypointIndex?: number | null;
+        centerPos?: { x: number; y: number; z: number } | null;
+    };
+    mining?: {
+        active: boolean;
+        targetBlocks?: string[];
+        range?: number;
+        stopOnFull?: boolean;
+        minEmptySlots?: number;
+        lastTargetBlock?: string | null;
+    };
+    action?: {
+        looping?: boolean;
+        actionsCount?: number;
+    };
+    aiView?: {
+        active: boolean;
+        range?: number;
+        lastTarget?: string | null;
+    };
+}
+
 export function BotSettingsPanel({
     botId,
     restartTimer,
@@ -90,6 +133,16 @@ export function BotSettingsPanel({
     const [autoRestartEnabled, setAutoRestartEnabled] = useState(pterodactyl?.autoRestart?.enabled || false);
     const [maxRetries, setMaxRetries] = useState(pterodactyl?.autoRestart?.maxRetries || 3);
 
+    const [attackWhitelistText, setAttackWhitelistText] = useState<string>("");
+    const [attackMinHealth, setAttackMinHealth] = useState<string>("6");
+    const [patrolWaypointsText, setPatrolWaypointsText] = useState<string>("");
+    const [commandAllowAll, setCommandAllowAll] = useState<boolean>(false);
+    const [commandCooldownSeconds, setCommandCooldownSeconds] = useState<string>("3");
+    const [commandWhitelistText, setCommandWhitelistText] = useState<string>("");
+    const [commandSilentReject, setCommandSilentReject] = useState<boolean>(false);
+    const [behaviorStatus, setBehaviorStatus] = useState<BehaviorStatus | null>(null);
+    const [behaviorLoading, setBehaviorLoading] = useState(false);
+
     const [sftpHost, setSftpHost] = useState(sftpProp?.host || "");
     const [sftpPort, setSftpPort] = useState<string>((sftpProp?.port || 22).toString());
     const [sftpUsername, setSftpUsername] = useState(sftpProp?.username || "");
@@ -99,6 +152,18 @@ export function BotSettingsPanel({
     const [proxyNodeId, setProxyNodeId] = useState(proxyNodeIdProp || "");
     const [autoReconnect, setAutoReconnect] = useState(autoReconnectProp);
     const [proxyNodes, setProxyNodes] = useState<ProxyNode[]>([]);
+
+    const fetchBehaviorStatus = useCallback(async () => {
+        setBehaviorLoading(true);
+        try {
+            const result = await api.getBehaviors(botId) as { behaviors?: BehaviorStatus | null };
+            setBehaviorStatus(result.behaviors || null);
+        } catch (error) {
+            console.error("Failed to fetch behavior status:", error);
+        } finally {
+            setBehaviorLoading(false);
+        }
+    }, [botId]);
 
     // Sync state when props change
     useEffect(() => {
@@ -124,10 +189,46 @@ export function BotSettingsPanel({
         setAutoReconnect(autoReconnectProp);
     }, [botId, restartTimer, autoChatProp, pterodactyl, sftpProp, fileAccessTypeProp, proxyNodeIdProp, autoReconnectProp]);
 
+    useEffect(() => {
+        let active = true;
+        api.getBotConfig(botId)
+            .then(result => {
+                if (!active || !result?.config) return;
+                const settings = result.config.behaviorSettings || {};
+                setAttackWhitelistText((settings.attack?.whitelist || []).join("\n"));
+                setAttackMinHealth(
+                    settings.attack?.minHealth !== undefined
+                        ? String(settings.attack.minHealth)
+                        : "6"
+                );
+                const waypoints = settings.patrol?.waypoints || [];
+                setPatrolWaypointsText(
+                    waypoints.map(point => `${point.x} ${point.y} ${point.z}`).join("\n")
+                );
+                const cmdSettings = result.config.commandSettings || {};
+                setCommandAllowAll(!!cmdSettings.allowAll);
+                setCommandCooldownSeconds(
+                    cmdSettings.cooldownSeconds !== undefined
+                        ? String(cmdSettings.cooldownSeconds)
+                        : "3"
+                );
+                setCommandWhitelistText((cmdSettings.whitelist || []).join("\n"));
+                setCommandSilentReject(!!cmdSettings.silentReject);
+            })
+            .catch(() => {});
+        return () => {
+            active = false;
+        };
+    }, [botId]);
+
     // Load proxy nodes once
     useEffect(() => {
         api.getProxyNodes().then(setProxyNodes).catch(console.error);
     }, []);
+
+    useEffect(() => {
+        fetchBehaviorStatus();
+    }, [fetchBehaviorStatus]);
 
     // Handlers
     const handleSaveRestartTimer = async () => {
@@ -309,11 +410,95 @@ export function BotSettingsPanel({
         }
     };
 
+    const parseWaypoints = (raw: string): { x: number; y: number; z: number }[] => {
+        return raw
+            .split("\n")
+            .map(line => line.trim())
+            .filter(line => line)
+            .map(line => line.replace(/,/g, " ").split(/\s+/))
+            .filter(parts => parts.length >= 3)
+            .map(parts => ({
+                x: Number(parts[0]),
+                y: Number(parts[1]),
+                z: Number(parts[2])
+            }))
+            .filter(point => !Number.isNaN(point.x) && !Number.isNaN(point.y) && !Number.isNaN(point.z));
+    };
+
+    const handleSaveBehaviorSettings = async () => {
+        setLoading("behavior");
+        try {
+            const whitelist = attackWhitelistText
+                .split("\n")
+                .map(name => name.trim())
+                .filter(name => name);
+            const minHealth = Number(attackMinHealth);
+            const waypoints = parseWaypoints(patrolWaypointsText);
+
+            await api.setBehaviorSettings(botId, {
+                attack: {
+                    whitelist,
+                    minHealth: Number.isNaN(minHealth) ? 6 : minHealth
+                },
+                patrol: {
+                    waypoints
+                }
+            });
+
+            toast({ title: "行为设置已保存" });
+            onUpdate?.();
+        } catch (error) {
+            toast({ title: "错误", description: String(error), variant: "destructive" });
+        } finally {
+            setLoading(null);
+        }
+    };
+
+    const handleSaveCommandSettings = async () => {
+        setLoading("command");
+        try {
+            const whitelist = commandWhitelistText
+                .split("\n")
+                .map(name => name.trim())
+                .filter(name => name);
+            const cooldownSeconds = Number(commandCooldownSeconds);
+            await api.setCommandSettings(botId, {
+                allowAll: commandAllowAll,
+                cooldownSeconds: Number.isNaN(cooldownSeconds) ? 3 : cooldownSeconds,
+                whitelist,
+                silentReject: commandSilentReject
+            });
+            toast({ title: "指令设置已保存" });
+            onUpdate?.();
+        } catch (error) {
+            toast({ title: "错误", description: String(error), variant: "destructive" });
+        } finally {
+            setLoading(null);
+        }
+    };
+
+    const formatPos = (pos?: { x: number; y: number; z: number } | null) => {
+        if (!pos) return "未知";
+        return `${pos.x} ${pos.y} ${pos.z}`;
+    };
+
+    const formatValue = (value: string | number | null | undefined, fallback = "无") => {
+        if (value === null || value === undefined || value === "") return fallback;
+        return String(value);
+    };
+
+    const formatList = (items?: string[]) => {
+        if (!items || items.length === 0) return "无";
+        return items.join(", ");
+    };
+
     return (
         <Tabs defaultValue="restart" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-7">
                 <TabsTrigger value="restart">通用</TabsTrigger>
                 <TabsTrigger value="chat">喊话</TabsTrigger>
+                <TabsTrigger value="behavior">行为</TabsTrigger>
+                <TabsTrigger value="command">指令</TabsTrigger>
                 <TabsTrigger value="network">网络</TabsTrigger>
                 <TabsTrigger value="panel">面板</TabsTrigger>
                 <TabsTrigger value="sftp">SFTP</TabsTrigger>
@@ -448,6 +633,134 @@ export function BotSettingsPanel({
                 >
                     {loading === "autoChat" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                     保存自动喊话设置
+                </Button>
+            </TabsContent>
+
+            <TabsContent value="behavior" className="space-y-4 pt-4">
+                <div className="rounded-md border p-3 text-xs space-y-2">
+                    <div className="flex items-center justify-between">
+                        <span className="font-medium">行为状态</span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={fetchBehaviorStatus}
+                            disabled={behaviorLoading}
+                            className="h-6 px-2 text-xs"
+                        >
+                            {behaviorLoading ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RotateCcw className="h-3 w-3 mr-1" />}
+                            刷新
+                        </Button>
+                    </div>
+                    {!behaviorStatus ? (
+                        <p className="text-muted-foreground">暂无行为状态</p>
+                    ) : (
+                        <div className="space-y-1">
+                            <div>跟随: {behaviorStatus.follow?.active ? `目标 ${formatValue(behaviorStatus.follow.target)} | 距离 ${formatValue(behaviorStatus.follow.minDistance)}-${formatValue(behaviorStatus.follow.maxDistance)} | 丢失 ${formatValue(behaviorStatus.follow.lostTicks)}` : "未开启"}</div>
+                            <div>攻击: {behaviorStatus.attack?.active ? `模式 ${formatValue(behaviorStatus.attack.mode)} | 范围 ${formatValue(behaviorStatus.attack.range)} | 血线 ${formatValue(behaviorStatus.attack.minHealth)} | 白名单 ${formatValue(behaviorStatus.attack.whitelistCount)} | 目标 ${formatValue(behaviorStatus.attack.lastTarget)}` : "未开启"}</div>
+                            <div>巡逻: {behaviorStatus.patrol?.active ? `移动中 ${behaviorStatus.patrol.isMoving ? "是" : "否"} | 半径 ${formatValue(behaviorStatus.patrol.radius)} | 路径点 ${formatValue(behaviorStatus.patrol.waypointsCount)} | 下一个 ${formatValue(behaviorStatus.patrol.nextWaypointIndex)}` : "未开启"}</div>
+                            <div>巡逻中心: {formatPos(behaviorStatus.patrol?.centerPos)}</div>
+                            <div>挖矿: {behaviorStatus.mining?.active ? `范围 ${formatValue(behaviorStatus.mining.range)} | 停满 ${behaviorStatus.mining.stopOnFull ? "是" : "否"} | 空位 ${formatValue(behaviorStatus.mining.minEmptySlots)} | 目标 ${formatValue(behaviorStatus.mining.lastTargetBlock)}` : "未开启"}</div>
+                            <div>挖矿目标: {formatList(behaviorStatus.mining?.targetBlocks)}</div>
+                            <div>AI视角: {behaviorStatus.aiView?.active ? `范围 ${formatValue(behaviorStatus.aiView.range)} | 目标 ${formatValue(behaviorStatus.aiView.lastTarget)}` : "未开启"}</div>
+                            <div>动作: {behaviorStatus.action?.looping ? `循环中 | 动作数 ${formatValue(behaviorStatus.action.actionsCount)}` : "未开启"}</div>
+                        </div>
+                    )}
+                </div>
+                <div className="space-y-2">
+                    <Label>攻击白名单 (每行一个玩家名)</Label>
+                    <Textarea
+                        value={attackWhitelistText}
+                        onChange={(e) => setAttackWhitelistText(e.target.value)}
+                        placeholder="friend1\nfriend2"
+                        rows={4}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        白名单中的玩家不会被自动攻击。
+                    </p>
+                </div>
+                <div className="space-y-2">
+                    <Label>攻击最低生命值</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={attackMinHealth}
+                        onChange={(e) => setAttackMinHealth(e.target.value)}
+                        placeholder="6"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        低于该生命值自动停止攻击。
+                    </p>
+                </div>
+                <div className="space-y-2">
+                    <Label>巡逻路径点 (每行 x y z)</Label>
+                    <Textarea
+                        value={patrolWaypointsText}
+                        onChange={(e) => setPatrolWaypointsText(e.target.value)}
+                        placeholder="0 64 0\n10 64 10"
+                        rows={4}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        留空时使用随机巡逻，填入后按路径点循环。
+                    </p>
+                </div>
+                <Button
+                    onClick={handleSaveBehaviorSettings}
+                    disabled={loading === "behavior"}
+                    className="w-full"
+                >
+                    {loading === "behavior" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                    保存行为设置
+                </Button>
+            </TabsContent>
+
+            <TabsContent value="command" className="space-y-4 pt-4">
+                <div className="flex items-center justify-between">
+                    <Label>允许所有玩家使用指令</Label>
+                    <Switch
+                        checked={commandAllowAll}
+                        onCheckedChange={setCommandAllowAll}
+                    />
+                </div>
+                <div className="flex items-center justify-between">
+                    <Label>静默拒绝</Label>
+                    <Switch
+                        checked={commandSilentReject}
+                        onCheckedChange={setCommandSilentReject}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>指令白名单 (每行一个玩家名)</Label>
+                    <Textarea
+                        value={commandWhitelistText}
+                        onChange={(e) => setCommandWhitelistText(e.target.value)}
+                        placeholder="friend1\nfriend2"
+                        rows={4}
+                        disabled={commandAllowAll}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        关闭“允许所有”时，仅白名单玩家可用指令。忽略大小写。
+                    </p>
+                </div>
+                <div className="space-y-2">
+                    <Label>指令冷却 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={commandCooldownSeconds}
+                        onChange={(e) => setCommandCooldownSeconds(e.target.value)}
+                        placeholder="3"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        设为 0 关闭冷却。
+                    </p>
+                </div>
+                <Button
+                    onClick={handleSaveCommandSettings}
+                    disabled={loading === "command"}
+                    className="w-full"
+                >
+                    {loading === "command" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                    保存指令设置
                 </Button>
             </TabsContent>
 

@@ -7,15 +7,21 @@
  * 跟随行为
  */
 export class FollowBehavior {
-  constructor(bot, goals) {
+  constructor(bot, goals, logFn = null, onAutoStop = null) {
     this.bot = bot;
     this.goals = goals;
+    this.log = logFn;
+    this.onAutoStop = onAutoStop;
     this.target = null;
     this.active = false;
     this.interval = null;
+    this.minDistance = 2;
+    this.maxDistance = 6;
+    this.lostTicks = 0;
+    this.lostLimit = 5;
   }
 
-  start(playerName) {
+  start(playerName, options = {}) {
     const player = this.bot.players[playerName];
     if (!player?.entity) {
       return { success: false, message: '找不到玩家' };
@@ -23,6 +29,12 @@ export class FollowBehavior {
 
     this.target = playerName;
     this.active = true;
+    this.lostTicks = 0;
+    this.minDistance = typeof options.minDistance === 'number' ? options.minDistance : 2;
+    this.maxDistance = typeof options.maxDistance === 'number' ? options.maxDistance : 6;
+    if (this.maxDistance < this.minDistance) {
+      this.maxDistance = this.minDistance;
+    }
 
     // 持续跟随
     this.interval = setInterval(() => {
@@ -33,17 +45,52 @@ export class FollowBehavior {
 
       const target = this.bot.players[this.target];
       if (target?.entity) {
-        const goal = new this.goals.GoalFollow(target.entity, 2);
+        this.lostTicks = 0;
+        if (!this.bot.entity) return;
+        const distance = this.bot.entity.position.distanceTo(target.entity.position);
+        if (distance <= this.minDistance) {
+          if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+          return;
+        }
+        if (distance <= this.maxDistance) {
+          return;
+        }
+        const goal = new this.goals.GoalFollow(target.entity, this.minDistance);
         this.bot.pathfinder.setGoal(goal, true);
+      } else {
+        this.lostTicks += 1;
+        if (this.lostTicks >= this.lostLimit) {
+          this.autoStop('target_lost');
+        }
       }
     }, 1000);
 
     return { success: true, message: `开始跟随 ${playerName}` };
   }
 
+  autoStop(reason = 'unknown') {
+    this.active = false;
+    this.target = null;
+    this.lostTicks = 0;
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+    if (this.bot?.pathfinder) {
+      this.bot.pathfinder.stop();
+    }
+    if (this.log && reason === 'target_lost') {
+      this.log('warning', '跟随目标离开，自动停止跟随', '👣');
+    }
+    if (this.onAutoStop) {
+      this.onAutoStop('follow', reason);
+    }
+  }
+
   stop() {
     this.active = false;
     this.target = null;
+    this.lostTicks = 0;
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
@@ -57,7 +104,10 @@ export class FollowBehavior {
   getStatus() {
     return {
       active: this.active,
-      target: this.target
+      target: this.target,
+      minDistance: this.minDistance,
+      maxDistance: this.maxDistance,
+      lostTicks: this.lostTicks
     };
   }
 }
@@ -66,22 +116,39 @@ export class FollowBehavior {
  * 攻击行为
  */
 export class AttackBehavior {
-  constructor(bot, goals) {
+  constructor(bot, goals, logFn = null, onAutoStop = null) {
     this.bot = bot;
     this.goals = goals;
+    this.log = logFn;
+    this.onAutoStop = onAutoStop;
     this.active = false;
     this.mode = 'hostile'; // hostile, all, player
     this.interval = null;
     this.range = 4;
+    this.whitelist = [];
+    this.minHealth = 6;
+    this.lastTarget = null;
   }
 
-  start(mode = 'hostile') {
+  start(mode = 'hostile', options = {}) {
     this.mode = mode;
     this.active = true;
+    this.range = typeof options.range === 'number' ? options.range : this.range;
+    if (Array.isArray(options.whitelist)) {
+      this.whitelist = options.whitelist;
+    }
+    if (typeof options.minHealth === 'number') {
+      this.minHealth = options.minHealth;
+    }
 
     this.interval = setInterval(() => {
       if (!this.active || !this.bot) {
         this.stop();
+        return;
+      }
+
+      if (typeof this.bot.health === 'number' && this.bot.health <= this.minHealth) {
+        this.autoStop('low_health');
         return;
       }
 
@@ -103,6 +170,11 @@ export class AttackBehavior {
 
     for (const entity of entities) {
       if (!entity || entity === this.bot.entity) continue;
+
+      if (entity.type === 'player') {
+        const name = entity.username || entity.name || '';
+        if (name && this.whitelist.includes(name)) continue;
+      }
 
       const dist = this.bot.entity.position.distanceTo(entity.position);
       if (dist > nearestDist) continue;
@@ -130,6 +202,7 @@ export class AttackBehavior {
       this.bot.lookAt(entity.position.offset(0, entity.height * 0.85, 0));
       // 攻击
       this.bot.attack(entity);
+      this.lastTarget = entity.username || entity.name || entity.type || 'unknown';
     } catch (e) {
       // 忽略攻击错误
     }
@@ -137,6 +210,7 @@ export class AttackBehavior {
 
   stop() {
     this.active = false;
+    this.lastTarget = null;
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
@@ -144,11 +218,29 @@ export class AttackBehavior {
     return { success: true, message: '停止攻击' };
   }
 
+  autoStop(reason = 'unknown') {
+    this.active = false;
+    this.lastTarget = null;
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+    if (this.log && reason === 'low_health') {
+      this.log('warning', '生命值过低，自动停止攻击', '🛡️');
+    }
+    if (this.onAutoStop) {
+      this.onAutoStop('attack', reason);
+    }
+  }
+
   getStatus() {
     return {
       active: this.active,
       mode: this.mode,
-      range: this.range
+      range: this.range,
+      minHealth: this.minHealth,
+      whitelistCount: this.whitelist.length,
+      lastTarget: this.lastTarget
     };
   }
 }
@@ -167,11 +259,13 @@ export class PatrolBehavior {
     this.patrolInterval = null;
     this.moveTimeout = null;
     this.radius = 12;
+    this.waypoints = [];
+    this.waypointIndex = 0;
     this.onGoalReachedBound = null;
     this.onPathStopBound = null;
   }
 
-  start() {
+  start(waypoints = null) {
     // 先清理旧的监听器（防止重复绑定）
     this.cleanup();
 
@@ -185,6 +279,19 @@ export class PatrolBehavior {
 
     this.active = true;
     this.isMoving = false;
+    this.waypointIndex = 0;
+
+    if (Array.isArray(waypoints) && waypoints.length > 0) {
+      this.waypoints = waypoints
+        .map(point => ({
+          x: Number(point.x),
+          y: Number(point.y),
+          z: Number(point.z)
+        }))
+        .filter(point => !Number.isNaN(point.x) && !Number.isNaN(point.y) && !Number.isNaN(point.z));
+    } else {
+      this.waypoints = [];
+    }
 
     // 记录当前位置作为中心点（和 Pathfinder PRO 一样）
     try {
@@ -267,6 +374,16 @@ export class PatrolBehavior {
       }
     }, 10000);
 
+    if (this.waypoints.length > 0) {
+      const target = this.waypoints[this.waypointIndex];
+      if (this.log) {
+        this.log('info', `巡逻前往: X:${Math.floor(target.x)} Y:${Math.floor(target.y)} Z:${Math.floor(target.z)}`, '🚶');
+      }
+      this.bot.pathfinder.setGoal(new this.goals.GoalNear(target.x, target.y, target.z, 1));
+      this.waypointIndex = (this.waypointIndex + 1) % this.waypoints.length;
+      return;
+    }
+
     // 和 Pathfinder PRO 完全一样的计算方式：offset((Math.random()-0.5)*12, 0, (Math.random()-0.5)*12)
     const targetPos = this.centerPos.offset(
       (Math.random() - 0.5) * this.radius,
@@ -320,6 +437,8 @@ export class PatrolBehavior {
       active: this.active,
       isMoving: this.isMoving,
       radius: this.radius,
+      waypointsCount: this.waypoints.length,
+      nextWaypointIndex: this.waypoints.length > 0 ? this.waypointIndex : null,
       centerPos: this.centerPos ? {
         x: Math.round(this.centerPos.x),
         y: Math.round(this.centerPos.y),
@@ -333,17 +452,33 @@ export class PatrolBehavior {
  * 挖矿行为
  */
 export class MiningBehavior {
-  constructor(bot) {
+  constructor(bot, logFn = null, onAutoStop = null) {
     this.bot = bot;
+    this.log = logFn;
+    this.onAutoStop = onAutoStop;
     this.active = false;
     this.targetBlocks = ['coal_ore', 'iron_ore', 'gold_ore', 'diamond_ore', 'emerald_ore'];
     this.interval = null;
     this.range = 32;
+    this.stopOnFull = true;
+    this.minEmptySlots = 1;
+    this.lastTargetBlock = null;
   }
 
-  start(blockTypes = null) {
-    if (blockTypes) {
+  start(blockTypes = null, options = {}) {
+    if (blockTypes && !Array.isArray(blockTypes) && typeof blockTypes === 'object') {
+      options = blockTypes;
+      blockTypes = null;
+    }
+
+    if (Array.isArray(blockTypes) && blockTypes.length > 0) {
       this.targetBlocks = blockTypes;
+    }
+    if (typeof options.stopOnFull === 'boolean') {
+      this.stopOnFull = options.stopOnFull;
+    }
+    if (typeof options.minEmptySlots === 'number') {
+      this.minEmptySlots = options.minEmptySlots;
     }
     this.active = true;
     this.mineLoop();
@@ -353,6 +488,10 @@ export class MiningBehavior {
   async mineLoop() {
     while (this.active && this.bot) {
       try {
+        if (this.stopOnFull && !this.hasFreeSlots()) {
+          this.autoStop('inventory_full');
+          break;
+        }
         const block = this.findOre();
         if (block) {
           await this.mineBlock(block);
@@ -387,6 +526,7 @@ export class MiningBehavior {
     if (!this.bot || !block) return;
 
     try {
+      this.lastTargetBlock = block.name || 'unknown';
       // 走到矿石附近
       await this.bot.pathfinder.goto(
         new (await import('mineflayer-pathfinder')).goals.GoalNear(
@@ -407,17 +547,54 @@ export class MiningBehavior {
 
   stop() {
     this.active = false;
+    this.lastTargetBlock = null;
     if (this.bot) {
       this.bot.stopDigging();
     }
     return { success: true, message: '停止挖矿' };
   }
 
+  autoStop(reason = 'unknown') {
+    this.active = false;
+    this.lastTargetBlock = null;
+    if (this.bot) {
+      this.bot.stopDigging();
+    }
+    if (this.log && reason === 'inventory_full') {
+      this.log('warning', '背包已满，自动停止挖矿', '🎒');
+    }
+    if (this.onAutoStop) {
+      this.onAutoStop('mining', reason);
+    }
+  }
+
+  hasFreeSlots() {
+    return this.getFreeSlots() >= this.minEmptySlots;
+  }
+
+  getFreeSlots() {
+    const inv = this.bot?.inventory;
+    if (!inv) return 0;
+    if (typeof inv.emptySlotCount === 'function') {
+      return inv.emptySlotCount();
+    }
+    if (typeof inv.emptySlotCount === 'number') {
+      return inv.emptySlotCount;
+    }
+    if (Array.isArray(inv.slots)) {
+      return inv.slots.filter(slot => !slot).length;
+    }
+    return 0;
+  }
+
   getStatus() {
     return {
       active: this.active,
       targetBlocks: this.targetBlocks,
-      range: this.range
+      range: this.range,
+      stopOnFull: this.stopOnFull,
+      minEmptySlots: this.minEmptySlots,
+      lastTargetBlock: this.lastTargetBlock
     };
   }
 }
@@ -615,15 +792,16 @@ export class ActionBehavior {
  * 行为管理器 - 统一管理所有行为
  */
 export class BehaviorManager {
-  constructor(bot, goals, logFn = null) {
+  constructor(bot, goals, logFn = null, onAutoStop = null) {
     this.bot = bot;
     this.goals = goals;
     this.log = logFn;
+    this.onAutoStop = onAutoStop;
 
-    this.follow = new FollowBehavior(bot, goals);
-    this.attack = new AttackBehavior(bot, goals);
+    this.follow = new FollowBehavior(bot, goals, logFn, onAutoStop);
+    this.attack = new AttackBehavior(bot, goals, logFn, onAutoStop);
     this.patrol = new PatrolBehavior(bot, goals, logFn); // 传递日志函数
-    this.mining = new MiningBehavior(bot);
+    this.mining = new MiningBehavior(bot, logFn, onAutoStop);
     this.action = new ActionBehavior(bot);
     this.aiView = new AiViewBehavior(bot);
   }

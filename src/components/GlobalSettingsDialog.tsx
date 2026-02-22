@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
@@ -39,13 +39,7 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
     const [selectedNode, setSelectedNode] = useState<ProxyNode | null>(null);
     const [testLoading, setTestLoading] = useState<Record<string, boolean>>({});
 
-    useEffect(() => {
-        if (open) {
-            loadConfig();
-        }
-    }, [open]);
-
-    const loadConfig = async () => {
+    const loadConfig = useCallback(async () => {
         try {
             setLoading(true);
             const tg = await api.getTelegramConfig();
@@ -62,6 +56,17 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
         } finally {
             setLoading(false);
         }
+    }, [toast]);
+
+    useEffect(() => {
+        if (open) {
+            loadConfig();
+        }
+    }, [open, loadConfig]);
+
+    const getErrorMessage = (error: unknown, fallback: string) => {
+        if (error instanceof Error && error.message) return error.message;
+        return fallback;
     };
 
     const handleSaveTelegram = async () => {
@@ -117,11 +122,11 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
             });
             // Optional: Logout user?
             setPasswordData({ currentPassword: "", newPassword: "", confirmPassword: "" });
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Failed to change password:", error);
             toast({
                 title: "修改失败",
-                description: error.message || "无法修改密码，请检查当前密码是否正确",
+                description: getErrorMessage(error, "无法修改密码，请检查当前密码是否正确"),
                 variant: "destructive",
             });
         } finally {
@@ -177,8 +182,8 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
             const node = await api.parseProxyLink(link);
             setProxyNodes([...proxyNodes, node]);
             toast({ title: "导入成功", description: `已添加节点: ${node.name}` });
-        } catch (error: any) {
-            toast({ title: "导入失败", description: error.message, variant: "destructive" });
+        } catch (error: unknown) {
+            toast({ title: "导入失败", description: getErrorMessage(error, "导入失败"), variant: "destructive" });
         }
     };
 
@@ -191,8 +196,8 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
             const nodes = await api.syncSubscription(url);
             setProxyNodes([...proxyNodes, ...nodes]);
             toast({ title: "同步成功", description: `已导入 ${nodes.length} 个节点` });
-        } catch (error: any) {
-            toast({ title: "同步失败", description: error.message, variant: "destructive" });
+        } catch (error: unknown) {
+            toast({ title: "同步失败", description: getErrorMessage(error, "同步失败"), variant: "destructive" });
         } finally {
             setSaving(false);
         }
@@ -209,8 +214,8 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                 updateProxyNode(id, { latency: -1 });
                 toast({ title: "测试失败", description: "节点可能不可用", variant: "destructive" });
             }
-        } catch (error: any) {
-            toast({ title: "测试错误", description: error.message, variant: "destructive" });
+        } catch (error: unknown) {
+            toast({ title: "测试错误", description: getErrorMessage(error, "测试失败"), variant: "destructive" });
         } finally {
             setTestLoading(prev => ({ ...prev, [id]: false }));
         }
@@ -510,7 +515,7 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                                     <select
                                         className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
                                         value={selectedNode.transport || 'tcp'}
-                                        onChange={e => updateProxyNode(selectedNode.id, { transport: e.target.value as any })}
+                                        onChange={e => updateProxyNode(selectedNode.id, { transport: e.target.value as ProxyNode["transport"] })}
                                     >
                                         <option value="tcp">TCP</option>
                                         <option value="ws">WebSocket</option>
@@ -561,7 +566,7 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                                     <select
                                         className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
                                         value={selectedNode.security || 'none'}
-                                        onChange={e => updateProxyNode(selectedNode.id, { security: e.target.value as any })}
+                                        onChange={e => updateProxyNode(selectedNode.id, { security: e.target.value as ProxyNode["security"] })}
                                     >
                                         <option value="none">None</option>
                                         <option value="tls">TLS</option>

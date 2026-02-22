@@ -399,7 +399,22 @@ export class ConfigManager {
       // 文件访问方式: 'pterodactyl' | 'sftp' | 'none'
       fileAccessType: serverConfig.fileAccessType || 'pterodactyl',
       // 是否自动OP
-      autoOp: serverConfig.autoOp !== false
+      autoOp: serverConfig.autoOp !== false,
+      commandSettings: serverConfig.commandSettings || {
+        allowAll: false,
+        cooldownSeconds: 3,
+        whitelist: [],
+        silentReject: false
+      },
+      behaviorSettings: serverConfig.behaviorSettings || {
+        attack: {
+          whitelist: [],
+          minHealth: 6
+        },
+        patrol: {
+          waypoints: []
+        }
+      }
     };
 
     this.config.servers.push(fullConfig);
@@ -424,6 +439,8 @@ export class ConfigManager {
       restartTimer: { ...current.restartTimer, ...(updates.restartTimer || {}) },
       pterodactyl: { ...current.pterodactyl, ...(updates.pterodactyl || {}) },
       sftp: { ...current.sftp, ...(updates.sftp || {}) },
+      commandSettings: { ...current.commandSettings, ...(updates.commandSettings || {}) },
+      behaviorSettings: { ...current.behaviorSettings, ...(updates.behaviorSettings || {}) },
       proxyNodeId: updates.proxyNodeId !== undefined ? updates.proxyNodeId : current.proxyNodeId
     };
     console.log(`[ConfigManager] 更新服务器 ${id} 配置项:`, Object.keys(updates));

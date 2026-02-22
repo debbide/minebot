@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Settings,
@@ -48,6 +48,8 @@ interface SettingsData {
     enabled: boolean;
     url: string;
     method: string;
+    headers: Record<string, string>;
+    body: string;
     interval: number;
   };
 }
@@ -62,31 +64,44 @@ export default function SettingsPage() {
     ai: { enabled: true, apiKey: "", baseURL: "", model: "gpt-3.5-turbo", systemPrompt: "" },
     auth: { username: "admin", password: "" },
     autoChat: { enabled: false, interval: 60000, messages: [] },
-    autoRenew: { enabled: false, url: "", method: "GET", interval: 300000 }
+    autoRenew: { enabled: false, url: "", method: "GET", headers: {}, body: "", interval: 300000 }
   });
   const [autoChatMessages, setAutoChatMessages] = useState("");
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       const config = await api.getFullConfig();
-      setSettings({
-        server: config.server || settings.server,
-        ai: config.ai || settings.ai,
-        auth: config.auth || settings.auth,
-        autoChat: config.autoChat || settings.autoChat,
-        autoRenew: config.autoRenew || settings.autoRenew
-      });
+      setSettings(prev => ({
+        server: config.server
+          ? {
+            ...prev.server,
+            ...config.server,
+            version: config.server.version === false ? "" : (config.server.version || prev.server.version)
+          }
+          : prev.server,
+        ai: config.ai || prev.ai,
+        auth: config.auth || prev.auth,
+        autoChat: config.autoChat || prev.autoChat,
+        autoRenew: config.autoRenew
+          ? {
+            ...prev.autoRenew,
+            ...config.autoRenew,
+            headers: config.autoRenew.headers || prev.autoRenew.headers,
+            body: config.autoRenew.body || prev.autoRenew.body
+          }
+          : prev.autoRenew
+      }));
       setAutoChatMessages((config.autoChat?.messages || []).join("\n"));
     } catch (error) {
       console.error("Failed to load settings:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleSave = async () => {
     setSaving(true);
