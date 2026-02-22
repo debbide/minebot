@@ -248,6 +248,14 @@ app.post('/api/auth/logout', (req, res) => {
 
 
 // Serve static files
+app.use((req, res, next) => {
+  if (req.path === '/' || req.path.endsWith('.html')) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
 app.use(express.static(join(__dirname, '../dist')));
 // Serve screenshots
 app.use('/api/screenshots', express.static(join(process.cwd(), 'data', 'screenshots')));
