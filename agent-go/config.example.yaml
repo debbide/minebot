@@ -1,0 +1,50 @@
+agentId: "node-001"
+token: "CHANGE_ME"
+wsUrl: "wss://panel.example.com/agent/ws"
+dockerBin: "docker"
+containerLabelKey: "minebot.serverId"
+
+# Map serverId -> container name/id
+containerMap:
+  "server-1": "container_id_or_name"
+
+# Optional: map serverId -> volume folder name
+# Used when fileRoot is a volumes path
+volumeMap:
+  "server-1": "volume_uuid"
+
+rcon:
+  enabled: false
+  host: "127.0.0.1"
+  port: 25575
+  password: ""
+
+fileRoot: "/srv/pterodactyl/volumes"
+
+security:
+  allowActions:
+    - START
+    - STOP
+    - RESTART
+    - KILL
+    - COMMAND
+    - STATS
+    - LOGS
+    - LIST
+    - READ
+    - WRITE
+    - MKDIR
+    - DELETE
+    - RENAME
+    - COPY
+    - COMPRESS
+    - DECOMPRESS
+    - UPLOAD_INIT
+    - UPLOAD_CHUNK
+    - UPLOAD_FINISH
+    - DOWNLOAD_INIT
+    - DOWNLOAD_CHUNK
+  commandAllowlist:
+    - "say"
+    - "list"
+    - "save-all"

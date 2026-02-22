@@ -592,7 +592,7 @@ class ApiService {
     return this.request(`/api/bots/${id}/files/download?file=${encodeURIComponent(file)}`);
   }
 
-  async getUploadUrl(id: string): Promise<{ success: boolean; url?: string; type?: 'sftp' | 'pterodactyl'; endpoint?: string; error?: string }> {
+  async getUploadUrl(id: string): Promise<{ success: boolean; url?: string; type?: 'sftp' | 'pterodactyl' | 'agent'; endpoint?: string; error?: string }> {
     return this.request(`/api/bots/${id}/files/upload`);
   }
 

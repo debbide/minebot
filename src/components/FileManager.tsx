@@ -298,7 +298,7 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
       // 先检查文件访问类型
       const uploadInfo = await api.getUploadUrl(serverId);
 
-      if (uploadInfo.type === 'sftp') {
+        if (uploadInfo.type === 'sftp' || uploadInfo.type === 'agent') {
         // SFTP 模式：直接下载
         const token = localStorage.getItem('token');
         const downloadUrl = `/api/bots/${serverId}/files/download?file=${encodeURIComponent(filePath)}`;
@@ -406,7 +406,7 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
 
       const token = localStorage.getItem('token');
 
-      if (result.type === 'sftp') {
+      if (result.type === 'sftp' || result.type === 'agent') {
         // SFTP 模式：逐个上传到后端
         for (const file of Array.from(fileList)) {
           const uploadUrl = `${result.endpoint}?directory=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`;

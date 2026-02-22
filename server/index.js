@@ -15,6 +15,8 @@ import { AuthService } from './services/AuthService.js';
 import { AuditService } from './services/AuditService.js';
 import { SystemService } from './services/SystemService.js';
 import { proxyService } from './services/ProxyService.js';
+import { AgentRegistry } from './services/AgentRegistry.js';
+import { AgentGateway } from './services/AgentGateway.js';
 
 dotenv.config();
 
@@ -104,6 +106,16 @@ const aiService = new AIService(configManager);
 const systemService = new SystemService();
 const auditService = new AuditService();
 const botManager = new BotManager(configManager, aiService, broadcast);
+const agentRegistry = new AgentRegistry();
+const agentGateway = new AgentGateway(server, agentRegistry);
+
+const getAgentIdForBot = (bot) => {
+  const agentId = bot?.status?.agentId;
+  if (!agentId) return null;
+  const status = agentGateway.getStatus(agentId);
+  if (!status.connected) return null;
+  return agentId;
+};
 
 // Initialize Proxy Service
 const initializeProxy = async () => {
@@ -908,6 +920,21 @@ app.post('/api/bots/:id/rcon', (req, res) => {
   }
 });
 
+// Set agent binding for a bot
+app.post('/api/bots/:id/agent-binding', (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { agentId } = req.body || {};
+    const result = bot.setAgentId(agentId || null);
+    res.json({ success: true, agentId: result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Test RCON connection for a bot
 app.post('/api/bots/:id/rcon-test', async (req, res) => {
   try {
@@ -917,6 +944,38 @@ app.post('/api/bots/:id/rcon-test', async (req, res) => {
     }
     const result = await bot.testRconConnection();
     res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Agent registry
+app.get('/api/agents', (req, res) => {
+  const agents = agentRegistry.list().map(agent => ({
+    agentId: agent.agentId,
+    name: agent.name || agent.agentId,
+    status: agentGateway.getStatus(agent.agentId)
+  }));
+  res.json({ success: true, agents });
+});
+
+app.post('/api/agents', (req, res) => {
+  const { agentId, token, name } = req.body || {};
+  if (!agentId || !token) {
+    return res.status(400).json({ success: false, error: 'agentId and token required' });
+  }
+  const agent = agentRegistry.upsert({ agentId, token, name: name || agentId });
+  res.json({ success: true, agent: { agentId: agent.agentId, name: agent.name } });
+});
+
+app.post('/api/agents/:agentId/request', async (req, res) => {
+  try {
+    const { action, payload, timeoutMs } = req.body || {};
+    if (!action) {
+      return res.status(400).json({ success: false, error: 'action required' });
+    }
+    const result = await agentGateway.request(req.params.agentId, action, payload || {}, timeoutMs);
+    res.json({ success: true, result });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -945,8 +1004,14 @@ app.post('/api/bots/:id/panel-command', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Bot not found' });
     }
     const { command } = req.body;
-    const result = await bot.sendPanelCommand(command);
-    res.json(result);
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'COMMAND', { serverId: bot.id, command });
+      const payload = result?.data || result;
+      return res.json({ success: result.success !== false, message: payload?.message || result?.message || 'ok' });
+    }
+    const fallback = await bot.sendPanelCommand(command);
+    res.json(fallback);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1004,8 +1069,15 @@ app.post('/api/bots/:id/power', async (req, res) => {
     if (!signal) {
       return res.status(400).json({ success: false, error: '缺少 signal 参数 (start/stop/restart/kill)' });
     }
-    const result = await bot.sendPowerSignal(signal);
-    res.json(result);
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const actionMap = { start: 'START', stop: 'STOP', restart: 'RESTART', kill: 'KILL' };
+      const action = actionMap[signal] || 'RESTART';
+      const result = await agentGateway.request(agentId, action, { serverId: bot.id });
+      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+    }
+    const fallback = await bot.sendPowerSignal(signal);
+    res.json(fallback);
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1057,6 +1129,7 @@ app.get('/api/bots/:id/config', (req, res) => {
         sftp: bot.status.sftp,
         fileAccessType: bot.status.fileAccessType,
         autoOp: bot.status.autoOp,
+        agentId: bot.status.agentId,
         behaviorSettings: bot.behaviorSettings || null,
         commandSettings: bot.commandSettings || null
       }
@@ -1076,6 +1149,11 @@ app.get('/api/bots/:id/files', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Bot not found' });
     }
     const directory = req.query.directory || '/';
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'LIST', { serverId: bot.id, path: directory });
+      return res.json({ success: result.success !== false, files: result.data || [], directory });
+    }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
     let result;
@@ -1100,6 +1178,11 @@ app.get('/api/bots/:id/files/contents', async (req, res) => {
     const file = req.query.file;
     if (!file) {
       return res.status(400).json({ success: false, error: '缺少 file 参数' });
+    }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'READ', { serverId: bot.id, path: file });
+      return res.json({ success: result.success !== false, content: result.data?.content || '' });
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1126,6 +1209,11 @@ app.post('/api/bots/:id/files/write', express.text({ limit: '50mb' }), async (re
     if (!file) {
       return res.status(400).json({ success: false, error: '缺少 file 参数' });
     }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'WRITE', { serverId: bot.id, path: file, content: req.body || '' });
+      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+    }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
     let result;
@@ -1150,6 +1238,30 @@ app.get('/api/bots/:id/files/download', async (req, res) => {
     const file = req.query.file;
     if (!file) {
       return res.status(400).json({ success: false, error: '缺少 file 参数' });
+    }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const init = await agentGateway.request(agentId, 'DOWNLOAD_INIT', { serverId: bot.id, path: file });
+      const downloadId = init.data?.downloadId;
+      if (!downloadId) {
+        return res.status(400).json({ success: false, error: init.message || '下载失败' });
+      }
+      const fileName = file.split('/').pop();
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+
+      let index = 0;
+      while (true) {
+        const chunk = await agentGateway.request(agentId, 'DOWNLOAD_CHUNK', { downloadId, index });
+        const data = chunk.data?.data || '';
+        if (data) {
+          res.write(Buffer.from(data, 'base64'));
+        }
+        if (chunk.data?.done) break;
+        index += 1;
+      }
+      res.end();
+      return;
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1181,6 +1293,14 @@ app.get('/api/bots/:id/files/upload', async (req, res) => {
     if (!bot) {
       return res.status(404).json({ success: false, error: 'Bot not found' });
     }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      return res.json({
+        success: true,
+        type: 'agent',
+        endpoint: `/api/bots/${req.params.id}/files/upload-agent`
+      });
+    }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
     if (fileAccessType === 'sftp') {
@@ -1194,6 +1314,47 @@ app.get('/api/bots/:id/files/upload', async (req, res) => {
       const result = await bot.getUploadUrl();
       res.json(result);
     }
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Agent 文件上传端点
+app.post('/api/bots/:id/files/upload-agent', express.raw({ limit: '100mb', type: '*/*' }), async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const agentId = getAgentIdForBot(bot);
+    if (!agentId) {
+      return res.status(400).json({ success: false, error: 'Agent not connected' });
+    }
+    const directory = req.query.directory || '/';
+    const fileName = req.query.name;
+    if (!fileName) {
+      return res.status(400).json({ success: false, error: '缺少 name 参数' });
+    }
+    const fullPath = directory === '/' ? `/${fileName}` : `${directory}/${fileName}`;
+    const size = req.body?.length || 0;
+    const init = await agentGateway.request(agentId, 'UPLOAD_INIT', { serverId: bot.id, path: fullPath, size });
+    const uploadId = init.data?.uploadId;
+    if (!uploadId) {
+      return res.status(400).json({ success: false, error: init.message || '上传失败' });
+    }
+    const chunkSize = 256 * 1024;
+    let index = 0;
+    for (let offset = 0; offset < size; offset += chunkSize) {
+      const slice = req.body.slice(offset, offset + chunkSize);
+      await agentGateway.request(agentId, 'UPLOAD_CHUNK', {
+        uploadId,
+        index,
+        data: slice.toString('base64')
+      });
+      index += 1;
+    }
+    await agentGateway.request(agentId, 'UPLOAD_FINISH', { uploadId });
+    res.json({ success: true, message: '上传成功' });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
@@ -1229,6 +1390,11 @@ app.post('/api/bots/:id/files/folder', async (req, res) => {
     if (!name) {
       return res.status(400).json({ success: false, error: '缺少 name 参数' });
     }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'MKDIR', { serverId: bot.id, root: root || '/', name });
+      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+    }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
     let result;
@@ -1253,6 +1419,11 @@ app.post('/api/bots/:id/files/delete', async (req, res) => {
     const { root, files } = req.body;
     if (!files || !Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ success: false, error: '缺少 files 参数' });
+    }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'DELETE', { serverId: bot.id, root: root || '/', files });
+      return res.json({ success: result.success !== false, message: result.message || 'ok' });
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1279,6 +1450,11 @@ app.post('/api/bots/:id/files/rename', async (req, res) => {
     if (!from || !to) {
       return res.status(400).json({ success: false, error: '缺少 from 或 to 参数' });
     }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'RENAME', { serverId: bot.id, root: root || '/', from, to });
+      return res.json({ success: result.success !== false, message: result.message || 'ok' });
+    }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
     let result;
@@ -1303,6 +1479,11 @@ app.post('/api/bots/:id/files/copy', async (req, res) => {
     const { location } = req.body;
     if (!location) {
       return res.status(400).json({ success: false, error: '缺少 location 参数' });
+    }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'COPY', { serverId: bot.id, location });
+      return res.json({ success: result.success !== false, message: result.message || 'ok' });
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
@@ -1329,6 +1510,11 @@ app.post('/api/bots/:id/files/compress', async (req, res) => {
     if (!files || !Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ success: false, error: '缺少 files 参数' });
     }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'COMPRESS', { serverId: bot.id, root: root || '/', files });
+      return res.json({ success: result.success !== false, archive: result.data?.archive, message: result.message || 'ok' });
+    }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
     if (fileAccessType === 'sftp') {
@@ -1351,6 +1537,11 @@ app.post('/api/bots/:id/files/decompress', async (req, res) => {
     const { root, file } = req.body;
     if (!file) {
       return res.status(400).json({ success: false, error: '缺少 file 参数' });
+    }
+    const agentId = getAgentIdForBot(bot);
+    if (agentId) {
+      const result = await agentGateway.request(agentId, 'DECOMPRESS', { serverId: bot.id, root: root || '/', file });
+      return res.json({ success: result.success !== false, message: result.message || 'ok' });
     }
     const fileAccessType = bot.status.fileAccessType || 'pterodactyl';
 
