@@ -73,7 +73,6 @@ interface BotControlPanelProps {
     basePath: string;
   } | null;
   fileAccessType?: 'pterodactyl' | 'sftp' | 'none';
-  onUpdate?: () => void;
 }
 
 interface BehaviorStatus {
@@ -129,7 +128,6 @@ export function BotControlPanel({
   players = [],
   restartTimer,
   pterodactyl,
-  onUpdate
 }: BotControlPanelProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -169,7 +167,6 @@ export function BotControlPanel({
     try {
       const result = await api.setBehavior(botId, behavior, enabled, options);
       toast({ title: enabled ? "已启用" : "已停止", description: result.message });
-      onUpdate?.();
     } catch (error) {
       toast({ title: "错误", description: String(error), variant: "destructive" });
     } finally {
@@ -214,7 +211,6 @@ export function BotControlPanel({
     try {
       await api.stopAllBehaviors(botId);
       toast({ title: "已停止", description: "所有行为已停止" });
-      onUpdate?.();
     } catch (error) {
       toast({ title: "错误", description: String(error), variant: "destructive" });
     } finally {
@@ -228,7 +224,6 @@ export function BotControlPanel({
     try {
       await api.setBotMode(botId, mode, enabled);
       toast({ title: enabled ? "已开启" : "已关闭", description: `${mode} 模式` });
-      onUpdate?.();
     } catch (error) {
       toast({ title: "错误", description: String(error), variant: "destructive" });
     } finally {
