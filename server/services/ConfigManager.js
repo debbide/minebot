@@ -404,7 +404,9 @@ export class ConfigManager {
         allowAll: false,
         cooldownSeconds: 3,
         whitelist: [],
-        silentReject: false
+        silentReject: false,
+        globalCooldownSeconds: 1,
+        maxPerMinute: 20
       },
       behaviorSettings: serverConfig.behaviorSettings || {
         attack: {

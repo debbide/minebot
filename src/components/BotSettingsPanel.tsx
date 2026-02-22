@@ -140,6 +140,8 @@ export function BotSettingsPanel({
     const [commandCooldownSeconds, setCommandCooldownSeconds] = useState<string>("3");
     const [commandWhitelistText, setCommandWhitelistText] = useState<string>("");
     const [commandSilentReject, setCommandSilentReject] = useState<boolean>(false);
+    const [commandGlobalCooldownSeconds, setCommandGlobalCooldownSeconds] = useState<string>("1");
+    const [commandMaxPerMinute, setCommandMaxPerMinute] = useState<string>("20");
     const [behaviorStatus, setBehaviorStatus] = useState<BehaviorStatus | null>(null);
     const [behaviorLoading, setBehaviorLoading] = useState(false);
 
@@ -214,6 +216,16 @@ export function BotSettingsPanel({
                 );
                 setCommandWhitelistText((cmdSettings.whitelist || []).join("\n"));
                 setCommandSilentReject(!!cmdSettings.silentReject);
+                setCommandGlobalCooldownSeconds(
+                    cmdSettings.globalCooldownSeconds !== undefined
+                        ? String(cmdSettings.globalCooldownSeconds)
+                        : "1"
+                );
+                setCommandMaxPerMinute(
+                    cmdSettings.maxPerMinute !== undefined
+                        ? String(cmdSettings.maxPerMinute)
+                        : "20"
+                );
             })
             .catch(() => {});
         return () => {
@@ -462,11 +474,15 @@ export function BotSettingsPanel({
                 .map(name => name.trim())
                 .filter(name => name);
             const cooldownSeconds = Number(commandCooldownSeconds);
+            const globalCooldownSeconds = Number(commandGlobalCooldownSeconds);
+            const maxPerMinute = Number(commandMaxPerMinute);
             await api.setCommandSettings(botId, {
                 allowAll: commandAllowAll,
                 cooldownSeconds: Number.isNaN(cooldownSeconds) ? 3 : cooldownSeconds,
                 whitelist,
-                silentReject: commandSilentReject
+                silentReject: commandSilentReject,
+                globalCooldownSeconds: Number.isNaN(globalCooldownSeconds) ? 1 : globalCooldownSeconds,
+                maxPerMinute: Number.isNaN(maxPerMinute) ? 20 : maxPerMinute
             });
             toast({ title: "指令设置已保存" });
             onUpdate?.();
@@ -752,6 +768,32 @@ export function BotSettingsPanel({
                     />
                     <p className="text-xs text-muted-foreground">
                         设为 0 关闭冷却。
+                    </p>
+                </div>
+                <div className="space-y-2">
+                    <Label>全局节流 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={commandGlobalCooldownSeconds}
+                        onChange={(e) => setCommandGlobalCooldownSeconds(e.target.value)}
+                        placeholder="1"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        同一玩家的任意指令之间最小间隔。0 为关闭。
+                    </p>
+                </div>
+                <div className="space-y-2">
+                    <Label>每分钟上限</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={commandMaxPerMinute}
+                        onChange={(e) => setCommandMaxPerMinute(e.target.value)}
+                        placeholder="20"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        同一玩家每分钟最多可用指令次数。0 为关闭。
                     </p>
                 </div>
                 <Button

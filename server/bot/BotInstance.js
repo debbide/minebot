@@ -95,9 +95,13 @@ export class BotInstance {
       cooldownSeconds: 3,
       whitelist: [],
       silentReject: false,
+      globalCooldownSeconds: 1,
+      maxPerMinute: 20,
       ...(config.commandSettings || {})
     };
     this.commandCooldowns = new Map();
+    this.commandUserCooldowns = new Map();
+    this.commandUserWindows = new Map();
 
     // 自动喊话配置
     this.autoChatConfig = config.autoChat || {
@@ -1461,6 +1465,12 @@ export class BotInstance {
           }
           return;
         }
+        if (this.isUserCommandThrottled(username)) {
+          if (this.bot && !this.commandSettings.silentReject) {
+            this.bot.chat('指令过于频繁，请稍后再试');
+          }
+          return;
+        }
         if (this.isCommandOnCooldown(username, cmd)) {
           if (this.bot && !this.commandSettings.silentReject) {
             this.bot.chat('指令冷却中，请稍后再试');
@@ -1491,6 +1501,35 @@ export class BotInstance {
       return true;
     }
     this.commandCooldowns.set(key, now);
+    return false;
+  }
+
+  isUserCommandThrottled(username) {
+    const now = Date.now();
+    const globalCooldown = Number(this.commandSettings.globalCooldownSeconds) || 0;
+    if (globalCooldown > 0) {
+      const last = this.commandUserCooldowns.get(username) || 0;
+      if (now - last < globalCooldown * 1000) {
+        return true;
+      }
+      this.commandUserCooldowns.set(username, now);
+    }
+
+    const maxPerMinute = Number(this.commandSettings.maxPerMinute) || 0;
+    if (maxPerMinute > 0) {
+      const window = this.commandUserWindows.get(username) || { start: now, count: 0 };
+      if (now - window.start > 60000) {
+        window.start = now;
+        window.count = 0;
+      }
+      if (window.count >= maxPerMinute) {
+        this.commandUserWindows.set(username, window);
+        return true;
+      }
+      window.count += 1;
+      this.commandUserWindows.set(username, window);
+    }
+
     return false;
   }
 
@@ -1601,7 +1640,13 @@ export class BotInstance {
         : this.commandSettings.whitelist,
       silentReject: typeof settings.silentReject === 'boolean'
         ? settings.silentReject
-        : this.commandSettings.silentReject
+        : this.commandSettings.silentReject,
+      globalCooldownSeconds: Number.isFinite(settings.globalCooldownSeconds)
+        ? Math.max(0, settings.globalCooldownSeconds)
+        : this.commandSettings.globalCooldownSeconds,
+      maxPerMinute: Number.isFinite(settings.maxPerMinute)
+        ? Math.max(0, settings.maxPerMinute)
+        : this.commandSettings.maxPerMinute
     };
 
     this.commandSettings = next;

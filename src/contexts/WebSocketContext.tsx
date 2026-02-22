@@ -37,8 +37,39 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  const connectRef = useRef<() => void>(() => {});
   const maxReconnectAttempts = 10;
   const baseReconnectDelay = 1000; // 1 秒
+  const maxReconnectDelay = 30000; // 30 秒
+
+  const clearReconnectTimeout = () => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+  };
+
+  const scheduleReconnect = useCallback(() => {
+    if (!navigator.onLine) {
+      console.warn('[WebSocket] offline, waiting for network');
+      return;
+    }
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+      console.error('[WebSocket] 达到最大重连次数，停止重连');
+      reconnectAttemptsRef.current = 0;
+      return;
+    }
+    const expDelay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
+    const cappedDelay = Math.min(expDelay, maxReconnectDelay);
+    const jitter = 0.8 + Math.random() * 0.4;
+    const delay = Math.floor(cappedDelay * jitter);
+    reconnectAttemptsRef.current += 1;
+    console.log(`[WebSocket] 第 ${reconnectAttemptsRef.current} 次重连，延迟 ${delay}ms`);
+    clearReconnectTimeout();
+    reconnectTimeoutRef.current = window.setTimeout(() => {
+      connectRef.current();
+    }, delay);
+  }, []);
 
   const connect = useCallback(() => {
     const token = localStorage.getItem('token');
@@ -56,6 +87,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       ws.onopen = () => {
         setConnected(true);
         reconnectAttemptsRef.current = 0; // 重置重连计数
+        clearReconnectTimeout();
         console.log('WebSocket connected');
       };
 
@@ -118,16 +150,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 指数退避重试
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-          const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
-          reconnectAttemptsRef.current++;
-          console.log(`[WebSocket] 第 ${reconnectAttemptsRef.current} 次重连，延迟 ${delay}ms`);
-          reconnectTimeoutRef.current = window.setTimeout(connect, delay);
-        } else {
-          console.error('[WebSocket] 达到最大重连次数，停止重连');
-          reconnectAttemptsRef.current = 0;
-        }
+        scheduleReconnect();
       };
 
       ws.onerror = (error) => {
@@ -135,22 +158,19 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       };
     } catch (error) {
       console.error('WebSocket connection error:', error);
-      if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-        const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
-        reconnectAttemptsRef.current++;
-        console.log(`[WebSocket] 连接失败，第 ${reconnectAttemptsRef.current} 次重连，延迟 ${delay}ms`);
-        reconnectTimeoutRef.current = window.setTimeout(connect, delay);
-      }
+      scheduleReconnect();
     }
-  }, []);
+  }, [scheduleReconnect]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   useEffect(() => {
     connect();
 
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      clearReconnectTimeout();
       wsRef.current?.close();
     };
   }, [connect]);
@@ -167,6 +187,25 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [connect]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      reconnectAttemptsRef.current = 0;
+      connect();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !connected) {
+        connect();
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [connect, connected]);
 
   return (
     <WebSocketContext.Provider value={{ status, logs, connected, setLogs, systemStatus, botUpdates }}>
