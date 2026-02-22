@@ -191,6 +191,8 @@ export function ServerDetailDialog({
 
   const isPanel = server.type === "panel";
 
+  const agentConfigured = !!server?.agentStatus?.connected || !!server?.agentStatus?.lastSeen;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-[90vw] sm:max-w-[600px] flex flex-col p-0 gap-0 border-l border-border/40 bg-background/80 backdrop-blur-xl">
@@ -257,7 +259,7 @@ export function ServerDetailDialog({
                 <Terminal className="h-4 w-4" />
                 日志
               </TabsTrigger>
-              {server.agentId && (
+              {agentConfigured && (
                 <TabsTrigger
                   value="agent"
                   className="gap-2 px-0 pb-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all"
@@ -266,7 +268,7 @@ export function ServerDetailDialog({
                   探针
                 </TabsTrigger>
               )}
-              {(server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp') || (server.agentId && server.agentStatus?.connected)) && (
+              {(server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp') || agentConfigured) && (
                 <TabsTrigger
                   value="files"
                   className="gap-2 px-0 pb-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all"
@@ -279,7 +281,7 @@ export function ServerDetailDialog({
           </div>
 
           {/* 文件管理 - 完全独立的层，覆盖其他内容 */}
-          {activeTab === 'files' && (server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp') || (server.agentId && server.agentStatus?.connected)) && (
+          {activeTab === 'files' && (server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp') || agentConfigured) && (
             <div className="flex-1 overflow-y-auto p-6">
               <FileManager
                 serverId={server.id}

@@ -609,7 +609,51 @@ export function BotSettingsPanel({
         return `agentId: "${agentId || ""}"
 token: "${agentToken || ""}"
 wsUrl: "${wsUrl}"
-serverUrl: "${origin}"`;
+serverUrl: "${origin}"
+
+dockerBin: "docker"
+containerLabelKey: "minebot.serverId"
+
+volumeMap:
+  "${botId}": "volume_uuid"
+
+containerMap:
+  "${botId}": "container_name_or_id"
+
+fileRoot: "/srv/pterodactyl/volumes"
+
+rcon:
+  enabled: false
+  host: "127.0.0.1"
+  port: 25575
+  password: ""
+
+security:
+  allowActions:
+    - START
+    - STOP
+    - RESTART
+    - KILL
+    - COMMAND
+    - STATS
+    - HOST_STATS
+    - PROCESS_LIST
+    - LOGS
+    - LIST
+    - READ
+    - WRITE
+    - CHMOD
+    - MKDIR
+    - DELETE
+    - RENAME
+    - COPY
+    - COMPRESS
+    - DECOMPRESS
+    - UPLOAD_INIT
+    - UPLOAD_CHUNK
+    - UPLOAD_FINISH
+    - DOWNLOAD_INIT
+    - DOWNLOAD_CHUNK`;
     };
 
     const handleCopyAgentConfig = async () => {
