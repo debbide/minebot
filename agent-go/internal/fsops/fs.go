@@ -37,11 +37,14 @@ func ResolveBase(root string, volumeMap, containerMap map[string]string, serverI
 	if root == "" {
 		return ""
 	}
+	base := root
 	if v, ok := volumeMap[serverId]; ok && v != "" {
-		return filepath.Join(root, v)
+		base = filepath.Join(root, v)
+	} else if c, ok := containerMap[serverId]; ok && c != "" {
+		base = filepath.Join(root, c)
 	}
-	if c, ok := containerMap[serverId]; ok && c != "" {
-		return filepath.Join(root, c)
+	if _, err := os.Stat(base); err == nil {
+		return base
 	}
 	return root
 }
