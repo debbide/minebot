@@ -620,6 +620,7 @@ export class PanelInstance {
 
     if (!url && !apiKey && !cookie && !serverId) {
       this.status.pterodactyl = null;
+      this.config.pterodactyl = null;
       this.log('info', '翼龙面板配置已清除', '🔑');
     } else {
       this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, serverId };
@@ -633,6 +634,7 @@ export class PanelInstance {
         // Preserve existing autoRestart if not provided in config (safety fallback)
         this.status.pterodactyl.autoRestart = oldPterodactyl.autoRestart;
       }
+      this.config.pterodactyl = this.status.pterodactyl;
       this.log('info', `翼龙面板配置已更新 [${authType === 'cookie' ? 'Cookie' : 'API Key'}]`, '🔑');
     }
 
@@ -640,7 +642,7 @@ export class PanelInstance {
     if (this.configManager) {
       console.log(`[Debug] [${this.id}] 更新服务器配置:`, JSON.stringify(this.status.pterodactyl));
       this.configManager.updateServer(this.id, {
-        pterodactyl: this.status.pterodactyl || {}
+        pterodactyl: this.status.pterodactyl === null ? null : (this.status.pterodactyl || {})
       });
     }
 
@@ -974,6 +976,7 @@ export class PanelInstance {
       privateKey: config.privateKey || '',
       basePath: config.basePath || '/'
     };
+    this.config.sftp = this.status.sftp;
     this.log('info', 'SFTP 配置已更新', '🔑');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     this.saveConfig();
@@ -990,6 +993,7 @@ export class PanelInstance {
       return { success: false, message: `无效的文件访问方式，可选: ${validTypes.join(', ')}` };
     }
     this.status.fileAccessType = type;
+    this.config.fileAccessType = type;
     this.log('info', `文件访问方式已设置为: ${type}`, '📁');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     this.saveConfig();
@@ -1007,7 +1011,7 @@ export class PanelInstance {
         name: this.config.name,
         host: this.config.host,
         port: this.config.port,
-        pterodactyl: this.status.pterodactyl || {},
+        pterodactyl: this.status.pterodactyl === null ? null : (this.status.pterodactyl || {}),
         sftp: this.status.sftp || {},
         fileAccessType: this.status.fileAccessType || 'pterodactyl'
       });
