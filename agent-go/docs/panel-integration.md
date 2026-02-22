@@ -51,3 +51,8 @@ Panel HTTP API can forward requests:
 3. Send to agent WS connection
 4. Wait for `RES` with same `id`
 5. Return HTTP response to UI
+
+## Suggested HTTP endpoints
+- `GET /api/agents/:agentId/host-stats`
+- `GET /api/agents/:agentId/processes?limit=50`
+- `POST /api/agents/:agentId/request` (generic action)

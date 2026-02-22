@@ -29,6 +29,8 @@ security:
     - KILL
     - COMMAND
     - STATS
+    - HOST_STATS
+    - PROCESS_LIST
     - LOGS
     - LIST
     - READ

@@ -45,6 +45,10 @@ func (h *Handlers) Handle(msg protocol.Message) protocol.Message {
 		return h.handleCommand(msg)
 	case "STATS":
 		return h.handleStats(msg)
+	case "HOST_STATS":
+		return h.handleHostStats(msg)
+	case "PROCESS_LIST":
+		return h.handleProcessList(msg)
 	case "LOGS":
 		return h.handleLogs(msg)
 	case "LIST":
@@ -141,6 +145,29 @@ func (h *Handlers) handleStats(msg protocol.Message) protocol.Message {
 		return response(msg.ID, false, err.Error(), nil)
 	}
 	return response(msg.ID, true, "ok", data)
+}
+
+func (h *Handlers) handleHostStats(msg protocol.Message) protocol.Message {
+	data, err := stats.GetHost(h.cfg.FileRoot)
+	if err != nil {
+		return response(msg.ID, false, err.Error(), nil)
+	}
+	return response(msg.ID, true, "ok", data)
+}
+
+func (h *Handlers) handleProcessList(msg protocol.Message) protocol.Message {
+	var payload struct {
+		Limit int `json:"limit"`
+	}
+	_ = json.Unmarshal(msg.Payload, &payload)
+	if payload.Limit <= 0 || payload.Limit > 200 {
+		payload.Limit = 50
+	}
+	list, err := stats.GetProcesses(payload.Limit)
+	if err != nil {
+		return response(msg.ID, false, err.Error(), nil)
+	}
+	return response(msg.ID, true, "ok", list)
 }
 
 func (h *Handlers) handleLogs(msg protocol.Message) protocol.Message {

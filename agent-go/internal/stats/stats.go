@@ -5,12 +5,44 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/host"
+	"github.com/shirou/gopsutil/v3/load"
+	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/net"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 type ContainerStats struct {
 	Status string `json:"status"`
 	CPU    string `json:"cpu"`
 	Memory string `json:"memory"`
+}
+
+type HostStats struct {
+	Hostname    string  `json:"hostname"`
+	Uptime      uint64  `json:"uptime"`
+	Load1       float64 `json:"load1"`
+	Load5       float64 `json:"load5"`
+	Load15      float64 `json:"load15"`
+	CPU         float64 `json:"cpu"`
+	MemTotal    uint64  `json:"memTotal"`
+	MemUsed     uint64  `json:"memUsed"`
+	MemUsedPct  float64 `json:"memUsedPct"`
+	DiskTotal   uint64  `json:"diskTotal"`
+	DiskUsed    uint64  `json:"diskUsed"`
+	DiskUsedPct float64 `json:"diskUsedPct"`
+	NetRx       uint64  `json:"netRx"`
+	NetTx       uint64  `json:"netTx"`
+}
+
+type ProcessInfo struct {
+	PID  int32   `json:"pid"`
+	Name string  `json:"name"`
+	CPU  float64 `json:"cpu"`
+	Mem  float32 `json:"mem"`
 }
 
 func Get(dockerBin, container string) (*ContainerStats, error) {
@@ -20,6 +52,71 @@ func Get(dockerBin, container string) (*ContainerStats, error) {
 	}
 	cpu, mem := statsSnapshot(dockerBin, container)
 	return &ContainerStats{Status: status, CPU: cpu, Memory: mem}, nil
+}
+
+func GetHost(fileRoot string) (*HostStats, error) {
+	h, _ := host.Info()
+	loadAvg, _ := load.Avg()
+	cpuPercent, _ := cpu.Percent(0, false)
+	memInfo, _ := mem.VirtualMemory()
+
+	diskPath := fileRoot
+	if diskPath == "" {
+		diskPath = "/"
+	}
+	diskInfo, _ := disk.Usage(diskPath)
+
+	ioCounters, _ := net.IOCounters(false)
+	var rx, tx uint64
+	if len(ioCounters) > 0 {
+		rx = ioCounters[0].BytesRecv
+		tx = ioCounters[0].BytesSent
+	}
+
+	cpuVal := 0.0
+	if len(cpuPercent) > 0 {
+		cpuVal = cpuPercent[0]
+	}
+
+	return &HostStats{
+		Hostname:    h.Hostname,
+		Uptime:      h.Uptime,
+		Load1:       loadAvg.Load1,
+		Load5:       loadAvg.Load5,
+		Load15:      loadAvg.Load15,
+		CPU:         cpuVal,
+		MemTotal:    memInfo.Total,
+		MemUsed:     memInfo.Used,
+		MemUsedPct:  memInfo.UsedPercent,
+		DiskTotal:   diskInfo.Total,
+		DiskUsed:    diskInfo.Used,
+		DiskUsedPct: diskInfo.UsedPercent,
+		NetRx:       rx,
+		NetTx:       tx,
+	}, nil
+}
+
+func GetProcesses(limit int) ([]ProcessInfo, error) {
+	plist, err := process.Processes()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]ProcessInfo, 0, limit)
+	for _, p := range plist {
+		name, _ := p.Name()
+		cpuVal, _ := p.CPUPercent()
+		memVal, _ := p.MemoryPercent()
+		result = append(result, ProcessInfo{
+			PID:  p.Pid,
+			Name: name,
+			CPU:  cpuVal,
+			Mem:  memVal,
+		})
+		if len(result) >= limit {
+			break
+		}
+	}
+	return result, nil
 }
 
 func inspectStatus(dockerBin, container string) (string, error) {

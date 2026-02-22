@@ -981,6 +981,25 @@ app.post('/api/agents/:agentId/request', async (req, res) => {
   }
 });
 
+app.get('/api/agents/:agentId/host-stats', async (req, res) => {
+  try {
+    const result = await agentGateway.request(req.params.agentId, 'HOST_STATS', {});
+    res.json({ success: result.success !== false, data: result.data || result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/agents/:agentId/processes', async (req, res) => {
+  try {
+    const limit = Number(req.query.limit) || 50;
+    const result = await agentGateway.request(req.params.agentId, 'PROCESS_LIST', { limit });
+    res.json({ success: result.success !== false, data: result.data || result });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Set file access type for a bot
 app.post('/api/bots/:id/file-access-type', (req, res) => {
   try {
