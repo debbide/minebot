@@ -10,8 +10,19 @@ const MASTER_KEY_FILE = path.join(__dirname, '../data/master.key');
 
 function getMasterPassword() {
   if (process.env.MASTER_PASSWORD) return process.env.MASTER_PASSWORD;
-  if (fs.existsSync(MASTER_KEY_FILE)) {
-    return fs.readFileSync(MASTER_KEY_FILE, 'utf-8').trim() || null;
+  try {
+    if (fs.existsSync(MASTER_KEY_FILE)) {
+      return fs.readFileSync(MASTER_KEY_FILE, 'utf-8').trim() || null;
+    }
+    const configFile = path.join(__dirname, '../data/config.json');
+    if (fs.existsSync(configFile)) {
+      const raw = JSON.parse(fs.readFileSync(configFile, 'utf-8'));
+      if (raw && raw.masterKey) {
+        return raw.masterKey;
+      }
+    }
+  } catch (error) {
+    return null;
   }
   return null;
 }

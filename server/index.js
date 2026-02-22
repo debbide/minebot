@@ -1353,6 +1353,28 @@ app.post('/api/bots/:id/files/write', express.text({ limit: '50mb' }), async (re
   }
 });
 
+// 修改文件权限 (仅 agent 支持)
+app.post('/api/bots/:id/files/chmod', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const { path, mode } = req.body || {};
+    if (!path || !mode) {
+      return res.status(400).json({ success: false, error: '缺少 path 或 mode 参数' });
+    }
+    const agentId = getAgentIdForBot(bot);
+    if (!agentId) {
+      return res.status(400).json({ success: false, error: 'Agent not connected' });
+    }
+    const result = await agentGateway.request(agentId, 'CHMOD', { serverId: bot.id, path, mode });
+    res.json({ success: result.success !== false, message: result.message || 'ok', channel: 'agent' });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // 获取下载链接 (pterodactyl) 或直接下载文件 (sftp)
 app.get('/api/bots/:id/files/download', async (req, res) => {
   try {

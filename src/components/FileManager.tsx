@@ -84,6 +84,9 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<FileInfo | null>(null);
   const [newName, setNewName] = useState("");
+  const [permOpen, setPermOpen] = useState(false);
+  const [permTarget, setPermTarget] = useState<FileInfo | null>(null);
+  const [permMode, setPermMode] = useState("0644");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingFile, setEditingFile] = useState<string | null>(null);
@@ -299,6 +302,35 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
       setRenameOpen(false);
       setRenameTarget(null);
       setNewName("");
+    }
+  };
+
+  const handleOpenPerms = (file: FileInfo) => {
+    setPermTarget(file);
+    setPermMode(file.mode || "0644");
+    setPermOpen(true);
+  };
+
+  const handleChmod = async () => {
+    if (!permTarget) return;
+    const filePath = currentPath === "/" ? `/${permTarget.name}` : `${currentPath}/${permTarget.name}`;
+    try {
+      const result = await api.chmodFile(serverId, filePath, permMode.trim());
+      if (result.success) {
+        toast({ title: "权限已更新", variant: "success" });
+        loadFiles();
+      } else {
+        toast({ title: "修改失败", description: result.error, variant: "destructive" });
+      }
+    } catch (error) {
+      toast({
+        title: "修改失败",
+        description: error instanceof Error ? error.message : "未知错误",
+        variant: "destructive",
+      });
+    } finally {
+      setPermOpen(false);
+      setPermTarget(null);
     }
   };
 
@@ -712,6 +744,12 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
                             下载
                           </DropdownMenuItem>
                         )}
+                        {file.isFile && activeChannel === 'agent' && (
+                          <DropdownMenuItem onClick={() => handleOpenPerms(file)}>
+                            <Edit3 className="h-4 w-4 mr-2" />
+                            权限
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => handleCopy(file)}>
                           <Copy className="h-4 w-4 mr-2" />
                           复制
@@ -798,6 +836,30 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
                 取消
               </Button>
               <Button onClick={handleRename} disabled={!newName.trim()}>
+                确定
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={permOpen} onOpenChange={setPermOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>修改权限</DialogTitle>
+              <DialogDescription>
+                {permTarget?.name}
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              placeholder="0644"
+              value={permMode}
+              onChange={(e) => setPermMode(e.target.value)}
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPermOpen(false)}>
+                取消
+              </Button>
+              <Button onClick={handleChmod} disabled={!permMode.trim()}>
                 确定
               </Button>
             </DialogFooter>
@@ -1042,6 +1104,12 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
                           下载
                         </DropdownMenuItem>
                       )}
+                      {file.isFile && activeChannel === 'agent' && (
+                        <DropdownMenuItem onClick={() => handleOpenPerms(file)}>
+                          <Edit3 className="h-4 w-4 mr-2" />
+                          权限
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => handleCopy(file)}>
                         <Copy className="h-4 w-4 mr-2" />
                         复制
@@ -1129,6 +1197,30 @@ export function FileManager({ serverId, serverName, onClose, compact = false }: 
               取消
             </Button>
             <Button onClick={handleRename} disabled={!newName.trim()}>
+              确定
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={permOpen} onOpenChange={setPermOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>修改权限</DialogTitle>
+            <DialogDescription>
+              {permTarget?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            placeholder="0644"
+            value={permMode}
+            onChange={(e) => setPermMode(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPermOpen(false)}>
+              取消
+            </Button>
+            <Button onClick={handleChmod} disabled={!permMode.trim()}>
               确定
             </Button>
           </DialogFooter>

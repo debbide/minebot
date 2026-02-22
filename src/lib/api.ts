@@ -630,6 +630,13 @@ class ApiService {
     return response.json();
   }
 
+  async chmodFile(id: string, path: string, mode: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    return this.request(`/api/bots/${id}/files/chmod`, {
+      method: 'POST',
+      body: JSON.stringify({ path, mode })
+    });
+  }
+
   async getDownloadUrl(id: string, file: string): Promise<{ success: boolean; url?: string; error?: string }> {
     return this.request(`/api/bots/${id}/files/download?file=${encodeURIComponent(file)}`);
   }

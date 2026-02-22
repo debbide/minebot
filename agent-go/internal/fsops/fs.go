@@ -13,6 +13,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,10 +22,15 @@ import (
 const chunkSize = 256 * 1024
 
 type FileInfo struct {
-	Name    string `json:"name"`
-	Size    int64  `json:"size"`
-	ModTime int64  `json:"modTime"`
-	IsFile  bool   `json:"isFile"`
+	Name       string `json:"name"`
+	Mode       string `json:"mode"`
+	Size       int64  `json:"size"`
+	IsFile     bool   `json:"isFile"`
+	IsSymlink  bool   `json:"isSymlink"`
+	IsEditable bool   `json:"isEditable"`
+	Mimetype   string `json:"mimetype"`
+	CreatedAt  string `json:"createdAt"`
+	ModifiedAt string `json:"modifiedAt"`
 }
 
 func ResolveBase(root string, volumeMap, containerMap map[string]string, serverId string) string {
@@ -55,11 +61,21 @@ func List(base, path string) ([]FileInfo, error) {
 		if err != nil {
 			continue
 		}
+		isFile := !e.IsDir()
+		isSymlink := info.Mode()&os.ModeSymlink != 0
+		modifiedAt := info.ModTime().UTC().Format(time.RFC3339)
+		mode := fmt.Sprintf("%#o", info.Mode().Perm())
+		isEditable := isFile && info.Size() < 10*1024*1024
 		out = append(out, FileInfo{
-			Name:    e.Name(),
-			Size:    info.Size(),
-			ModTime: info.ModTime().Unix(),
-			IsFile:  !e.IsDir(),
+			Name:       e.Name(),
+			Mode:       mode,
+			Size:       info.Size(),
+			IsFile:     isFile,
+			IsSymlink:  isSymlink,
+			IsEditable: isEditable,
+			Mimetype:   "",
+			CreatedAt:  modifiedAt,
+			ModifiedAt: modifiedAt,
 		})
 	}
 	return out, nil
@@ -83,6 +99,18 @@ func Write(base, path, content string) error {
 		return err
 	}
 	return os.WriteFile(abs, []byte(content), 0644)
+}
+
+func Chmod(base, path, mode string) error {
+	abs, err := safePath(base, path)
+	if err != nil {
+		return err
+	}
+	parsed, err := strconv.ParseUint(strings.TrimPrefix(mode, "0"), 8, 32)
+	if err != nil {
+		return err
+	}
+	return os.Chmod(abs, os.FileMode(parsed))
 }
 
 func Mkdir(base, root, name string) error {

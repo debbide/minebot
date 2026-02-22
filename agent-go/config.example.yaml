@@ -35,6 +35,7 @@ security:
     - LIST
     - READ
     - WRITE
+    - CHMOD
     - MKDIR
     - DELETE
     - RENAME

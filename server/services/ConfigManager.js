@@ -91,6 +91,12 @@ function getMasterPassword() {
       const stored = fs.readFileSync(MASTER_KEY_FILE, 'utf-8').trim();
       return stored || null;
     }
+    if (fs.existsSync(CONFIG_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+      if (raw && raw.masterKey) {
+        return raw.masterKey;
+      }
+    }
   } catch (error) {
     console.error('❌ Error reading master key file:', error.message);
   }
@@ -293,7 +299,8 @@ export class ConfigManager {
           encrypted: true,
           version: '2.0',
           salt: salt.toString('base64'),
-          data: encrypted
+          data: encrypted,
+          masterKey: process.env.MASTER_PASSWORD ? undefined : masterPassword
         };
 
         fs.writeFileSync(CONFIG_FILE, JSON.stringify(encryptedConfig, null, 2));

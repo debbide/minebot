@@ -59,6 +59,8 @@ func (h *Handlers) Handle(msg protocol.Message) protocol.Message {
 		return h.handleWrite(msg)
 	case "MKDIR":
 		return h.handleMkdir(msg)
+	case "CHMOD":
+		return h.handleChmod(msg)
 	case "DELETE":
 		return h.handleDelete(msg)
 	case "RENAME":
@@ -248,6 +250,25 @@ func (h *Handlers) handleMkdir(msg protocol.Message) protocol.Message {
 	}
 	base := fsops.ResolveBase(h.cfg.FileRoot, h.cfg.VolumeMap, h.cfg.ContainerMap, payload.ServerID)
 	if err := fsops.Mkdir(base, payload.Root, payload.Name); err != nil {
+		return response(msg.ID, false, err.Error(), nil)
+	}
+	return response(msg.ID, true, "ok", nil)
+}
+
+func (h *Handlers) handleChmod(msg protocol.Message) protocol.Message {
+	var payload struct {
+		ServerID string `json:"serverId"`
+		Path     string `json:"path"`
+		Mode     string `json:"mode"`
+	}
+	if err := json.Unmarshal(msg.Payload, &payload); err != nil {
+		return response(msg.ID, false, "bad payload", nil)
+	}
+	if payload.Path == "" || payload.Mode == "" {
+		return response(msg.ID, false, "missing path or mode", nil)
+	}
+	base := fsops.ResolveBase(h.cfg.FileRoot, h.cfg.VolumeMap, h.cfg.ContainerMap, payload.ServerID)
+	if err := fsops.Chmod(base, payload.Path, payload.Mode); err != nil {
 		return response(msg.ID, false, err.Error(), nil)
 	}
 	return response(msg.ID, true, "ok", nil)
