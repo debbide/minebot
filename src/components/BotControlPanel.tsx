@@ -39,6 +39,7 @@ interface BotControlPanelProps {
   connected: boolean;
   serverType?: "minecraft" | "panel";  // 服务器类型
   panelServerState?: string;  // 面板服务器状态
+  agentOnline?: boolean;
   modes?: {
     follow?: boolean;
     autoAttack?: boolean;
@@ -124,6 +125,7 @@ export function BotControlPanel({
   connected,
   serverType = "minecraft",
   panelServerState,
+  agentOnline = false,
   modes = {},
   players = [],
   restartTimer,
@@ -254,6 +256,7 @@ export function BotControlPanel({
 
   // 纯面板服务器：只显示电源控制
   if (serverType === "panel") {
+    const panelAvailable = !!pterodactyl?.url || agentOnline;
     return (
       <div className="space-y-2 mt-2">
         <div className="flex gap-2 flex-wrap">
@@ -262,7 +265,7 @@ export function BotControlPanel({
             size="sm"
             variant="default"
             onClick={() => handlePowerSignal('start')}
-            disabled={loading?.startsWith('power-') || !pterodactyl?.url}
+            disabled={loading?.startsWith('power-') || !panelAvailable}
             className="bg-green-600 hover:bg-green-700"
           >
             {loading === "power-start" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Power className="h-4 w-4 mr-1" />}
@@ -272,7 +275,7 @@ export function BotControlPanel({
             size="sm"
             variant="default"
             onClick={() => handlePowerSignal('stop')}
-            disabled={loading?.startsWith('power-') || !pterodactyl?.url}
+            disabled={loading?.startsWith('power-') || !panelAvailable}
             className="bg-yellow-600 hover:bg-yellow-700"
           >
             {loading === "power-stop" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <PowerOff className="h-4 w-4 mr-1" />}
@@ -282,15 +285,15 @@ export function BotControlPanel({
             size="sm"
             variant="default"
             onClick={() => handlePowerSignal('restart')}
-            disabled={loading?.startsWith('power-') || !pterodactyl?.url}
+            disabled={loading?.startsWith('power-') || !panelAvailable}
             className="bg-blue-600 hover:bg-blue-700"
           >
             {loading === "power-restart" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RotateCcw className="h-4 w-4 mr-1" />}
             <span className="text-xs">重启</span>
           </Button>
         </div>
-        {!pterodactyl?.url && (
-          <p className="text-xs text-muted-foreground">请先在设置中配置翼龙面板信息</p>
+        {!panelAvailable && (
+          <p className="text-xs text-muted-foreground">请先在设置中配置翼龙面板信息或绑定探针</p>
         )}
       </div>
     );

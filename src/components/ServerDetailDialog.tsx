@@ -264,7 +264,7 @@ export function ServerDetailDialog({
                 <Activity className="h-4 w-4" />
                 探针
               </TabsTrigger>
-              {(server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
+              {(server.agentStatus?.connected || server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
                 <TabsTrigger
                   value="files"
                   className="gap-2 px-0 pb-3 rounded-none bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none transition-all"
@@ -277,7 +277,7 @@ export function ServerDetailDialog({
           </div>
 
           {/* 文件管理 - 完全独立的层，覆盖其他内容 */}
-          {activeTab === 'files' && (server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
+          {activeTab === 'files' && (server.agentStatus?.connected || server.pterodactyl?.url || (server.sftp?.host && server.fileAccessType === 'sftp')) && (
             <div className="flex-1 overflow-y-auto p-6">
               <FileManager
                 serverId={server.id}
@@ -348,13 +348,14 @@ export function ServerDetailDialog({
                 </div>
 
                 {/* Bot 控制面板 */}
-                <BotControlPanel
-                  botId={server.id}
-                  botName={server.username || server.name}
-                  connected={server.connected || false}
-                  serverType={server.type || "minecraft"}
-                  panelServerState={server.panelServerState}
-                  modes={server.modes}
+              <BotControlPanel
+                botId={server.id}
+                botName={server.username || server.name}
+                connected={server.connected || false}
+                serverType={server.type || "minecraft"}
+                panelServerState={server.panelServerState}
+                agentOnline={server.agentStatus?.connected || false}
+                modes={server.modes}
                   players={server.players}
                   restartTimer={server.restartTimer}
                   autoChat={server.autoChat}
