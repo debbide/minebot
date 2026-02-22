@@ -970,6 +970,29 @@ export class BotInstance {
     }
   }
 
+  async testRconConnection() {
+    const rcon = this.status.rcon;
+    if (!rcon || !rcon.enabled || !rcon.host || !rcon.port || !rcon.password) {
+      return { success: false, message: 'RCON 未配置' };
+    }
+
+    try {
+      const { Rcon } = await import('rcon-client');
+      const client = await Rcon.connect({
+        host: rcon.host,
+        port: rcon.port,
+        password: rcon.password,
+        timeout: 8000
+      });
+      const response = await client.send('list');
+      await client.end();
+      return { success: true, message: response || 'RCON 连接成功' };
+    } catch (error) {
+      const errMsg = error?.message || 'RCON 连接失败';
+      return { success: false, message: errMsg };
+    }
+  }
+
   /**
    * 自动给机器人 OP 权限
    */

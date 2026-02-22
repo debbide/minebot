@@ -449,6 +449,22 @@ export function BotSettingsPanel({
         }
     };
 
+    const handleTestRcon = async () => {
+        setLoading("rconTest");
+        try {
+            const result = await api.testRcon(botId);
+            toast({
+                title: result.success ? "RCON 连接成功" : "RCON 连接失败",
+                description: result.message,
+                variant: result.success ? "default" : "destructive"
+            });
+        } catch (error) {
+            toast({ title: "错误", description: String(error), variant: "destructive" });
+        } finally {
+            setLoading(null);
+        }
+    };
+
     const parseWaypoints = (raw: string): { x: number; y: number; z: number }[] => {
         return raw
             .split("\n")
@@ -985,6 +1001,15 @@ export function BotSettingsPanel({
                     >
                         {loading === "rcon" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
                         保存 RCON 配置
+                    </Button>
+                    <Button
+                        variant="outline"
+                        onClick={handleTestRcon}
+                        disabled={loading === "rconTest" || !rconEnabled}
+                        className="w-full"
+                    >
+                        {loading === "rconTest" ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                        测试 RCON 连接
                     </Button>
                 </div>
 

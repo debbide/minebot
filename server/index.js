@@ -908,6 +908,20 @@ app.post('/api/bots/:id/rcon', (req, res) => {
   }
 });
 
+// Test RCON connection for a bot
+app.post('/api/bots/:id/rcon-test', async (req, res) => {
+  try {
+    const bot = botManager.bots.get(req.params.id);
+    if (!bot) {
+      return res.status(404).json({ success: false, error: 'Bot not found' });
+    }
+    const result = await bot.testRconConnection();
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
 // Set file access type for a bot
 app.post('/api/bots/:id/file-access-type', (req, res) => {
   try {

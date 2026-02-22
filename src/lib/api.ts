@@ -544,6 +544,13 @@ class ApiService {
     });
   }
 
+  // Test RCON connection for a bot
+  async testRcon(id: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/bots/${id}/rcon-test`, {
+      method: 'POST'
+    });
+  }
+
   // Update behavior settings for a bot
   async setBehaviorSettings(id: string, settings: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } }): Promise<{ success: boolean; behaviorSettings: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } } }> {
     return this.request(`/api/bots/${id}/behavior-settings`, {
