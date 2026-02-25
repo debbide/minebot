@@ -2189,6 +2189,9 @@ export class BotInstance {
         result = { success: false, message: '未知行为' };
     }
 
+    this.config.modes = { ...this.modes };
+    this.saveConfig();
+
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
     return result;
   }
