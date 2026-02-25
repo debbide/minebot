@@ -75,7 +75,12 @@ export class BotInstance {
       autoAttack: false,
       follow: false,
       mining: false,
-      invincible: false  // 无敌模式
+      invincible: false,  // 无敌模式
+      antiAfk: false,
+      autoEat: false,
+      guard: false,
+      fishing: false,
+      rateLimit: false
     };
     this.modes = { ...defaultModes, ...(config.modes || {}) };
 
@@ -89,6 +94,32 @@ export class BotInstance {
         waypoints: Array.isArray(config.behaviorSettings?.patrol?.waypoints)
           ? config.behaviorSettings.patrol.waypoints
           : []
+      },
+      antiAfk: {
+        intervalSeconds: 45,
+        jitterSeconds: 15,
+        ...(config.behaviorSettings?.antiAfk || {})
+      },
+      autoEat: {
+        minHealth: 6,
+        minFood: 14,
+        ...(config.behaviorSettings?.autoEat || {})
+      },
+      guard: {
+        radius: 12,
+        attackRange: 4,
+        minHealth: 6,
+        ...(config.behaviorSettings?.guard || {})
+      },
+      fishing: {
+        intervalSeconds: 2,
+        timeoutSeconds: 25,
+        ...(config.behaviorSettings?.fishing || {})
+      },
+      rateLimit: {
+        globalCooldownSeconds: 1,
+        maxPerMinute: 20,
+        ...(config.behaviorSettings?.rateLimit || {})
       }
     };
 
@@ -767,6 +798,56 @@ export class BotInstance {
         }
       } catch (e) {
         this.log('warning', `自动攻击恢复失败: ${e.message}`, '⚠️');
+      }
+
+      try {
+        if (this.modes.antiAfk) {
+          const options = this.behaviorSettings.antiAfk || {};
+          this.behaviors.antiAfk.start(options);
+          this.log('info', '防踢已恢复', '🟢');
+        }
+      } catch (e) {
+        this.log('warning', `防踢恢复失败: ${e.message}`, '⚠️');
+      }
+
+      try {
+        if (this.modes.autoEat) {
+          const options = this.behaviorSettings.autoEat || {};
+          this.behaviors.autoEat.start(options);
+          this.log('info', '自动吃已恢复', '🍖');
+        }
+      } catch (e) {
+        this.log('warning', `自动吃恢复失败: ${e.message}`, '⚠️');
+      }
+
+      try {
+        if (this.modes.guard) {
+          const options = this.behaviorSettings.guard || {};
+          this.behaviors.guard.start(options);
+          this.log('info', '守护已恢复', '🛡️');
+        }
+      } catch (e) {
+        this.log('warning', `守护恢复失败: ${e.message}`, '⚠️');
+      }
+
+      try {
+        if (this.modes.fishing) {
+          const options = this.behaviorSettings.fishing || {};
+          this.behaviors.fishing.start(options);
+          this.log('info', '自动钓鱼已恢复', '🎣');
+        }
+      } catch (e) {
+        this.log('warning', `自动钓鱼恢复失败: ${e.message}`, '⚠️');
+      }
+
+      try {
+        if (this.modes.rateLimit) {
+          const options = this.behaviorSettings.rateLimit || {};
+          this.behaviors.rateLimit.start(options);
+          this.log('info', '限速已恢复', '⏱️');
+        }
+      } catch (e) {
+        this.log('warning', `限速恢复失败: ${e.message}`, '⚠️');
       }
 
       try {
@@ -1653,6 +1734,14 @@ export class BotInstance {
         this.behaviors.mining.stop();
         this.modes.mining = false;
         break;
+      case 'guard':
+        this.behaviors.guard.stop();
+        this.modes.guard = false;
+        break;
+      case 'fishing':
+        this.behaviors.fishing.stop();
+        this.modes.fishing = false;
+        break;
       default:
         return;
     }
@@ -1663,7 +1752,9 @@ export class BotInstance {
       follow: ['patrol', 'mining'],
       patrol: ['follow', 'mining', 'attack'],
       mining: ['follow', 'patrol', 'attack'],
-      attack: ['patrol', 'mining']
+      attack: ['patrol', 'mining'],
+      guard: ['follow', 'patrol', 'mining', 'attack', 'fishing'],
+      fishing: ['follow', 'patrol', 'mining', 'attack', 'guard']
     };
 
     const toStop = conflicts[target] || [];
@@ -1672,6 +1763,8 @@ export class BotInstance {
       if (mode === 'patrol' && this.modes.patrol) this.stopMode('patrol');
       if (mode === 'mining' && this.modes.mining) this.stopMode('mining');
       if (mode === 'attack' && this.modes.autoAttack) this.stopMode('attack');
+      if (mode === 'guard' && this.modes.guard) this.stopMode('guard');
+      if (mode === 'fishing' && this.modes.fishing) this.stopMode('fishing');
     });
   }
 
@@ -1679,12 +1772,18 @@ export class BotInstance {
     const messages = {
       follow: { target_lost: '跟随目标已离开，自动停止跟随' },
       attack: { low_health: '生命值过低，自动停止攻击' },
-      mining: { inventory_full: '背包已满，自动停止挖矿' }
+      mining: { inventory_full: '背包已满，自动停止挖矿' },
+      guard: { low_health: '生命值过低，自动停止守护' }
     };
 
     if (behavior === 'follow') this.modes.follow = false;
     if (behavior === 'attack') this.modes.autoAttack = false;
     if (behavior === 'mining') this.modes.mining = false;
+    if (behavior === 'guard') this.modes.guard = false;
+    if (behavior === 'fishing') this.modes.fishing = false;
+    if (behavior === 'antiAfk') this.modes.antiAfk = false;
+    if (behavior === 'autoEat') this.modes.autoEat = false;
+    if (behavior === 'rateLimit') this.modes.rateLimit = false;
 
     const msg = messages[behavior]?.[reason];
     if (msg && this.bot) {
@@ -1696,7 +1795,12 @@ export class BotInstance {
   updateBehaviorSettings(settings = {}) {
     const next = {
       attack: { ...(this.behaviorSettings.attack || {}) },
-      patrol: { ...(this.behaviorSettings.patrol || {}) }
+      patrol: { ...(this.behaviorSettings.patrol || {}) },
+      antiAfk: { ...(this.behaviorSettings.antiAfk || {}) },
+      autoEat: { ...(this.behaviorSettings.autoEat || {}) },
+      guard: { ...(this.behaviorSettings.guard || {}) },
+      fishing: { ...(this.behaviorSettings.fishing || {}) },
+      rateLimit: { ...(this.behaviorSettings.rateLimit || {}) }
     };
 
     if (settings.attack) {
@@ -1723,6 +1827,51 @@ export class BotInstance {
           }))
           .filter(point => !Number.isNaN(point.x) && !Number.isNaN(point.y) && !Number.isNaN(point.z));
       }
+    }
+
+    if (settings.antiAfk) {
+      const intervalSeconds = Number(settings.antiAfk.intervalSeconds);
+      const jitterSeconds = Number(settings.antiAfk.jitterSeconds);
+      if (!Number.isNaN(intervalSeconds)) {
+        next.antiAfk.intervalSeconds = Math.max(5, intervalSeconds);
+      }
+      if (!Number.isNaN(jitterSeconds)) {
+        next.antiAfk.jitterSeconds = Math.max(0, jitterSeconds);
+      }
+    }
+
+    if (settings.autoEat) {
+      const minHealth = Number(settings.autoEat.minHealth);
+      const minFood = Number(settings.autoEat.minFood);
+      if (!Number.isNaN(minHealth)) {
+        next.autoEat.minHealth = Math.max(0, minHealth);
+      }
+      if (!Number.isNaN(minFood)) {
+        next.autoEat.minFood = Math.max(0, minFood);
+      }
+    }
+
+    if (settings.guard) {
+      const radius = Number(settings.guard.radius);
+      const attackRange = Number(settings.guard.attackRange);
+      const minHealth = Number(settings.guard.minHealth);
+      if (!Number.isNaN(radius)) next.guard.radius = Math.max(2, radius);
+      if (!Number.isNaN(attackRange)) next.guard.attackRange = Math.max(2, attackRange);
+      if (!Number.isNaN(minHealth)) next.guard.minHealth = Math.max(0, minHealth);
+    }
+
+    if (settings.fishing) {
+      const intervalSeconds = Number(settings.fishing.intervalSeconds);
+      const timeoutSeconds = Number(settings.fishing.timeoutSeconds);
+      if (!Number.isNaN(intervalSeconds)) next.fishing.intervalSeconds = Math.max(1, intervalSeconds);
+      if (!Number.isNaN(timeoutSeconds)) next.fishing.timeoutSeconds = Math.max(5, timeoutSeconds);
+    }
+
+    if (settings.rateLimit) {
+      const globalCooldownSeconds = Number(settings.rateLimit.globalCooldownSeconds);
+      const maxPerMinute = Number(settings.rateLimit.maxPerMinute);
+      if (!Number.isNaN(globalCooldownSeconds)) next.rateLimit.globalCooldownSeconds = Math.max(0, globalCooldownSeconds);
+      if (!Number.isNaN(maxPerMinute)) next.rateLimit.maxPerMinute = Math.max(0, maxPerMinute);
     }
 
     this.behaviorSettings = next;
@@ -1820,6 +1969,11 @@ export class BotInstance {
     this.modes.autoAttack = false;
     this.modes.patrol = false;
     this.modes.mining = false;
+    this.modes.antiAfk = false;
+    this.modes.autoEat = false;
+    this.modes.guard = false;
+    this.modes.fishing = false;
+    this.modes.rateLimit = false;
     this.bot.chat('已停止所有行为');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
   }
@@ -1974,6 +2128,58 @@ export class BotInstance {
         } else {
           result = this.behaviors.mining.stop();
           this.modes.mining = false;
+        }
+        break;
+      case 'antiAfk':
+        if (enabled) {
+          const antiAfkOptions = { ...(this.behaviorSettings.antiAfk || {}), ...(options || {}) };
+          result = this.behaviors.antiAfk.start(antiAfkOptions);
+          this.modes.antiAfk = result.success;
+        } else {
+          result = this.behaviors.antiAfk.stop();
+          this.modes.antiAfk = false;
+        }
+        break;
+      case 'autoEat':
+        if (enabled) {
+          const autoEatOptions = { ...(this.behaviorSettings.autoEat || {}), ...(options || {}) };
+          result = this.behaviors.autoEat.start(autoEatOptions);
+          this.modes.autoEat = result.success;
+        } else {
+          result = this.behaviors.autoEat.stop();
+          this.modes.autoEat = false;
+        }
+        break;
+      case 'guard':
+        if (enabled) {
+          this.stopConflictingModes('guard');
+          const guardOptions = { ...(this.behaviorSettings.guard || {}), ...(options || {}) };
+          result = this.behaviors.guard.start(guardOptions);
+          this.modes.guard = result.success;
+        } else {
+          result = this.behaviors.guard.stop();
+          this.modes.guard = false;
+        }
+        break;
+      case 'fishing':
+        if (enabled) {
+          this.stopConflictingModes('fishing');
+          const fishingOptions = { ...(this.behaviorSettings.fishing || {}), ...(options || {}) };
+          result = this.behaviors.fishing.start(fishingOptions);
+          this.modes.fishing = result.success;
+        } else {
+          result = this.behaviors.fishing.stop();
+          this.modes.fishing = false;
+        }
+        break;
+      case 'rateLimit':
+        if (enabled) {
+          const rateOptions = { ...(this.behaviorSettings.rateLimit || {}), ...(options || {}) };
+          result = this.behaviors.rateLimit.start(rateOptions);
+          this.modes.rateLimit = result.success;
+        } else {
+          result = this.behaviors.rateLimit.stop();
+          this.modes.rateLimit = false;
         }
         break;
       default:

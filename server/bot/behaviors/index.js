@@ -666,6 +666,514 @@ export class AiViewBehavior {
 }
 
 /**
+ * 防踢行为 - 轻量随机动作
+ */
+export class AntiAfkBehavior {
+  constructor(bot, logFn = null) {
+    this.bot = bot;
+    this.log = logFn;
+    this.active = false;
+    this.intervalSeconds = 45;
+    this.jitterSeconds = 15;
+    this.actions = ['look', 'jump', 'swing', 'sneak'];
+    this.timeout = null;
+    this.lastAction = null;
+  }
+
+  start(options = {}) {
+    if (this.active) return { success: false, message: '防踢已在运行' };
+
+    this.intervalSeconds = Number.isFinite(options.intervalSeconds)
+      ? Math.max(5, options.intervalSeconds)
+      : this.intervalSeconds;
+    this.jitterSeconds = Number.isFinite(options.jitterSeconds)
+      ? Math.max(0, options.jitterSeconds)
+      : this.jitterSeconds;
+    if (Array.isArray(options.actions) && options.actions.length > 0) {
+      this.actions = options.actions.map(item => String(item));
+    }
+
+    this.active = true;
+    this.scheduleNext();
+    return { success: true, message: '防踢已开启' };
+  }
+
+  scheduleNext() {
+    if (!this.active) return;
+    const base = this.intervalSeconds * 1000;
+    const jitter = this.jitterSeconds * 1000;
+    const delay = Math.max(500, base + (Math.random() * 2 - 1) * jitter);
+    this.timeout = setTimeout(() => {
+      this.performAction();
+      this.scheduleNext();
+    }, delay);
+  }
+
+  performAction() {
+    if (!this.active || !this.bot?.entity) return;
+    const action = this.actions[Math.floor(Math.random() * this.actions.length)] || 'look';
+    this.lastAction = action;
+
+    try {
+      switch (action) {
+        case 'jump':
+          this.bot.setControlState('jump', true);
+          setTimeout(() => {
+            if (this.bot) this.bot.setControlState('jump', false);
+          }, 150);
+          break;
+        case 'swing':
+          this.bot.swingArm();
+          break;
+        case 'sneak':
+          this.bot.setControlState('sneak', true);
+          setTimeout(() => {
+            if (this.bot) this.bot.setControlState('sneak', false);
+          }, 200);
+          break;
+        case 'look':
+        default: {
+          const pos = this.bot.entity.position;
+          const target = pos.offset((Math.random() - 0.5) * 4, Math.random() * 2, (Math.random() - 0.5) * 4);
+          this.bot.lookAt(target);
+          break;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  stop() {
+    this.active = false;
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = null;
+    }
+    return { success: true, message: '防踢已关闭' };
+  }
+
+  getStatus() {
+    return {
+      active: this.active,
+      intervalSeconds: this.intervalSeconds,
+      jitterSeconds: this.jitterSeconds,
+      lastAction: this.lastAction
+    };
+  }
+}
+
+/**
+ * 自动吃东西行为
+ */
+export class AutoEatBehavior {
+  constructor(bot, logFn = null, onAutoStop = null) {
+    this.bot = bot;
+    this.log = logFn;
+    this.onAutoStop = onAutoStop;
+    this.active = false;
+    this.minHealth = 6;
+    this.minFood = 14;
+    this.interval = null;
+    this.eating = false;
+    this.lastFood = null;
+  }
+
+  start(options = {}) {
+    if (this.active) return { success: false, message: '自动吃已在运行' };
+
+    if (Number.isFinite(options.minHealth)) {
+      this.minHealth = Math.max(0, options.minHealth);
+    }
+    if (Number.isFinite(options.minFood)) {
+      this.minFood = Math.max(0, options.minFood);
+    }
+
+    this.active = true;
+    this.interval = setInterval(() => this.tick(), 1500);
+    return { success: true, message: '自动吃已开启' };
+  }
+
+  getFoodPoints(item) {
+    const registry = this.bot?.registry;
+    if (!registry || !item) return 0;
+    const foods = registry.foods || {};
+    if (foods[item.name]?.foodPoints) return foods[item.name].foodPoints;
+    const itemDef = registry.itemsByName?.[item.name];
+    if (itemDef?.foodPoints) return itemDef.foodPoints;
+    return 0;
+  }
+
+  isFoodItem(item) {
+    if (!item) return false;
+    const foodPoints = this.getFoodPoints(item);
+    if (foodPoints > 0) return true;
+    const fallbackFoods = new Set([
+      'bread', 'apple', 'golden_apple', 'carrot', 'baked_potato',
+      'cooked_beef', 'cooked_chicken', 'cooked_porkchop', 'cooked_mutton',
+      'cooked_rabbit', 'cooked_cod', 'cooked_salmon', 'melon_slice'
+    ]);
+    return fallbackFoods.has(item.name);
+  }
+
+  findBestFood() {
+    const items = this.bot?.inventory?.items?.() || [];
+    const foods = items.filter(item => this.isFoodItem(item));
+    if (foods.length === 0) return null;
+    foods.sort((a, b) => this.getFoodPoints(b) - this.getFoodPoints(a));
+    return foods[0];
+  }
+
+  async tick() {
+    if (!this.active || !this.bot || this.eating) return;
+    const health = typeof this.bot.health === 'number' ? this.bot.health : 20;
+    const food = typeof this.bot.food === 'number' ? this.bot.food : 20;
+    if (health > this.minHealth && food > this.minFood) return;
+
+    const foodItem = this.findBestFood();
+    if (!foodItem) {
+      return;
+    }
+
+    this.eating = true;
+    try {
+      await this.bot.equip(foodItem, 'hand');
+      if (typeof this.bot.consume === 'function') {
+        await this.bot.consume();
+      } else {
+        this.bot.activateItem();
+        await new Promise(r => setTimeout(r, 1600));
+        this.bot.deactivateItem();
+      }
+      this.lastFood = foodItem.name;
+      if (this.log) this.log('info', `自动进食: ${foodItem.name}`, '🍖');
+    } catch (e) {
+      // ignore eat errors
+    } finally {
+      this.eating = false;
+    }
+  }
+
+  stop() {
+    this.active = false;
+    this.lastFood = null;
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+    return { success: true, message: '自动吃已关闭' };
+  }
+
+  getStatus() {
+    return {
+      active: this.active,
+      minHealth: this.minHealth,
+      minFood: this.minFood,
+      lastFood: this.lastFood
+    };
+  }
+}
+
+/**
+ * 守护行为 - 保护机器人自身
+ */
+export class GuardBehavior {
+  constructor(bot, goals, logFn = null, onAutoStop = null) {
+    this.bot = bot;
+    this.goals = goals;
+    this.log = logFn;
+    this.onAutoStop = onAutoStop;
+    this.active = false;
+    this.radius = 12;
+    this.attackRange = 4;
+    this.minHealth = 6;
+    this.interval = null;
+    this.lastTarget = null;
+  }
+
+  start(options = {}) {
+    if (this.active) return { success: false, message: '守护已在运行' };
+
+    if (Number.isFinite(options.radius)) {
+      this.radius = Math.max(2, options.radius);
+    }
+    if (Number.isFinite(options.attackRange)) {
+      this.attackRange = Math.max(2, options.attackRange);
+    }
+    if (Number.isFinite(options.minHealth)) {
+      this.minHealth = Math.max(0, options.minHealth);
+    }
+
+    this.active = true;
+    this.interval = setInterval(() => this.tick(), 500);
+    return { success: true, message: '守护已开启' };
+  }
+
+  findTarget() {
+    if (!this.bot?.entity) return null;
+    const origin = this.bot.entity.position;
+    let nearest = null;
+    let nearestDist = this.radius;
+
+    for (const entity of Object.values(this.bot.entities)) {
+      if (!entity || entity === this.bot.entity) continue;
+      if (entity.type !== 'hostile') continue;
+      const dist = origin.distanceTo(entity.position);
+      if (dist > nearestDist) continue;
+      nearest = entity;
+      nearestDist = dist;
+    }
+
+    return nearest;
+  }
+
+  tick() {
+    if (!this.active || !this.bot?.entity) return;
+    if (typeof this.bot.health === 'number' && this.bot.health <= this.minHealth) {
+      this.autoStop('low_health');
+      return;
+    }
+
+    const target = this.findTarget();
+    if (!target) {
+      this.lastTarget = null;
+      if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+      return;
+    }
+
+    this.lastTarget = target.username || target.name || target.type || 'unknown';
+    const dist = this.bot.entity.position.distanceTo(target.position);
+    if (dist > this.attackRange && this.bot?.pathfinder) {
+      const goal = new this.goals.GoalFollow(target, 1);
+      this.bot.pathfinder.setGoal(goal, true);
+      return;
+    }
+
+    try {
+      this.bot.lookAt(target.position.offset(0, target.height * 0.85, 0));
+      this.bot.attack(target);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  autoStop(reason = 'unknown') {
+    this.active = false;
+    this.lastTarget = null;
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+    if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+    if (this.log && reason === 'low_health') {
+      this.log('warning', '生命值过低，自动停止守护', '🛡️');
+    }
+    if (this.onAutoStop) {
+      this.onAutoStop('guard', reason);
+    }
+  }
+
+  stop() {
+    this.active = false;
+    this.lastTarget = null;
+    if (this.interval) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
+    if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+    return { success: true, message: '守护已关闭' };
+  }
+
+  getStatus() {
+    return {
+      active: this.active,
+      radius: this.radius,
+      attackRange: this.attackRange,
+      minHealth: this.minHealth,
+      lastTarget: this.lastTarget
+    };
+  }
+}
+
+/**
+ * 自动钓鱼行为
+ */
+export class FishingBehavior {
+  constructor(bot, logFn = null, onAutoStop = null) {
+    this.bot = bot;
+    this.log = logFn;
+    this.onAutoStop = onAutoStop;
+    this.active = false;
+    this.intervalSeconds = 2;
+    this.timeoutSeconds = 25;
+    this.fishing = false;
+    this.lastResult = null;
+  }
+
+  start(options = {}) {
+    if (this.active) return { success: false, message: '自动钓鱼已在运行' };
+
+    if (Number.isFinite(options.intervalSeconds)) {
+      this.intervalSeconds = Math.max(1, options.intervalSeconds);
+    }
+    if (Number.isFinite(options.timeoutSeconds)) {
+      this.timeoutSeconds = Math.max(5, options.timeoutSeconds);
+    }
+
+    this.active = true;
+    this.loop();
+    return { success: true, message: '自动钓鱼已开启' };
+  }
+
+  async loop() {
+    while (this.active && this.bot) {
+      if (this.fishing) {
+        await new Promise(r => setTimeout(r, 300));
+        continue;
+      }
+
+      const rod = (this.bot.inventory?.items?.() || []).find(item => item.name === 'fishing_rod');
+      if (!rod) {
+        this.lastResult = '没有钓鱼竿';
+        if (this.log) this.log('warning', '自动钓鱼失败: 未找到钓鱼竿', '🎣');
+        this.autoStop('no_rod');
+        break;
+      }
+
+      if (typeof this.bot.fish !== 'function') {
+        this.lastResult = '不支持钓鱼';
+        if (this.log) this.log('warning', '当前版本不支持自动钓鱼', '🎣');
+        this.autoStop('unsupported');
+        break;
+      }
+
+      this.fishing = true;
+      try {
+        await this.bot.equip(rod, 'hand');
+        await Promise.race([
+          this.bot.fish(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), this.timeoutSeconds * 1000))
+        ]);
+        this.lastResult = '钓鱼成功';
+      } catch (e) {
+        this.lastResult = e?.message || '钓鱼失败';
+      } finally {
+        this.fishing = false;
+      }
+
+      await new Promise(r => setTimeout(r, this.intervalSeconds * 1000));
+    }
+  }
+
+  autoStop(reason = 'unknown') {
+    this.active = false;
+    if (this.bot) this.bot.deactivateItem();
+    if (this.onAutoStop) {
+      this.onAutoStop('fishing', reason);
+    }
+  }
+
+  stop() {
+    this.active = false;
+    if (this.bot) this.bot.deactivateItem();
+    return { success: true, message: '自动钓鱼已关闭' };
+  }
+
+  getStatus() {
+    return {
+      active: this.active,
+      intervalSeconds: this.intervalSeconds,
+      timeoutSeconds: this.timeoutSeconds,
+      lastResult: this.lastResult
+    };
+  }
+}
+
+/**
+ * 消息限速行为 - 限制 bot.chat 频率
+ */
+export class RateLimitBehavior {
+  constructor(bot, logFn = null) {
+    this.bot = bot;
+    this.log = logFn;
+    this.active = false;
+    this.globalCooldownSeconds = 1;
+    this.maxPerMinute = 20;
+    this.lastChatTime = 0;
+    this.windowStart = 0;
+    this.windowCount = 0;
+    this.blockedCount = 0;
+    this.originalChat = null;
+  }
+
+  start(options = {}) {
+    if (this.active) return { success: false, message: '限速已在运行' };
+
+    if (Number.isFinite(options.globalCooldownSeconds)) {
+      this.globalCooldownSeconds = Math.max(0, options.globalCooldownSeconds);
+    }
+    if (Number.isFinite(options.maxPerMinute)) {
+      this.maxPerMinute = Math.max(0, options.maxPerMinute);
+    }
+
+    if (!this.bot?.chat) return { success: false, message: 'Bot 未就绪' };
+
+    this.active = true;
+    this.blockedCount = 0;
+    this.originalChat = this.bot.chat.bind(this.bot);
+    this.bot.chat = (message) => {
+      if (!this.active) return this.originalChat(message);
+      if (this.shouldBlock()) {
+        this.blockedCount += 1;
+        return;
+      }
+      return this.originalChat(message);
+    };
+    return { success: true, message: '限速已开启' };
+  }
+
+  shouldBlock() {
+    const now = Date.now();
+    const minInterval = this.globalCooldownSeconds * 1000;
+    if (minInterval > 0 && now - this.lastChatTime < minInterval) {
+      return true;
+    }
+    this.lastChatTime = now;
+
+    if (this.maxPerMinute > 0) {
+      if (!this.windowStart || now - this.windowStart > 60000) {
+        this.windowStart = now;
+        this.windowCount = 0;
+      }
+      if (this.windowCount >= this.maxPerMinute) {
+        return true;
+      }
+      this.windowCount += 1;
+    }
+
+    return false;
+  }
+
+  stop() {
+    this.active = false;
+    if (this.bot && this.originalChat) {
+      this.bot.chat = this.originalChat;
+    }
+    this.originalChat = null;
+    return { success: true, message: '限速已关闭' };
+  }
+
+  getStatus() {
+    return {
+      active: this.active,
+      globalCooldownSeconds: this.globalCooldownSeconds,
+      maxPerMinute: this.maxPerMinute,
+      blockedCount: this.blockedCount
+    };
+  }
+}
+
+/**
  * 动作行为 - 模拟玩家动作
  */
 export class ActionBehavior {
@@ -804,6 +1312,11 @@ export class BehaviorManager {
     this.mining = new MiningBehavior(bot, logFn, onAutoStop);
     this.action = new ActionBehavior(bot);
     this.aiView = new AiViewBehavior(bot);
+    this.antiAfk = new AntiAfkBehavior(bot, logFn);
+    this.autoEat = new AutoEatBehavior(bot, logFn, onAutoStop);
+    this.guard = new GuardBehavior(bot, goals, logFn, onAutoStop);
+    this.fishing = new FishingBehavior(bot, logFn, onAutoStop);
+    this.rateLimit = new RateLimitBehavior(bot, logFn);
   }
 
   stopAll() {
@@ -813,6 +1326,11 @@ export class BehaviorManager {
     this.mining.stop();
     this.action.stopLoop();
     this.aiView.stop();
+    this.antiAfk.stop();
+    this.autoEat.stop();
+    this.guard.stop();
+    this.fishing.stop();
+    this.rateLimit.stop();
     return { success: true, message: '已停止所有行为' };
   }
 
@@ -823,7 +1341,12 @@ export class BehaviorManager {
       patrol: this.patrol.getStatus(),
       mining: this.mining.getStatus(),
       action: this.action.getStatus(),
-      aiView: this.aiView.getStatus()
+      aiView: this.aiView.getStatus(),
+      antiAfk: this.antiAfk.getStatus(),
+      autoEat: this.autoEat.getStatus(),
+      guard: this.guard.getStatus(),
+      fishing: this.fishing.getStatus(),
+      rateLimit: this.rateLimit.getStatus()
     };
   }
 }

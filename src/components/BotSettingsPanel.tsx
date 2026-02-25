@@ -98,6 +98,37 @@ interface BehaviorStatus {
         range?: number;
         lastTarget?: string | null;
     };
+    antiAfk?: {
+        active: boolean;
+        intervalSeconds?: number;
+        jitterSeconds?: number;
+        lastAction?: string | null;
+    };
+    autoEat?: {
+        active: boolean;
+        minHealth?: number;
+        minFood?: number;
+        lastFood?: string | null;
+    };
+    guard?: {
+        active: boolean;
+        radius?: number;
+        attackRange?: number;
+        minHealth?: number;
+        lastTarget?: string | null;
+    };
+    fishing?: {
+        active: boolean;
+        intervalSeconds?: number;
+        timeoutSeconds?: number;
+        lastResult?: string | null;
+    };
+    rateLimit?: {
+        active: boolean;
+        globalCooldownSeconds?: number;
+        maxPerMinute?: number;
+        blockedCount?: number;
+    };
 }
 
 export function BotSettingsPanel({
@@ -140,6 +171,17 @@ export function BotSettingsPanel({
     const [attackWhitelistText, setAttackWhitelistText] = useState<string>("");
     const [attackMinHealth, setAttackMinHealth] = useState<string>("6");
     const [patrolWaypointsText, setPatrolWaypointsText] = useState<string>("");
+    const [antiAfkInterval, setAntiAfkInterval] = useState<string>("45");
+    const [antiAfkJitter, setAntiAfkJitter] = useState<string>("15");
+    const [autoEatMinHealth, setAutoEatMinHealth] = useState<string>("6");
+    const [autoEatMinFood, setAutoEatMinFood] = useState<string>("14");
+    const [guardRadius, setGuardRadius] = useState<string>("12");
+    const [guardAttackRange, setGuardAttackRange] = useState<string>("4");
+    const [guardMinHealth, setGuardMinHealth] = useState<string>("6");
+    const [fishingInterval, setFishingInterval] = useState<string>("2");
+    const [fishingTimeout, setFishingTimeout] = useState<string>("25");
+    const [rateLimitCooldown, setRateLimitCooldown] = useState<string>("1");
+    const [rateLimitMaxPerMinute, setRateLimitMaxPerMinute] = useState<string>("20");
     const [commandAllowAll, setCommandAllowAll] = useState<boolean>(false);
     const [commandCooldownSeconds, setCommandCooldownSeconds] = useState<string>("3");
     const [commandWhitelistText, setCommandWhitelistText] = useState<string>("");
@@ -234,6 +276,61 @@ export function BotSettingsPanel({
                 const waypoints = settings.patrol?.waypoints || [];
                 setPatrolWaypointsText(
                     waypoints.map(point => `${point.x} ${point.y} ${point.z}`).join("\n")
+                );
+                setAntiAfkInterval(
+                    settings.antiAfk?.intervalSeconds !== undefined
+                        ? String(settings.antiAfk.intervalSeconds)
+                        : "45"
+                );
+                setAntiAfkJitter(
+                    settings.antiAfk?.jitterSeconds !== undefined
+                        ? String(settings.antiAfk.jitterSeconds)
+                        : "15"
+                );
+                setAutoEatMinHealth(
+                    settings.autoEat?.minHealth !== undefined
+                        ? String(settings.autoEat.minHealth)
+                        : "6"
+                );
+                setAutoEatMinFood(
+                    settings.autoEat?.minFood !== undefined
+                        ? String(settings.autoEat.minFood)
+                        : "14"
+                );
+                setGuardRadius(
+                    settings.guard?.radius !== undefined
+                        ? String(settings.guard.radius)
+                        : "12"
+                );
+                setGuardAttackRange(
+                    settings.guard?.attackRange !== undefined
+                        ? String(settings.guard.attackRange)
+                        : "4"
+                );
+                setGuardMinHealth(
+                    settings.guard?.minHealth !== undefined
+                        ? String(settings.guard.minHealth)
+                        : "6"
+                );
+                setFishingInterval(
+                    settings.fishing?.intervalSeconds !== undefined
+                        ? String(settings.fishing.intervalSeconds)
+                        : "2"
+                );
+                setFishingTimeout(
+                    settings.fishing?.timeoutSeconds !== undefined
+                        ? String(settings.fishing.timeoutSeconds)
+                        : "25"
+                );
+                setRateLimitCooldown(
+                    settings.rateLimit?.globalCooldownSeconds !== undefined
+                        ? String(settings.rateLimit.globalCooldownSeconds)
+                        : "1"
+                );
+                setRateLimitMaxPerMinute(
+                    settings.rateLimit?.maxPerMinute !== undefined
+                        ? String(settings.rateLimit.maxPerMinute)
+                        : "20"
                 );
                 const cmdSettings = result.config.commandSettings || {};
                 setCommandAllowAll(!!cmdSettings.allowAll);
@@ -536,6 +633,17 @@ export function BotSettingsPanel({
                 .filter(name => name);
             const minHealth = Number(attackMinHealth);
             const waypoints = parseWaypoints(patrolWaypointsText);
+            const antiAfkIntervalValue = Number(antiAfkInterval);
+            const antiAfkJitterValue = Number(antiAfkJitter);
+            const autoEatMinHealthValue = Number(autoEatMinHealth);
+            const autoEatMinFoodValue = Number(autoEatMinFood);
+            const guardRadiusValue = Number(guardRadius);
+            const guardAttackRangeValue = Number(guardAttackRange);
+            const guardMinHealthValue = Number(guardMinHealth);
+            const fishingIntervalValue = Number(fishingInterval);
+            const fishingTimeoutValue = Number(fishingTimeout);
+            const rateLimitCooldownValue = Number(rateLimitCooldown);
+            const rateLimitMaxPerMinuteValue = Number(rateLimitMaxPerMinute);
 
             await api.setBehaviorSettings(botId, {
                 attack: {
@@ -544,6 +652,27 @@ export function BotSettingsPanel({
                 },
                 patrol: {
                     waypoints
+                },
+                antiAfk: {
+                    intervalSeconds: Number.isNaN(antiAfkIntervalValue) ? 45 : antiAfkIntervalValue,
+                    jitterSeconds: Number.isNaN(antiAfkJitterValue) ? 15 : antiAfkJitterValue
+                },
+                autoEat: {
+                    minHealth: Number.isNaN(autoEatMinHealthValue) ? 6 : autoEatMinHealthValue,
+                    minFood: Number.isNaN(autoEatMinFoodValue) ? 14 : autoEatMinFoodValue
+                },
+                guard: {
+                    radius: Number.isNaN(guardRadiusValue) ? 12 : guardRadiusValue,
+                    attackRange: Number.isNaN(guardAttackRangeValue) ? 4 : guardAttackRangeValue,
+                    minHealth: Number.isNaN(guardMinHealthValue) ? 6 : guardMinHealthValue
+                },
+                fishing: {
+                    intervalSeconds: Number.isNaN(fishingIntervalValue) ? 2 : fishingIntervalValue,
+                    timeoutSeconds: Number.isNaN(fishingTimeoutValue) ? 25 : fishingTimeoutValue
+                },
+                rateLimit: {
+                    globalCooldownSeconds: Number.isNaN(rateLimitCooldownValue) ? 1 : rateLimitCooldownValue,
+                    maxPerMinute: Number.isNaN(rateLimitMaxPerMinuteValue) ? 20 : rateLimitMaxPerMinuteValue
                 }
             });
 
@@ -828,6 +957,11 @@ security:
                             <div>挖矿目标: {formatList(behaviorStatus.mining?.targetBlocks)}</div>
                             <div>AI视角: {behaviorStatus.aiView?.active ? `范围 ${formatValue(behaviorStatus.aiView.range)} | 目标 ${formatValue(behaviorStatus.aiView.lastTarget)}` : "未开启"}</div>
                             <div>动作: {behaviorStatus.action?.looping ? `循环中 | 动作数 ${formatValue(behaviorStatus.action.actionsCount)}` : "未开启"}</div>
+                            <div>防踢: {behaviorStatus.antiAfk?.active ? `间隔 ${formatValue(behaviorStatus.antiAfk.intervalSeconds)}s | 抖动 ${formatValue(behaviorStatus.antiAfk.jitterSeconds)}s | 动作 ${formatValue(behaviorStatus.antiAfk.lastAction)}` : "未开启"}</div>
+                            <div>自动吃: {behaviorStatus.autoEat?.active ? `血线 ${formatValue(behaviorStatus.autoEat.minHealth)} | 饥饿 ${formatValue(behaviorStatus.autoEat.minFood)} | 食物 ${formatValue(behaviorStatus.autoEat.lastFood)}` : "未开启"}</div>
+                            <div>守护: {behaviorStatus.guard?.active ? `半径 ${formatValue(behaviorStatus.guard.radius)} | 攻击距 ${formatValue(behaviorStatus.guard.attackRange)} | 血线 ${formatValue(behaviorStatus.guard.minHealth)} | 目标 ${formatValue(behaviorStatus.guard.lastTarget)}` : "未开启"}</div>
+                            <div>钓鱼: {behaviorStatus.fishing?.active ? `间隔 ${formatValue(behaviorStatus.fishing.intervalSeconds)}s | 超时 ${formatValue(behaviorStatus.fishing.timeoutSeconds)}s | 状态 ${formatValue(behaviorStatus.fishing.lastResult)}` : "未开启"}</div>
+                            <div>限速: {behaviorStatus.rateLimit?.active ? `冷却 ${formatValue(behaviorStatus.rateLimit.globalCooldownSeconds)}s | 每分钟 ${formatValue(behaviorStatus.rateLimit.maxPerMinute)} | 拦截 ${formatValue(behaviorStatus.rateLimit.blockedCount)}` : "未开启"}</div>
                         </div>
                     )}
                 </div>
@@ -867,6 +1001,116 @@ security:
                     <p className="text-xs text-muted-foreground">
                         留空时使用随机巡逻，填入后按路径点循环。
                     </p>
+                </div>
+                <div className="space-y-2">
+                    <Label>防踢间隔 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="5"
+                        value={antiAfkInterval}
+                        onChange={(e) => setAntiAfkInterval(e.target.value)}
+                        placeholder="45"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>防踢抖动 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={antiAfkJitter}
+                        onChange={(e) => setAntiAfkJitter(e.target.value)}
+                        placeholder="15"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>自动吃最低生命值</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={autoEatMinHealth}
+                        onChange={(e) => setAutoEatMinHealth(e.target.value)}
+                        placeholder="6"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>自动吃最低饥饿值</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={autoEatMinFood}
+                        onChange={(e) => setAutoEatMinFood(e.target.value)}
+                        placeholder="14"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>守护半径</Label>
+                    <Input
+                        type="number"
+                        min="2"
+                        value={guardRadius}
+                        onChange={(e) => setGuardRadius(e.target.value)}
+                        placeholder="12"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>守护攻击距离</Label>
+                    <Input
+                        type="number"
+                        min="2"
+                        value={guardAttackRange}
+                        onChange={(e) => setGuardAttackRange(e.target.value)}
+                        placeholder="4"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>守护最低生命值</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={guardMinHealth}
+                        onChange={(e) => setGuardMinHealth(e.target.value)}
+                        placeholder="6"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>钓鱼间隔 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="1"
+                        value={fishingInterval}
+                        onChange={(e) => setFishingInterval(e.target.value)}
+                        placeholder="2"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>钓鱼超时 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="5"
+                        value={fishingTimeout}
+                        onChange={(e) => setFishingTimeout(e.target.value)}
+                        placeholder="25"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>限速全局冷却 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={rateLimitCooldown}
+                        onChange={(e) => setRateLimitCooldown(e.target.value)}
+                        placeholder="1"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>限速每分钟上限</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        value={rateLimitMaxPerMinute}
+                        onChange={(e) => setRateLimitMaxPerMinute(e.target.value)}
+                        placeholder="20"
+                    />
                 </div>
                 <Button
                     onClick={handleSaveBehaviorSettings}

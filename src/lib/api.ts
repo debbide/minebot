@@ -34,6 +34,11 @@ export interface BotStatus {
     aiView?: boolean;
     autoChat?: boolean;
     invincible?: boolean;
+    antiAfk?: boolean;
+    autoEat?: boolean;
+    guard?: boolean;
+    fishing?: boolean;
+    rateLimit?: boolean;
   };
   restartTimer?: {
     enabled: boolean;
@@ -533,7 +538,7 @@ class ApiService {
   }
 
   // Get bot config
-  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; rcon?: { enabled: boolean; host: string; port: number; password: string } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean; agentId?: string | null; agentToken?: string | null; behaviorSettings?: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } } | null; commandSettings?: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean; globalCooldownSeconds?: number; maxPerMinute?: number } | null } }> {
+  async getBotConfig(id: string): Promise<{ success: boolean; config: { id: string; name: string; modes: Record<string, boolean>; autoChat: { enabled: boolean; interval: number; messages: string[] }; restartTimer: { enabled: boolean; intervalMinutes: number; nextRestart: string | null }; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } | null; rcon?: { enabled: boolean; host: string; port: number; password: string } | null; sftp: { host: string; port: number; username: string; password: string; privateKey: string; basePath: string } | null; fileAccessType: 'pterodactyl' | 'sftp' | 'none'; autoOp: boolean; agentId?: string | null; agentToken?: string | null; behaviorSettings?: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] }; antiAfk?: { intervalSeconds?: number; jitterSeconds?: number }; autoEat?: { minHealth?: number; minFood?: number }; guard?: { radius?: number; attackRange?: number; minHealth?: number }; fishing?: { intervalSeconds?: number; timeoutSeconds?: number }; rateLimit?: { globalCooldownSeconds?: number; maxPerMinute?: number } } | null; commandSettings?: { allowAll?: boolean; cooldownSeconds?: number; whitelist?: string[]; silentReject?: boolean; globalCooldownSeconds?: number; maxPerMinute?: number } | null } }> {
     return this.request(`/api/bots/${id}/config`);
   }
 
@@ -594,7 +599,7 @@ class ApiService {
   }
 
   // Update behavior settings for a bot
-  async setBehaviorSettings(id: string, settings: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } }): Promise<{ success: boolean; behaviorSettings: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] } } }> {
+  async setBehaviorSettings(id: string, settings: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] }; antiAfk?: { intervalSeconds?: number; jitterSeconds?: number }; autoEat?: { minHealth?: number; minFood?: number }; guard?: { radius?: number; attackRange?: number; minHealth?: number }; fishing?: { intervalSeconds?: number; timeoutSeconds?: number }; rateLimit?: { globalCooldownSeconds?: number; maxPerMinute?: number } }): Promise<{ success: boolean; behaviorSettings: { attack?: { whitelist?: string[]; minHealth?: number }; patrol?: { waypoints?: { x: number; y: number; z: number }[] }; antiAfk?: { intervalSeconds?: number; jitterSeconds?: number }; autoEat?: { minHealth?: number; minFood?: number }; guard?: { radius?: number; attackRange?: number; minHealth?: number }; fishing?: { intervalSeconds?: number; timeoutSeconds?: number }; rateLimit?: { globalCooldownSeconds?: number; maxPerMinute?: number } } }> {
     return this.request(`/api/bots/${id}/behavior-settings`, {
       method: 'POST',
       body: JSON.stringify(settings)

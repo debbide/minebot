@@ -221,7 +221,13 @@ export class ConfigManager {
       modes: {
         aiView: false,
         patrol: false,
-        autoChat: false
+        autoChat: false,
+        invincible: false,
+        antiAfk: false,
+        autoEat: false,
+        guard: false,
+        fishing: false,
+        rateLimit: false
       },
       proxyNodes: [] // 全局代理节点库
     };
@@ -394,7 +400,12 @@ export class ConfigManager {
         aiView: false,
         patrol: false,
         autoChat: false,
-        invincible: false
+        invincible: false,
+        antiAfk: false,
+        autoEat: false,
+        guard: false,
+        fishing: false,
+        rateLimit: false
       },
       // 独立的自动喊话配置
       autoChat: serverConfig.autoChat || {
@@ -449,6 +460,27 @@ export class ConfigManager {
         },
         patrol: {
           waypoints: []
+        },
+        antiAfk: {
+          intervalSeconds: 45,
+          jitterSeconds: 15
+        },
+        autoEat: {
+          minHealth: 6,
+          minFood: 14
+        },
+        guard: {
+          radius: 12,
+          attackRange: 4,
+          minHealth: 6
+        },
+        fishing: {
+          intervalSeconds: 2,
+          timeoutSeconds: 25
+        },
+        rateLimit: {
+          globalCooldownSeconds: 1,
+          maxPerMinute: 20
         }
       }
     };

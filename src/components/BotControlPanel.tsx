@@ -13,7 +13,12 @@ import {
   RotateCcw,
   Power,
   PowerOff,
-  Shield
+  Shield,
+  ShieldCheck,
+  Apple,
+  Fish,
+  Activity,
+  Timer
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +53,11 @@ interface BotControlPanelProps {
     aiView?: boolean;
     autoChat?: boolean;
     invincible?: boolean;
+    antiAfk?: boolean;
+    autoEat?: boolean;
+    guard?: boolean;
+    fishing?: boolean;
+    rateLimit?: boolean;
   };
   players?: string[];
   restartTimer?: {
@@ -116,6 +126,37 @@ interface BehaviorStatus {
     active: boolean;
     range?: number;
     lastTarget?: string | null;
+  };
+  antiAfk?: {
+    active: boolean;
+    intervalSeconds?: number;
+    jitterSeconds?: number;
+    lastAction?: string | null;
+  };
+  autoEat?: {
+    active: boolean;
+    minHealth?: number;
+    minFood?: number;
+    lastFood?: string | null;
+  };
+  guard?: {
+    active: boolean;
+    radius?: number;
+    attackRange?: number;
+    minHealth?: number;
+    lastTarget?: string | null;
+  };
+  fishing?: {
+    active: boolean;
+    intervalSeconds?: number;
+    timeoutSeconds?: number;
+    lastResult?: string | null;
+  };
+  rateLimit?: {
+    active: boolean;
+    globalCooldownSeconds?: number;
+    maxPerMinute?: number;
+    blockedCount?: number;
   };
 }
 
@@ -356,6 +397,11 @@ export function BotControlPanel({
             {modes.mining && <Badge variant="secondary">挖矿中</Badge>}
             {modes.aiView && <Badge variant="secondary">AI视角</Badge>}
             {modes.autoChat && <Badge variant="secondary">自动喊话</Badge>}
+            {modes.antiAfk && <Badge variant="secondary">防踢</Badge>}
+            {modes.autoEat && <Badge variant="secondary">自动吃</Badge>}
+            {modes.guard && <Badge variant="secondary">守护</Badge>}
+            {modes.fishing && <Badge variant="secondary">钓鱼</Badge>}
+            {modes.rateLimit && <Badge variant="secondary">限速</Badge>}
             {restartTimer?.enabled && (
               <Badge variant="outline">
                 定时重启: {restartTimer.intervalMinutes}分钟
@@ -454,6 +500,54 @@ export function BotControlPanel({
                 </Button>
               </div>
 
+              <div className="grid grid-cols-5 gap-2">
+                <Button
+                  size="sm"
+                  variant={modes.guard ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("guard", !modes.guard)}
+                  disabled={loading !== null}
+                  title="守护"
+                >
+                  {loading === "guard" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={modes.autoEat ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("autoEat", !modes.autoEat)}
+                  disabled={loading !== null}
+                  title="自动吃"
+                >
+                  {loading === "autoEat" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Apple className="h-4 w-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={modes.antiAfk ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("antiAfk", !modes.antiAfk)}
+                  disabled={loading !== null}
+                  title="防踢"
+                >
+                  {loading === "antiAfk" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Activity className="h-4 w-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={modes.fishing ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("fishing", !modes.fishing)}
+                  disabled={loading !== null}
+                  title="钓鱼"
+                >
+                  {loading === "fishing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Fish className="h-4 w-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={modes.rateLimit ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("rateLimit", !modes.rateLimit)}
+                  disabled={loading !== null}
+                  title="限速"
+                >
+                  {loading === "rateLimit" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Timer className="h-4 w-4" />}
+                </Button>
+              </div>
+
               <div className="rounded-md border p-2 text-xs space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">行为状态</span>
@@ -480,6 +574,11 @@ export function BotControlPanel({
                     <div>挖矿目标: {formatList(behaviorStatus.mining?.targetBlocks)}</div>
                     <div>AI视角: {behaviorStatus.aiView?.active ? `范围 ${formatValue(behaviorStatus.aiView.range)} | 目标 ${formatValue(behaviorStatus.aiView.lastTarget)}` : "未开启"}</div>
                     <div>动作: {behaviorStatus.action?.looping ? `循环中 | 动作数 ${formatValue(behaviorStatus.action.actionsCount)}` : "未开启"}</div>
+                    <div>防踢: {behaviorStatus.antiAfk?.active ? `间隔 ${formatValue(behaviorStatus.antiAfk.intervalSeconds)}s | 抖动 ${formatValue(behaviorStatus.antiAfk.jitterSeconds)}s | 动作 ${formatValue(behaviorStatus.antiAfk.lastAction)}` : "未开启"}</div>
+                    <div>自动吃: {behaviorStatus.autoEat?.active ? `血线 ${formatValue(behaviorStatus.autoEat.minHealth)} | 饥饿 ${formatValue(behaviorStatus.autoEat.minFood)} | 食物 ${formatValue(behaviorStatus.autoEat.lastFood)}` : "未开启"}</div>
+                    <div>守护: {behaviorStatus.guard?.active ? `半径 ${formatValue(behaviorStatus.guard.radius)} | 攻击距 ${formatValue(behaviorStatus.guard.attackRange)} | 血线 ${formatValue(behaviorStatus.guard.minHealth)} | 目标 ${formatValue(behaviorStatus.guard.lastTarget)}` : "未开启"}</div>
+                    <div>钓鱼: {behaviorStatus.fishing?.active ? `间隔 ${formatValue(behaviorStatus.fishing.intervalSeconds)}s | 超时 ${formatValue(behaviorStatus.fishing.timeoutSeconds)}s | 状态 ${formatValue(behaviorStatus.fishing.lastResult)}` : "未开启"}</div>
+                    <div>限速: {behaviorStatus.rateLimit?.active ? `冷却 ${formatValue(behaviorStatus.rateLimit.globalCooldownSeconds)}s | 每分钟 ${formatValue(behaviorStatus.rateLimit.maxPerMinute)} | 拦截 ${formatValue(behaviorStatus.rateLimit.blockedCount)}` : "未开启"}</div>
                   </div>
                 )}
               </div>
