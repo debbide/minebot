@@ -217,6 +217,7 @@ export function BotSettingsPanel({
     const [safeIdleLookRange, setSafeIdleLookRange] = useState<string>("6");
     const [safeIdleActionChance, setSafeIdleActionChance] = useState<string>("0.5");
     const [safeIdleTimeout, setSafeIdleTimeout] = useState<string>("45");
+    const [safeIdleResumeDelay, setSafeIdleResumeDelay] = useState<string>("10");
     const [workflowStepsText, setWorkflowStepsText] = useState<string>("mining, patrol, rest");
     const [workflowPatrolSeconds, setWorkflowPatrolSeconds] = useState<string>("120");
     const [workflowRestSeconds, setWorkflowRestSeconds] = useState<string>("40");
@@ -426,6 +427,11 @@ export function BotSettingsPanel({
                     settings.safeIdle?.timeoutSeconds !== undefined
                         ? String(settings.safeIdle.timeoutSeconds)
                         : "45"
+                );
+                setSafeIdleResumeDelay(
+                    settings.safeIdle?.resumeDelaySeconds !== undefined
+                        ? String(settings.safeIdle.resumeDelaySeconds)
+                        : "10"
                 );
                 setWorkflowStepsText(
                     settings.workflow?.steps && settings.workflow.steps.length > 0
@@ -779,6 +785,7 @@ export function BotSettingsPanel({
             const safeIdleLookRangeValue = Number(safeIdleLookRange);
             const safeIdleActionChanceValue = Number(safeIdleActionChance);
             const safeIdleTimeoutValue = Number(safeIdleTimeout);
+            const safeIdleResumeDelayValue = Number(safeIdleResumeDelay);
             const workflowPatrolSecondsValue = Number(workflowPatrolSeconds);
             const workflowRestSecondsValue = Number(workflowRestSeconds);
             const workflowMiningMaxSecondsValue = Number(workflowMiningMaxSeconds);
@@ -829,7 +836,8 @@ export function BotSettingsPanel({
                     intervalSeconds: Number.isNaN(safeIdleIntervalValue) ? 20 : safeIdleIntervalValue,
                     lookRange: Number.isNaN(safeIdleLookRangeValue) ? 6 : safeIdleLookRangeValue,
                     actionChance: Number.isNaN(safeIdleActionChanceValue) ? 0.5 : safeIdleActionChanceValue,
-                    timeoutSeconds: Number.isNaN(safeIdleTimeoutValue) ? 45 : safeIdleTimeoutValue
+                    timeoutSeconds: Number.isNaN(safeIdleTimeoutValue) ? 45 : safeIdleTimeoutValue,
+                    resumeDelaySeconds: Number.isNaN(safeIdleResumeDelayValue) ? 10 : safeIdleResumeDelayValue
                 },
                 workflow: {
                     steps: workflowSteps.length > 0 ? workflowSteps : ["mining", "patrol", "rest"],

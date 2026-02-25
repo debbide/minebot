@@ -1352,10 +1352,12 @@ export class SafeIdleBehavior {
     this.lookRange = 6;
     this.actionChance = 0.5;
     this.timeoutSeconds = 45;
+    this.resumeDelaySeconds = 10;
     this.timeout = null;
     this.lastAction = null;
     this.lastPosition = null;
     this.lastMoveAt = 0;
+    this.pausedUntil = 0;
   }
 
   start(options = {}) {
@@ -1372,6 +1374,9 @@ export class SafeIdleBehavior {
     }
     if (Number.isFinite(options.timeoutSeconds)) {
       this.timeoutSeconds = Math.max(10, options.timeoutSeconds);
+    }
+    if (Number.isFinite(options.resumeDelaySeconds)) {
+      this.resumeDelaySeconds = Math.max(0, options.resumeDelaySeconds);
     }
 
     this.active = true;
@@ -1396,6 +1401,16 @@ export class SafeIdleBehavior {
     if (!this.active || !this.bot?.entity) return;
 
     this.checkTimeout();
+
+    if (this.pausedUntil && Date.now() < this.pausedUntil) {
+      return;
+    }
+    if (this.pausedUntil && Date.now() >= this.pausedUntil) {
+      this.pausedUntil = 0;
+      this.doStep();
+      this.lastAction = 'resume_step';
+      return;
+    }
 
     if (Math.random() > this.actionChance) return;
     const roll = Math.random();
@@ -1435,6 +1450,9 @@ export class SafeIdleBehavior {
       }
       this.lastAction = 'timeout_stop';
       this.lastMoveAt = Date.now();
+      if (this.resumeDelaySeconds > 0) {
+        this.pausedUntil = Date.now() + this.resumeDelaySeconds * 1000;
+      }
       if (this.log) this.log('warning', '安全挂机触发超时保护，已停止移动', '⏸️');
     }
   }
@@ -1492,6 +1510,7 @@ export class SafeIdleBehavior {
       lookRange: this.lookRange,
       actionChance: this.actionChance,
       timeoutSeconds: this.timeoutSeconds,
+      resumeDelaySeconds: this.resumeDelaySeconds,
       lastAction: this.lastAction
     };
   }

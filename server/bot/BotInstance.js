@@ -139,6 +139,7 @@ export class BotInstance {
         lookRange: 6,
         actionChance: 0.5,
         timeoutSeconds: 45,
+        resumeDelaySeconds: 10,
         ...(config.behaviorSettings?.safeIdle || {})
       },
       workflow: {
@@ -2034,10 +2035,12 @@ export class BotInstance {
       const lookRange = Number(settings.safeIdle.lookRange);
       const actionChance = Number(settings.safeIdle.actionChance);
       const timeoutSeconds = Number(settings.safeIdle.timeoutSeconds);
+      const resumeDelaySeconds = Number(settings.safeIdle.resumeDelaySeconds);
       if (!Number.isNaN(intervalSeconds)) next.safeIdle.intervalSeconds = Math.max(5, intervalSeconds);
       if (!Number.isNaN(lookRange)) next.safeIdle.lookRange = Math.max(2, lookRange);
       if (!Number.isNaN(actionChance)) next.safeIdle.actionChance = Math.min(1, Math.max(0, actionChance));
       if (!Number.isNaN(timeoutSeconds)) next.safeIdle.timeoutSeconds = Math.max(10, timeoutSeconds);
+      if (!Number.isNaN(resumeDelaySeconds)) next.safeIdle.resumeDelaySeconds = Math.max(0, resumeDelaySeconds);
     }
 
     if (settings.workflow) {

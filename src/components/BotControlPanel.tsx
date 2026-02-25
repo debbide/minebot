@@ -177,6 +177,7 @@ interface BehaviorStatus {
     lookRange?: number;
     actionChance?: number;
     timeoutSeconds?: number;
+    resumeDelaySeconds?: number;
     lastAction?: string | null;
   };
   workflow?: {
@@ -644,7 +645,7 @@ export function BotControlPanel({
                     <div>钓鱼: {formatState(modes.fishing, behaviorStatus.fishing?.active)}{behaviorStatus.fishing?.active ? ` | 间隔 ${formatValue(behaviorStatus.fishing.intervalSeconds)}s | 超时 ${formatValue(behaviorStatus.fishing.timeoutSeconds)}s | 状态 ${formatValue(behaviorStatus.fishing.lastResult)}` : ""}</div>
                     <div>限速: {formatState(modes.rateLimit, behaviorStatus.rateLimit?.active)}{behaviorStatus.rateLimit?.active ? ` | 冷却 ${formatValue(behaviorStatus.rateLimit.globalCooldownSeconds)}s | 每分钟 ${formatValue(behaviorStatus.rateLimit.maxPerMinute)} | 拦截 ${formatValue(behaviorStatus.rateLimit.blockedCount)}` : ""}</div>
                     <div>拟人: {formatState(modes.humanize, behaviorStatus.humanize?.active)}{behaviorStatus.humanize?.active ? ` | 间隔 ${formatValue(behaviorStatus.humanize.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.humanize.lookRange)} | 概率 ${formatValue(behaviorStatus.humanize.actionChance)}` : ""}</div>
-                    <div>安全挂机: {formatState(modes.safeIdle, behaviorStatus.safeIdle?.active)}{behaviorStatus.safeIdle?.active ? ` | 间隔 ${formatValue(behaviorStatus.safeIdle.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.safeIdle.lookRange)} | 超时 ${formatValue(behaviorStatus.safeIdle.timeoutSeconds)}s | 动作 ${formatValue(behaviorStatus.safeIdle.lastAction)}` : ""}</div>
+                    <div>安全挂机: {formatState(modes.safeIdle, behaviorStatus.safeIdle?.active)}{behaviorStatus.safeIdle?.active ? ` | 间隔 ${formatValue(behaviorStatus.safeIdle.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.safeIdle.lookRange)} | 超时 ${formatValue(behaviorStatus.safeIdle.timeoutSeconds)}s | 恢复 ${formatValue(behaviorStatus.safeIdle.resumeDelaySeconds)}s | 动作 ${formatValue(behaviorStatus.safeIdle.lastAction)}` : ""}</div>
                     <div>任务脚本: {formatState(modes.workflow, behaviorStatus.workflow?.active)}{behaviorStatus.workflow?.active ? ` | 步骤 ${formatValue(behaviorStatus.workflow.step)} | 已运行 ${formatValue(behaviorStatus.workflow.elapsedSeconds)}s | 原因 ${formatValue(behaviorStatus.workflow.lastReason)}` : ""}</div>
                   </div>
                 )}

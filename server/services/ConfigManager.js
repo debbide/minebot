@@ -501,7 +501,8 @@ export class ConfigManager {
           intervalSeconds: 20,
           lookRange: 6,
           actionChance: 0.5,
-          timeoutSeconds: 45
+          timeoutSeconds: 45,
+          resumeDelaySeconds: 10
         },
         workflow: {
           steps: ['mining', 'patrol', 'rest'],
