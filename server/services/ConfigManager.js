@@ -228,7 +228,9 @@ export class ConfigManager {
         guard: false,
         fishing: false,
         rateLimit: false,
-        humanize: false
+        humanize: false,
+        safeIdle: false,
+        workflow: false
       },
       proxyNodes: [] // 全局代理节点库
     };
@@ -407,7 +409,9 @@ export class ConfigManager {
         guard: false,
         fishing: false,
         rateLimit: false,
-        humanize: false
+        humanize: false,
+        safeIdle: false,
+        workflow: false
       },
       // 独立的自动喊话配置
       autoChat: serverConfig.autoChat || {
@@ -492,6 +496,26 @@ export class ConfigManager {
           stepChance: 0.3,
           sneakChance: 0.2,
           swingChance: 0.2
+        },
+        safeIdle: {
+          intervalSeconds: 20,
+          lookRange: 6,
+          actionChance: 0.5,
+          timeoutSeconds: 45
+        },
+        workflow: {
+          steps: ['mining', 'patrol', 'rest'],
+          patrolSeconds: 120,
+          restSeconds: 40,
+          miningMaxSeconds: 240
+        },
+        pathSafety: {
+          avoidWater: true,
+          avoidLava: true,
+          avoidEdges: true,
+          maxDropDown: 2,
+          allowSprinting: false,
+          allowParkour: false
         }
       }
     };

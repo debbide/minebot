@@ -81,7 +81,9 @@ export class BotInstance {
       guard: false,
       fishing: false,
       rateLimit: false,
-      humanize: false
+      humanize: false,
+      safeIdle: false,
+      workflow: false
     };
     this.modes = { ...defaultModes, ...(config.modes || {}) };
 
@@ -131,6 +133,29 @@ export class BotInstance {
         sneakChance: 0.2,
         swingChance: 0.2,
         ...(config.behaviorSettings?.humanize || {})
+      },
+      safeIdle: {
+        intervalSeconds: 20,
+        lookRange: 6,
+        actionChance: 0.5,
+        timeoutSeconds: 45,
+        ...(config.behaviorSettings?.safeIdle || {})
+      },
+      workflow: {
+        steps: ['mining', 'patrol', 'rest'],
+        patrolSeconds: 120,
+        restSeconds: 40,
+        miningMaxSeconds: 240,
+        ...(config.behaviorSettings?.workflow || {})
+      },
+      pathSafety: {
+        avoidWater: true,
+        avoidLava: true,
+        avoidEdges: true,
+        maxDropDown: 2,
+        allowSprinting: false,
+        allowParkour: false,
+        ...(config.behaviorSettings?.pathSafety || {})
       }
     };
 
@@ -214,6 +239,33 @@ export class BotInstance {
 
   updateActivity() {
     this.lastActivity = Date.now();
+  }
+
+  applyMovementSafety(movements) {
+    if (!movements) return;
+    const safety = this.behaviorSettings?.pathSafety || {};
+    if (typeof safety.allowSprinting === 'boolean') {
+      movements.allowSprinting = safety.allowSprinting;
+    }
+    if (typeof safety.allowParkour === 'boolean') {
+      movements.allowParkour = safety.allowParkour;
+    }
+    if (Number.isFinite(safety.maxDropDown)) {
+      movements.maxDropDown = Math.max(0, safety.maxDropDown);
+    }
+    if (safety.avoidEdges) {
+      movements.allowParkour = false;
+      if (Number.isFinite(safety.maxDropDown)) {
+        movements.maxDropDown = Math.max(0, safety.maxDropDown);
+      }
+    }
+    if (safety.avoidWater) {
+      movements.liquidCost = 1000;
+      movements.waterCost = 1000;
+    }
+    if (safety.avoidLava) {
+      movements.lavaCost = 1000;
+    }
   }
 
   generateUsername() {
@@ -545,13 +597,35 @@ export class BotInstance {
           try {
             const movements = new Movements(this.bot, this.bot.registry);
             movements.canDig = false; // 禁止挖掘方块
+            this.applyMovementSafety(movements);
+            this.movements = movements;
             this.bot.pathfinder.setMovements(movements);
           } catch (e) {
             this.log('warning', '路径规划初始化失败', '⚠');
           }
 
           // 初始化行为管理器，传递日志函数以便巡逻等行为输出坐标
-          this.behaviors = new BehaviorManager(this.bot, goals, this.log.bind(this), this.handleBehaviorAutoStop.bind(this));
+          const controller = {
+            startMining: () => {
+              this.stopConflictingModes('mining');
+              return this.behaviors?.mining?.start();
+            },
+            stopMining: () => this.behaviors?.mining?.stop(),
+            startPatrol: () => {
+              this.stopConflictingModes('patrol');
+              const waypoints = this.behaviorSettings.patrol?.waypoints || null;
+              return this.behaviors?.patrol?.start(waypoints);
+            },
+            stopPatrol: () => this.behaviors?.patrol?.stop(),
+            stopAllMovement: () => this.bot?.pathfinder?.stop?.()
+          };
+          this.behaviors = new BehaviorManager(
+            this.bot,
+            goals,
+            this.log.bind(this),
+            this.handleBehaviorAutoStop.bind(this),
+            controller
+          );
 
           this.log('success', `进入世界 (版本: ${this.bot.version})`, '✓');
 
@@ -869,6 +943,26 @@ export class BotInstance {
         }
       } catch (e) {
         this.log('warning', `拟人恢复失败: ${e.message}`, '⚠️');
+      }
+
+      try {
+        if (this.modes.safeIdle) {
+          const options = this.behaviorSettings.safeIdle || {};
+          this.behaviors.safeIdle.start(options);
+          this.log('info', '安全挂机已恢复', '⛺');
+        }
+      } catch (e) {
+        this.log('warning', `安全挂机恢复失败: ${e.message}`, '⚠️');
+      }
+
+      try {
+        if (this.modes.workflow) {
+          const options = this.behaviorSettings.workflow || {};
+          this.behaviors.workflow.start(options);
+          this.log('info', '任务脚本已恢复', '🧭');
+        }
+      } catch (e) {
+        this.log('warning', `任务脚本恢复失败: ${e.message}`, '⚠️');
       }
 
       try {
@@ -1767,6 +1861,14 @@ export class BotInstance {
         this.behaviors.humanize.stop();
         this.modes.humanize = false;
         break;
+      case 'safeIdle':
+        this.behaviors.safeIdle.stop();
+        this.modes.safeIdle = false;
+        break;
+      case 'workflow':
+        this.behaviors.workflow.stop();
+        this.modes.workflow = false;
+        break;
       default:
         return;
     }
@@ -1809,6 +1911,13 @@ export class BotInstance {
     if (behavior === 'antiAfk') this.modes.antiAfk = false;
     if (behavior === 'autoEat') this.modes.autoEat = false;
     if (behavior === 'rateLimit') this.modes.rateLimit = false;
+    if (behavior === 'humanize') this.modes.humanize = false;
+    if (behavior === 'safeIdle') this.modes.safeIdle = false;
+    if (behavior === 'workflow') this.modes.workflow = false;
+
+    if (behavior === 'mining' && this.behaviors?.workflow?.onStepComplete) {
+      this.behaviors.workflow.onStepComplete('mining', reason || 'done');
+    }
 
     const msg = messages[behavior]?.[reason];
     if (msg && this.bot) {
@@ -1825,7 +1934,11 @@ export class BotInstance {
       autoEat: { ...(this.behaviorSettings.autoEat || {}) },
       guard: { ...(this.behaviorSettings.guard || {}) },
       fishing: { ...(this.behaviorSettings.fishing || {}) },
-      rateLimit: { ...(this.behaviorSettings.rateLimit || {}) }
+      rateLimit: { ...(this.behaviorSettings.rateLimit || {}) },
+      humanize: { ...(this.behaviorSettings.humanize || {}) },
+      safeIdle: { ...(this.behaviorSettings.safeIdle || {}) },
+      workflow: { ...(this.behaviorSettings.workflow || {}) },
+      pathSafety: { ...(this.behaviorSettings.pathSafety || {}) }
     };
 
     if (settings.attack) {
@@ -1901,9 +2014,59 @@ export class BotInstance {
       if (!Number.isNaN(maxPerMinute)) next.rateLimit.maxPerMinute = Math.max(0, maxPerMinute);
     }
 
+    if (settings.humanize) {
+      const intervalSeconds = Number(settings.humanize.intervalSeconds);
+      const lookRange = Number(settings.humanize.lookRange);
+      const actionChance = Number(settings.humanize.actionChance);
+      const stepChance = Number(settings.humanize.stepChance);
+      const sneakChance = Number(settings.humanize.sneakChance);
+      const swingChance = Number(settings.humanize.swingChance);
+      if (!Number.isNaN(intervalSeconds)) next.humanize.intervalSeconds = Math.max(5, intervalSeconds);
+      if (!Number.isNaN(lookRange)) next.humanize.lookRange = Math.max(2, lookRange);
+      if (!Number.isNaN(actionChance)) next.humanize.actionChance = Math.min(1, Math.max(0, actionChance));
+      if (!Number.isNaN(stepChance)) next.humanize.stepChance = Math.min(1, Math.max(0, stepChance));
+      if (!Number.isNaN(sneakChance)) next.humanize.sneakChance = Math.min(1, Math.max(0, sneakChance));
+      if (!Number.isNaN(swingChance)) next.humanize.swingChance = Math.min(1, Math.max(0, swingChance));
+    }
+
+    if (settings.safeIdle) {
+      const intervalSeconds = Number(settings.safeIdle.intervalSeconds);
+      const lookRange = Number(settings.safeIdle.lookRange);
+      const actionChance = Number(settings.safeIdle.actionChance);
+      const timeoutSeconds = Number(settings.safeIdle.timeoutSeconds);
+      if (!Number.isNaN(intervalSeconds)) next.safeIdle.intervalSeconds = Math.max(5, intervalSeconds);
+      if (!Number.isNaN(lookRange)) next.safeIdle.lookRange = Math.max(2, lookRange);
+      if (!Number.isNaN(actionChance)) next.safeIdle.actionChance = Math.min(1, Math.max(0, actionChance));
+      if (!Number.isNaN(timeoutSeconds)) next.safeIdle.timeoutSeconds = Math.max(10, timeoutSeconds);
+    }
+
+    if (settings.workflow) {
+      const steps = Array.isArray(settings.workflow.steps) ? settings.workflow.steps.map(step => String(step)) : null;
+      const patrolSeconds = Number(settings.workflow.patrolSeconds);
+      const restSeconds = Number(settings.workflow.restSeconds);
+      const miningMaxSeconds = Number(settings.workflow.miningMaxSeconds);
+      if (steps && steps.length > 0) next.workflow.steps = steps;
+      if (!Number.isNaN(patrolSeconds)) next.workflow.patrolSeconds = Math.max(10, patrolSeconds);
+      if (!Number.isNaN(restSeconds)) next.workflow.restSeconds = Math.max(5, restSeconds);
+      if (!Number.isNaN(miningMaxSeconds)) next.workflow.miningMaxSeconds = Math.max(30, miningMaxSeconds);
+    }
+
+    if (settings.pathSafety) {
+      if (typeof settings.pathSafety.avoidWater === 'boolean') next.pathSafety.avoidWater = settings.pathSafety.avoidWater;
+      if (typeof settings.pathSafety.avoidLava === 'boolean') next.pathSafety.avoidLava = settings.pathSafety.avoidLava;
+      if (typeof settings.pathSafety.avoidEdges === 'boolean') next.pathSafety.avoidEdges = settings.pathSafety.avoidEdges;
+      const maxDropDown = Number(settings.pathSafety.maxDropDown);
+      if (!Number.isNaN(maxDropDown)) next.pathSafety.maxDropDown = Math.max(0, maxDropDown);
+      if (typeof settings.pathSafety.allowSprinting === 'boolean') next.pathSafety.allowSprinting = settings.pathSafety.allowSprinting;
+      if (typeof settings.pathSafety.allowParkour === 'boolean') next.pathSafety.allowParkour = settings.pathSafety.allowParkour;
+    }
+
     this.behaviorSettings = next;
     this.config.behaviorSettings = next;
     this.saveConfig();
+    if (settings.pathSafety) {
+      this.applyMovementSafety(this.movements);
+    }
     return this.behaviorSettings;
   }
 
@@ -2002,7 +2165,8 @@ export class BotInstance {
     this.modes.fishing = false;
     this.modes.rateLimit = false;
     this.modes.humanize = false;
-    this.modes.humanize = false;
+    this.modes.safeIdle = false;
+    this.modes.workflow = false;
     this.bot.chat('已停止所有行为');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
   }
@@ -2219,6 +2383,26 @@ export class BotInstance {
         } else {
           result = this.behaviors.humanize.stop();
           this.modes.humanize = false;
+        }
+        break;
+      case 'safeIdle':
+        if (enabled) {
+          const safeIdleOptions = { ...(this.behaviorSettings.safeIdle || {}), ...(options || {}) };
+          result = this.behaviors.safeIdle.start(safeIdleOptions);
+          this.modes.safeIdle = result.success;
+        } else {
+          result = this.behaviors.safeIdle.stop();
+          this.modes.safeIdle = false;
+        }
+        break;
+      case 'workflow':
+        if (enabled) {
+          const workflowOptions = { ...(this.behaviorSettings.workflow || {}), ...(options || {}) };
+          result = this.behaviors.workflow.start(workflowOptions);
+          this.modes.workflow = result.success;
+        } else {
+          result = this.behaviors.workflow.stop();
+          this.modes.workflow = false;
         }
         break;
       default:

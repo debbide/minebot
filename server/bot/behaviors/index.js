@@ -1341,6 +1341,274 @@ export class HumanizeBehavior {
 }
 
 /**
+ * 安全挂机行为 - 随机动作 + 视角 + 超时保护
+ */
+export class SafeIdleBehavior {
+  constructor(bot, logFn = null) {
+    this.bot = bot;
+    this.log = logFn;
+    this.active = false;
+    this.intervalSeconds = 20;
+    this.lookRange = 6;
+    this.actionChance = 0.5;
+    this.timeoutSeconds = 45;
+    this.timeout = null;
+    this.lastAction = null;
+    this.lastPosition = null;
+    this.lastMoveAt = 0;
+  }
+
+  start(options = {}) {
+    if (this.active) return { success: false, message: '安全挂机已在运行' };
+
+    if (Number.isFinite(options.intervalSeconds)) {
+      this.intervalSeconds = Math.max(5, options.intervalSeconds);
+    }
+    if (Number.isFinite(options.lookRange)) {
+      this.lookRange = Math.max(2, options.lookRange);
+    }
+    if (Number.isFinite(options.actionChance)) {
+      this.actionChance = Math.min(1, Math.max(0, options.actionChance));
+    }
+    if (Number.isFinite(options.timeoutSeconds)) {
+      this.timeoutSeconds = Math.max(10, options.timeoutSeconds);
+    }
+
+    this.active = true;
+    this.lastPosition = this.bot?.entity?.position?.clone?.() || null;
+    this.lastMoveAt = Date.now();
+    this.scheduleNext();
+    return { success: true, message: '安全挂机已开启' };
+  }
+
+  scheduleNext() {
+    if (!this.active) return;
+    const base = this.intervalSeconds * 1000;
+    const jitter = Math.max(500, base * 0.4);
+    const delay = Math.max(800, base + (Math.random() * 2 - 1) * jitter);
+    this.timeout = setTimeout(() => {
+      this.tick();
+      this.scheduleNext();
+    }, delay);
+  }
+
+  tick() {
+    if (!this.active || !this.bot?.entity) return;
+
+    this.checkTimeout();
+
+    if (Math.random() > this.actionChance) return;
+    const roll = Math.random();
+    if (roll < 0.4) {
+      this.doLook();
+    } else if (roll < 0.7) {
+      this.doSneak();
+    } else if (roll < 0.9) {
+      this.bot.swingArm();
+      this.lastAction = 'swing';
+    } else {
+      this.doStep();
+    }
+  }
+
+  checkTimeout() {
+    if (!this.bot?.entity) return;
+    const pos = this.bot.entity.position;
+    if (this.lastPosition) {
+      const moved = pos.distanceTo(this.lastPosition);
+      if (moved > 0.2) {
+        this.lastMoveAt = Date.now();
+        this.lastPosition = pos.clone();
+      }
+    } else {
+      this.lastPosition = pos.clone();
+      this.lastMoveAt = Date.now();
+    }
+
+    const moving = this.bot?.pathfinder?.isMoving?.() || false;
+    if (moving && Date.now() - this.lastMoveAt > this.timeoutSeconds * 1000) {
+      if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+      if (this.bot?.setControlState) {
+        this.bot.setControlState('sprint', false);
+        this.bot.setControlState('jump', false);
+        this.bot.setControlState('sneak', false);
+      }
+      this.lastAction = 'timeout_stop';
+      this.lastMoveAt = Date.now();
+      if (this.log) this.log('warning', '安全挂机触发超时保护，已停止移动', '⏸️');
+    }
+  }
+
+  doLook() {
+    const pos = this.bot.entity.position;
+    const target = pos.offset(
+      (Math.random() - 0.5) * this.lookRange * 2,
+      Math.random() * 2,
+      (Math.random() - 0.5) * this.lookRange * 2
+    );
+    this.bot.lookAt(target);
+    this.lastAction = 'look';
+  }
+
+  doSneak() {
+    this.lastAction = 'sneak';
+    this.bot.setControlState('sneak', true);
+    setTimeout(() => {
+      if (this.bot) this.bot.setControlState('sneak', false);
+    }, 200 + Math.random() * 200);
+  }
+
+  doStep() {
+    this.lastAction = 'step';
+    this.bot.setControlState('sprint', false);
+    const move = Math.random() > 0.5 ? 'forward' : 'back';
+    const strafe = Math.random() > 0.5 ? 'left' : 'right';
+    if (Math.random() > 0.5) {
+      this.bot.setControlState(move, true);
+    } else {
+      this.bot.setControlState(strafe, true);
+    }
+    setTimeout(() => {
+      if (this.bot) {
+        this.bot.setControlState(move, false);
+        this.bot.setControlState(strafe, false);
+      }
+    }, 160 + Math.random() * 220);
+  }
+
+  stop() {
+    this.active = false;
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = null;
+    }
+    return { success: true, message: '安全挂机已关闭' };
+  }
+
+  getStatus() {
+    return {
+      active: this.active,
+      intervalSeconds: this.intervalSeconds,
+      lookRange: this.lookRange,
+      actionChance: this.actionChance,
+      timeoutSeconds: this.timeoutSeconds,
+      lastAction: this.lastAction
+    };
+  }
+}
+
+/**
+ * 任务脚本 - 挖矿 -> 回收 -> 巡逻 -> 休息
+ */
+export class WorkflowBehavior {
+  constructor(bot, controller, logFn = null) {
+    this.bot = bot;
+    this.controller = controller;
+    this.log = logFn;
+    this.active = false;
+    this.steps = ['mining', 'patrol', 'rest'];
+    this.currentIndex = 0;
+    this.patrolSeconds = 120;
+    this.restSeconds = 40;
+    this.miningMaxSeconds = 240;
+    this.stepTimer = null;
+    this.startedAt = 0;
+    this.lastReason = null;
+  }
+
+  start(options = {}) {
+    if (this.active) return { success: false, message: '任务脚本已在运行' };
+
+    if (Array.isArray(options.steps) && options.steps.length > 0) {
+      this.steps = options.steps.map(step => String(step));
+    }
+    if (Number.isFinite(options.patrolSeconds)) {
+      this.patrolSeconds = Math.max(10, options.patrolSeconds);
+    }
+    if (Number.isFinite(options.restSeconds)) {
+      this.restSeconds = Math.max(5, options.restSeconds);
+    }
+    if (Number.isFinite(options.miningMaxSeconds)) {
+      this.miningMaxSeconds = Math.max(30, options.miningMaxSeconds);
+    }
+
+    this.active = true;
+    this.currentIndex = 0;
+    this.lastReason = null;
+    this.startStep();
+    return { success: true, message: '任务脚本已开启' };
+  }
+
+  startStep() {
+    if (!this.active) return;
+    const step = this.steps[this.currentIndex] || 'rest';
+    this.startedAt = Date.now();
+    this.clearTimer();
+
+    switch (step) {
+      case 'mining':
+        this.controller.startMining?.();
+        this.stepTimer = setTimeout(() => this.completeStep('timeout'), this.miningMaxSeconds * 1000);
+        break;
+      case 'patrol':
+        this.controller.startPatrol?.();
+        this.stepTimer = setTimeout(() => this.completeStep('timeout'), this.patrolSeconds * 1000);
+        break;
+      case 'rest':
+      default:
+        this.controller.stopAllMovement?.();
+        this.stepTimer = setTimeout(() => this.completeStep('timeout'), this.restSeconds * 1000);
+        break;
+    }
+  }
+
+  completeStep(reason = 'done') {
+    if (!this.active) return;
+    const step = this.steps[this.currentIndex] || 'rest';
+    this.lastReason = `${step}:${reason}`;
+    if (step === 'mining') this.controller.stopMining?.();
+    if (step === 'patrol') this.controller.stopPatrol?.();
+    if (step === 'rest') this.controller.stopAllMovement?.();
+    this.currentIndex = (this.currentIndex + 1) % this.steps.length;
+    this.startStep();
+  }
+
+  onStepComplete(step, reason = 'done') {
+    const current = this.steps[this.currentIndex];
+    if (!this.active || current !== step) return;
+    this.completeStep(reason);
+  }
+
+  stop() {
+    this.active = false;
+    this.clearTimer();
+    this.controller.stopMining?.();
+    this.controller.stopPatrol?.();
+    this.controller.stopAllMovement?.();
+    return { success: true, message: '任务脚本已关闭' };
+  }
+
+  clearTimer() {
+    if (this.stepTimer) {
+      clearTimeout(this.stepTimer);
+      this.stepTimer = null;
+    }
+  }
+
+  getStatus() {
+    const step = this.steps[this.currentIndex] || 'rest';
+    const elapsed = this.startedAt ? Math.floor((Date.now() - this.startedAt) / 1000) : 0;
+    return {
+      active: this.active,
+      step,
+      steps: this.steps,
+      elapsedSeconds: elapsed,
+      lastReason: this.lastReason
+    };
+  }
+}
+
+/**
  * 动作行为 - 模拟玩家动作
  */
 export class ActionBehavior {
@@ -1467,7 +1735,7 @@ export class ActionBehavior {
  * 行为管理器 - 统一管理所有行为
  */
 export class BehaviorManager {
-  constructor(bot, goals, logFn = null, onAutoStop = null) {
+  constructor(bot, goals, logFn = null, onAutoStop = null, controller = null) {
     this.bot = bot;
     this.goals = goals;
     this.log = logFn;
@@ -1485,6 +1753,8 @@ export class BehaviorManager {
     this.fishing = new FishingBehavior(bot, logFn, onAutoStop);
     this.rateLimit = new RateLimitBehavior(bot, logFn);
     this.humanize = new HumanizeBehavior(bot, logFn);
+    this.safeIdle = new SafeIdleBehavior(bot, logFn);
+    this.workflow = new WorkflowBehavior(bot, controller, logFn);
   }
 
   stopAll() {
@@ -1500,6 +1770,8 @@ export class BehaviorManager {
     this.fishing.stop();
     this.rateLimit.stop();
     this.humanize.stop();
+    this.safeIdle.stop();
+    this.workflow.stop();
     return { success: true, message: '已停止所有行为' };
   }
 
@@ -1516,7 +1788,9 @@ export class BehaviorManager {
       guard: this.guard.getStatus(),
       fishing: this.fishing.getStatus(),
       rateLimit: this.rateLimit.getStatus(),
-      humanize: this.humanize.getStatus()
+      humanize: this.humanize.getStatus(),
+      safeIdle: this.safeIdle.getStatus(),
+      workflow: this.workflow.getStatus()
     };
   }
 }

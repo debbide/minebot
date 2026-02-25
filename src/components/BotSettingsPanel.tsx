@@ -139,6 +139,21 @@ interface BehaviorStatus {
         swingChance?: number;
         lastAction?: string | null;
     };
+    safeIdle?: {
+        active: boolean;
+        intervalSeconds?: number;
+        lookRange?: number;
+        actionChance?: number;
+        timeoutSeconds?: number;
+        lastAction?: string | null;
+    };
+    workflow?: {
+        active: boolean;
+        step?: string | null;
+        steps?: string[];
+        elapsedSeconds?: number;
+        lastReason?: string | null;
+    };
 }
 
 export function BotSettingsPanel({
@@ -198,6 +213,20 @@ export function BotSettingsPanel({
     const [humanizeStepChance, setHumanizeStepChance] = useState<string>("0.3");
     const [humanizeSneakChance, setHumanizeSneakChance] = useState<string>("0.2");
     const [humanizeSwingChance, setHumanizeSwingChance] = useState<string>("0.2");
+    const [safeIdleInterval, setSafeIdleInterval] = useState<string>("20");
+    const [safeIdleLookRange, setSafeIdleLookRange] = useState<string>("6");
+    const [safeIdleActionChance, setSafeIdleActionChance] = useState<string>("0.5");
+    const [safeIdleTimeout, setSafeIdleTimeout] = useState<string>("45");
+    const [workflowStepsText, setWorkflowStepsText] = useState<string>("mining, patrol, rest");
+    const [workflowPatrolSeconds, setWorkflowPatrolSeconds] = useState<string>("120");
+    const [workflowRestSeconds, setWorkflowRestSeconds] = useState<string>("40");
+    const [workflowMiningMaxSeconds, setWorkflowMiningMaxSeconds] = useState<string>("240");
+    const [pathAvoidWater, setPathAvoidWater] = useState<boolean>(true);
+    const [pathAvoidLava, setPathAvoidLava] = useState<boolean>(true);
+    const [pathAvoidEdges, setPathAvoidEdges] = useState<boolean>(true);
+    const [pathMaxDropDown, setPathMaxDropDown] = useState<string>("2");
+    const [pathAllowSprinting, setPathAllowSprinting] = useState<boolean>(false);
+    const [pathAllowParkour, setPathAllowParkour] = useState<boolean>(false);
     const [commandAllowAll, setCommandAllowAll] = useState<boolean>(false);
     const [commandCooldownSeconds, setCommandCooldownSeconds] = useState<string>("3");
     const [commandWhitelistText, setCommandWhitelistText] = useState<string>("");
@@ -378,6 +407,56 @@ export function BotSettingsPanel({
                         ? String(settings.humanize.swingChance)
                         : "0.2"
                 );
+                setSafeIdleInterval(
+                    settings.safeIdle?.intervalSeconds !== undefined
+                        ? String(settings.safeIdle.intervalSeconds)
+                        : "20"
+                );
+                setSafeIdleLookRange(
+                    settings.safeIdle?.lookRange !== undefined
+                        ? String(settings.safeIdle.lookRange)
+                        : "6"
+                );
+                setSafeIdleActionChance(
+                    settings.safeIdle?.actionChance !== undefined
+                        ? String(settings.safeIdle.actionChance)
+                        : "0.5"
+                );
+                setSafeIdleTimeout(
+                    settings.safeIdle?.timeoutSeconds !== undefined
+                        ? String(settings.safeIdle.timeoutSeconds)
+                        : "45"
+                );
+                setWorkflowStepsText(
+                    settings.workflow?.steps && settings.workflow.steps.length > 0
+                        ? settings.workflow.steps.join(", ")
+                        : "mining, patrol, rest"
+                );
+                setWorkflowPatrolSeconds(
+                    settings.workflow?.patrolSeconds !== undefined
+                        ? String(settings.workflow.patrolSeconds)
+                        : "120"
+                );
+                setWorkflowRestSeconds(
+                    settings.workflow?.restSeconds !== undefined
+                        ? String(settings.workflow.restSeconds)
+                        : "40"
+                );
+                setWorkflowMiningMaxSeconds(
+                    settings.workflow?.miningMaxSeconds !== undefined
+                        ? String(settings.workflow.miningMaxSeconds)
+                        : "240"
+                );
+                setPathAvoidWater(settings.pathSafety?.avoidWater !== false);
+                setPathAvoidLava(settings.pathSafety?.avoidLava !== false);
+                setPathAvoidEdges(settings.pathSafety?.avoidEdges !== false);
+                setPathMaxDropDown(
+                    settings.pathSafety?.maxDropDown !== undefined
+                        ? String(settings.pathSafety.maxDropDown)
+                        : "2"
+                );
+                setPathAllowSprinting(!!settings.pathSafety?.allowSprinting);
+                setPathAllowParkour(!!settings.pathSafety?.allowParkour);
                 const cmdSettings = result.config.commandSettings || {};
                 setCommandAllowAll(!!cmdSettings.allowAll);
                 setCommandCooldownSeconds(
@@ -696,6 +775,18 @@ export function BotSettingsPanel({
             const humanizeStepChanceValue = Number(humanizeStepChance);
             const humanizeSneakChanceValue = Number(humanizeSneakChance);
             const humanizeSwingChanceValue = Number(humanizeSwingChance);
+            const safeIdleIntervalValue = Number(safeIdleInterval);
+            const safeIdleLookRangeValue = Number(safeIdleLookRange);
+            const safeIdleActionChanceValue = Number(safeIdleActionChance);
+            const safeIdleTimeoutValue = Number(safeIdleTimeout);
+            const workflowPatrolSecondsValue = Number(workflowPatrolSeconds);
+            const workflowRestSecondsValue = Number(workflowRestSeconds);
+            const workflowMiningMaxSecondsValue = Number(workflowMiningMaxSeconds);
+            const pathMaxDropDownValue = Number(pathMaxDropDown);
+            const workflowSteps = workflowStepsText
+                .split(/[,\n]/)
+                .map(step => step.trim())
+                .filter(step => step);
 
             await api.setBehaviorSettings(botId, {
                 attack: {
@@ -733,6 +824,26 @@ export function BotSettingsPanel({
                     stepChance: Number.isNaN(humanizeStepChanceValue) ? 0.3 : humanizeStepChanceValue,
                     sneakChance: Number.isNaN(humanizeSneakChanceValue) ? 0.2 : humanizeSneakChanceValue,
                     swingChance: Number.isNaN(humanizeSwingChanceValue) ? 0.2 : humanizeSwingChanceValue
+                },
+                safeIdle: {
+                    intervalSeconds: Number.isNaN(safeIdleIntervalValue) ? 20 : safeIdleIntervalValue,
+                    lookRange: Number.isNaN(safeIdleLookRangeValue) ? 6 : safeIdleLookRangeValue,
+                    actionChance: Number.isNaN(safeIdleActionChanceValue) ? 0.5 : safeIdleActionChanceValue,
+                    timeoutSeconds: Number.isNaN(safeIdleTimeoutValue) ? 45 : safeIdleTimeoutValue
+                },
+                workflow: {
+                    steps: workflowSteps.length > 0 ? workflowSteps : ["mining", "patrol", "rest"],
+                    patrolSeconds: Number.isNaN(workflowPatrolSecondsValue) ? 120 : workflowPatrolSecondsValue,
+                    restSeconds: Number.isNaN(workflowRestSecondsValue) ? 40 : workflowRestSecondsValue,
+                    miningMaxSeconds: Number.isNaN(workflowMiningMaxSecondsValue) ? 240 : workflowMiningMaxSecondsValue
+                },
+                pathSafety: {
+                    avoidWater: pathAvoidWater,
+                    avoidLava: pathAvoidLava,
+                    avoidEdges: pathAvoidEdges,
+                    maxDropDown: Number.isNaN(pathMaxDropDownValue) ? 2 : pathMaxDropDownValue,
+                    allowSprinting: pathAllowSprinting,
+                    allowParkour: pathAllowParkour
                 }
             });
 
@@ -1023,6 +1134,8 @@ security:
                             <div>钓鱼: {behaviorStatus.fishing?.active ? `间隔 ${formatValue(behaviorStatus.fishing.intervalSeconds)}s | 超时 ${formatValue(behaviorStatus.fishing.timeoutSeconds)}s | 状态 ${formatValue(behaviorStatus.fishing.lastResult)}` : "未开启"}</div>
                             <div>限速: {behaviorStatus.rateLimit?.active ? `冷却 ${formatValue(behaviorStatus.rateLimit.globalCooldownSeconds)}s | 每分钟 ${formatValue(behaviorStatus.rateLimit.maxPerMinute)} | 拦截 ${formatValue(behaviorStatus.rateLimit.blockedCount)}` : "未开启"}</div>
                             <div>拟人: {behaviorStatus.humanize?.active ? `间隔 ${formatValue(behaviorStatus.humanize.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.humanize.lookRange)} | 概率 ${formatValue(behaviorStatus.humanize.actionChance)} | 动作 ${formatValue(behaviorStatus.humanize.lastAction)}` : "未开启"}</div>
+                            <div>安全挂机: {behaviorStatus.safeIdle?.active ? `间隔 ${formatValue(behaviorStatus.safeIdle.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.safeIdle.lookRange)} | 超时 ${formatValue(behaviorStatus.safeIdle.timeoutSeconds)}s | 动作 ${formatValue(behaviorStatus.safeIdle.lastAction)}` : "未开启"}</div>
+                            <div>任务脚本: {behaviorStatus.workflow?.active ? `步骤 ${formatValue(behaviorStatus.workflow.step)} | 已运行 ${formatValue(behaviorStatus.workflow.elapsedSeconds)}s | 原因 ${formatValue(behaviorStatus.workflow.lastReason)}` : "未开启"}</div>
                         </div>
                     )}
                 </div>
@@ -1240,6 +1353,122 @@ security:
                         onChange={(e) => setHumanizeSwingChance(e.target.value)}
                         placeholder="0.2"
                     />
+                </div>
+                <div className="space-y-2">
+                    <Label>安全挂机间隔 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="5"
+                        value={safeIdleInterval}
+                        onChange={(e) => setSafeIdleInterval(e.target.value)}
+                        placeholder="20"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>安全挂机视距</Label>
+                    <Input
+                        type="number"
+                        min="2"
+                        value={safeIdleLookRange}
+                        onChange={(e) => setSafeIdleLookRange(e.target.value)}
+                        placeholder="6"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>安全挂机动作概率 (0-1)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={safeIdleActionChance}
+                        onChange={(e) => setSafeIdleActionChance(e.target.value)}
+                        placeholder="0.5"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>安全挂机超时保护 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="10"
+                        value={safeIdleTimeout}
+                        onChange={(e) => setSafeIdleTimeout(e.target.value)}
+                        placeholder="45"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>任务脚本步骤 (逗号分隔)</Label>
+                    <Input
+                        value={workflowStepsText}
+                        onChange={(e) => setWorkflowStepsText(e.target.value)}
+                        placeholder="mining, patrol, rest"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                        可选：mining、patrol、rest
+                    </p>
+                </div>
+                <div className="space-y-2">
+                    <Label>巡逻时长 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="10"
+                        value={workflowPatrolSeconds}
+                        onChange={(e) => setWorkflowPatrolSeconds(e.target.value)}
+                        placeholder="120"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>休息时长 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="5"
+                        value={workflowRestSeconds}
+                        onChange={(e) => setWorkflowRestSeconds(e.target.value)}
+                        placeholder="40"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>挖矿最大时长 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="30"
+                        value={workflowMiningMaxSeconds}
+                        onChange={(e) => setWorkflowMiningMaxSeconds(e.target.value)}
+                        placeholder="240"
+                    />
+                </div>
+                <div className="rounded-md border p-3 space-y-3">
+                    <div className="text-sm font-medium">路径安全</div>
+                    <div className="flex items-center justify-between">
+                        <Label>避开水域</Label>
+                        <Switch checked={pathAvoidWater} onCheckedChange={setPathAvoidWater} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <Label>避开岩浆</Label>
+                        <Switch checked={pathAvoidLava} onCheckedChange={setPathAvoidLava} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <Label>避免高处跳落</Label>
+                        <Switch checked={pathAvoidEdges} onCheckedChange={setPathAvoidEdges} />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>最大下落高度</Label>
+                        <Input
+                            type="number"
+                            min="0"
+                            value={pathMaxDropDown}
+                            onChange={(e) => setPathMaxDropDown(e.target.value)}
+                            placeholder="2"
+                        />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <Label>允许冲刺</Label>
+                        <Switch checked={pathAllowSprinting} onCheckedChange={setPathAllowSprinting} />
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <Label>允许跑酷跳跃</Label>
+                        <Switch checked={pathAllowParkour} onCheckedChange={setPathAllowParkour} />
+                    </div>
                 </div>
                 <Button
                     onClick={handleSaveBehaviorSettings}

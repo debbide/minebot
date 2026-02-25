@@ -19,7 +19,9 @@ import {
   Fish,
   Activity,
   Timer,
-  UserRound
+  UserRound,
+  Coffee,
+  ListChecks
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +62,8 @@ interface BotControlPanelProps {
     fishing?: boolean;
     rateLimit?: boolean;
     humanize?: boolean;
+    safeIdle?: boolean;
+    workflow?: boolean;
   };
   players?: string[];
   restartTimer?: {
@@ -166,6 +170,21 @@ interface BehaviorStatus {
     lookRange?: number;
     actionChance?: number;
     lastAction?: string | null;
+  };
+  safeIdle?: {
+    active: boolean;
+    intervalSeconds?: number;
+    lookRange?: number;
+    actionChance?: number;
+    timeoutSeconds?: number;
+    lastAction?: string | null;
+  };
+  workflow?: {
+    active: boolean;
+    step?: string | null;
+    steps?: string[];
+    elapsedSeconds?: number;
+    lastReason?: string | null;
   };
 }
 
@@ -418,6 +437,8 @@ export function BotControlPanel({
             {modes.fishing && <Badge variant="secondary">钓鱼</Badge>}
             {modes.rateLimit && <Badge variant="secondary">限速</Badge>}
             {modes.humanize && <Badge variant="secondary">拟人</Badge>}
+            {modes.safeIdle && <Badge variant="secondary">安全挂机</Badge>}
+            {modes.workflow && <Badge variant="secondary">任务脚本</Badge>}
             {restartTimer?.enabled && (
               <Badge variant="outline">
                 定时重启: {restartTimer.intervalMinutes}分钟
@@ -516,7 +537,7 @@ export function BotControlPanel({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-8 gap-2">
                 <Button
                   size="sm"
                   variant={modes.guard ? "destructive" : "outline"}
@@ -571,6 +592,24 @@ export function BotControlPanel({
                 >
                   {loading === "humanize" ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserRound className="h-4 w-4" />}
                 </Button>
+                <Button
+                  size="sm"
+                  variant={modes.safeIdle ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("safeIdle", !modes.safeIdle)}
+                  disabled={loading !== null}
+                  title="安全挂机"
+                >
+                  {loading === "safeIdle" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Coffee className="h-4 w-4" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={modes.workflow ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("workflow", !modes.workflow)}
+                  disabled={loading !== null}
+                  title="任务脚本"
+                >
+                  {loading === "workflow" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />}
+                </Button>
               </div>
 
               <div className="rounded-md border p-2 text-xs space-y-2">
@@ -605,6 +644,8 @@ export function BotControlPanel({
                     <div>钓鱼: {formatState(modes.fishing, behaviorStatus.fishing?.active)}{behaviorStatus.fishing?.active ? ` | 间隔 ${formatValue(behaviorStatus.fishing.intervalSeconds)}s | 超时 ${formatValue(behaviorStatus.fishing.timeoutSeconds)}s | 状态 ${formatValue(behaviorStatus.fishing.lastResult)}` : ""}</div>
                     <div>限速: {formatState(modes.rateLimit, behaviorStatus.rateLimit?.active)}{behaviorStatus.rateLimit?.active ? ` | 冷却 ${formatValue(behaviorStatus.rateLimit.globalCooldownSeconds)}s | 每分钟 ${formatValue(behaviorStatus.rateLimit.maxPerMinute)} | 拦截 ${formatValue(behaviorStatus.rateLimit.blockedCount)}` : ""}</div>
                     <div>拟人: {formatState(modes.humanize, behaviorStatus.humanize?.active)}{behaviorStatus.humanize?.active ? ` | 间隔 ${formatValue(behaviorStatus.humanize.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.humanize.lookRange)} | 概率 ${formatValue(behaviorStatus.humanize.actionChance)}` : ""}</div>
+                    <div>安全挂机: {formatState(modes.safeIdle, behaviorStatus.safeIdle?.active)}{behaviorStatus.safeIdle?.active ? ` | 间隔 ${formatValue(behaviorStatus.safeIdle.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.safeIdle.lookRange)} | 超时 ${formatValue(behaviorStatus.safeIdle.timeoutSeconds)}s | 动作 ${formatValue(behaviorStatus.safeIdle.lastAction)}` : ""}</div>
+                    <div>任务脚本: {formatState(modes.workflow, behaviorStatus.workflow?.active)}{behaviorStatus.workflow?.active ? ` | 步骤 ${formatValue(behaviorStatus.workflow.step)} | 已运行 ${formatValue(behaviorStatus.workflow.elapsedSeconds)}s | 原因 ${formatValue(behaviorStatus.workflow.lastReason)}` : ""}</div>
                   </div>
                 )}
               </div>
