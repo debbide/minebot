@@ -169,15 +169,15 @@ export function BotSettingsPanel({
     const [rconPassword, setRconPassword] = useState("");
 
     const [attackWhitelistText, setAttackWhitelistText] = useState<string>("");
-    const [attackMinHealth, setAttackMinHealth] = useState<string>("6");
+    const [attackMinHealth, setAttackMinHealth] = useState<string>("12");
     const [patrolWaypointsText, setPatrolWaypointsText] = useState<string>("");
     const [antiAfkInterval, setAntiAfkInterval] = useState<string>("45");
     const [antiAfkJitter, setAntiAfkJitter] = useState<string>("15");
-    const [autoEatMinHealth, setAutoEatMinHealth] = useState<string>("6");
-    const [autoEatMinFood, setAutoEatMinFood] = useState<string>("14");
-    const [guardRadius, setGuardRadius] = useState<string>("12");
-    const [guardAttackRange, setGuardAttackRange] = useState<string>("4");
-    const [guardMinHealth, setGuardMinHealth] = useState<string>("6");
+    const [autoEatMinHealth, setAutoEatMinHealth] = useState<string>("12");
+    const [autoEatMinFood, setAutoEatMinFood] = useState<string>("18");
+    const [guardRadius, setGuardRadius] = useState<string>("8");
+    const [guardAttackRange, setGuardAttackRange] = useState<string>("3");
+    const [guardMinHealth, setGuardMinHealth] = useState<string>("12");
     const [fishingInterval, setFishingInterval] = useState<string>("2");
     const [fishingTimeout, setFishingTimeout] = useState<string>("25");
     const [rateLimitCooldown, setRateLimitCooldown] = useState<string>("1");
@@ -271,7 +271,7 @@ export function BotSettingsPanel({
                 setAttackMinHealth(
                     settings.attack?.minHealth !== undefined
                         ? String(settings.attack.minHealth)
-                        : "6"
+                        : "12"
                 );
                 const waypoints = settings.patrol?.waypoints || [];
                 setPatrolWaypointsText(
@@ -290,27 +290,27 @@ export function BotSettingsPanel({
                 setAutoEatMinHealth(
                     settings.autoEat?.minHealth !== undefined
                         ? String(settings.autoEat.minHealth)
-                        : "6"
+                        : "12"
                 );
                 setAutoEatMinFood(
                     settings.autoEat?.minFood !== undefined
                         ? String(settings.autoEat.minFood)
-                        : "14"
+                        : "18"
                 );
                 setGuardRadius(
                     settings.guard?.radius !== undefined
                         ? String(settings.guard.radius)
-                        : "12"
+                        : "8"
                 );
                 setGuardAttackRange(
                     settings.guard?.attackRange !== undefined
                         ? String(settings.guard.attackRange)
-                        : "4"
+                        : "3"
                 );
                 setGuardMinHealth(
                     settings.guard?.minHealth !== undefined
                         ? String(settings.guard.minHealth)
-                        : "6"
+                        : "12"
                 );
                 setFishingInterval(
                     settings.fishing?.intervalSeconds !== undefined
@@ -648,7 +648,7 @@ export function BotSettingsPanel({
             await api.setBehaviorSettings(botId, {
                 attack: {
                     whitelist,
-                    minHealth: Number.isNaN(minHealth) ? 6 : minHealth
+                    minHealth: Number.isNaN(minHealth) ? 12 : minHealth
                 },
                 patrol: {
                     waypoints
@@ -658,13 +658,13 @@ export function BotSettingsPanel({
                     jitterSeconds: Number.isNaN(antiAfkJitterValue) ? 15 : antiAfkJitterValue
                 },
                 autoEat: {
-                    minHealth: Number.isNaN(autoEatMinHealthValue) ? 6 : autoEatMinHealthValue,
-                    minFood: Number.isNaN(autoEatMinFoodValue) ? 14 : autoEatMinFoodValue
+                    minHealth: Number.isNaN(autoEatMinHealthValue) ? 12 : autoEatMinHealthValue,
+                    minFood: Number.isNaN(autoEatMinFoodValue) ? 18 : autoEatMinFoodValue
                 },
                 guard: {
-                    radius: Number.isNaN(guardRadiusValue) ? 12 : guardRadiusValue,
-                    attackRange: Number.isNaN(guardAttackRangeValue) ? 4 : guardAttackRangeValue,
-                    minHealth: Number.isNaN(guardMinHealthValue) ? 6 : guardMinHealthValue
+                    radius: Number.isNaN(guardRadiusValue) ? 8 : guardRadiusValue,
+                    attackRange: Number.isNaN(guardAttackRangeValue) ? 3 : guardAttackRangeValue,
+                    minHealth: Number.isNaN(guardMinHealthValue) ? 12 : guardMinHealthValue
                 },
                 fishing: {
                     intervalSeconds: Number.isNaN(fishingIntervalValue) ? 2 : fishingIntervalValue,
@@ -984,7 +984,7 @@ security:
                         min="0"
                         value={attackMinHealth}
                         onChange={(e) => setAttackMinHealth(e.target.value)}
-                        placeholder="6"
+                        placeholder="12"
                     />
                     <p className="text-xs text-muted-foreground">
                         低于该生命值自动停止攻击。
@@ -1029,7 +1029,7 @@ security:
                         min="0"
                         value={autoEatMinHealth}
                         onChange={(e) => setAutoEatMinHealth(e.target.value)}
-                        placeholder="6"
+                        placeholder="12"
                     />
                 </div>
                 <div className="space-y-2">
@@ -1039,7 +1039,7 @@ security:
                         min="0"
                         value={autoEatMinFood}
                         onChange={(e) => setAutoEatMinFood(e.target.value)}
-                        placeholder="14"
+                        placeholder="18"
                     />
                 </div>
                 <div className="space-y-2">
@@ -1049,7 +1049,7 @@ security:
                         min="2"
                         value={guardRadius}
                         onChange={(e) => setGuardRadius(e.target.value)}
-                        placeholder="12"
+                        placeholder="8"
                     />
                 </div>
                 <div className="space-y-2">
@@ -1059,7 +1059,7 @@ security:
                         min="2"
                         value={guardAttackRange}
                         onChange={(e) => setGuardAttackRange(e.target.value)}
-                        placeholder="4"
+                        placeholder="3"
                     />
                 </div>
                 <div className="space-y-2">
@@ -1069,7 +1069,7 @@ security:
                         min="0"
                         value={guardMinHealth}
                         onChange={(e) => setGuardMinHealth(e.target.value)}
-                        placeholder="6"
+                        placeholder="12"
                     />
                 </div>
                 <div className="space-y-2">

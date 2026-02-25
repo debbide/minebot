@@ -837,6 +837,12 @@ export class AutoEatBehavior {
 
     this.eating = true;
     try {
+      if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+      if (this.bot?.setControlState) {
+        this.bot.setControlState('sprint', false);
+        this.bot.setControlState('jump', false);
+        this.bot.setControlState('sneak', false);
+      }
       await this.bot.equip(foodItem, 'hand');
       if (typeof this.bot.consume === 'function') {
         await this.bot.consume();
@@ -884,11 +890,13 @@ export class GuardBehavior {
     this.log = logFn;
     this.onAutoStop = onAutoStop;
     this.active = false;
-    this.radius = 12;
-    this.attackRange = 4;
-    this.minHealth = 6;
+    this.radius = 8;
+    this.attackRange = 3;
+    this.minHealth = 12;
+    this.pathCooldownMs = 800;
     this.interval = null;
     this.lastTarget = null;
+    this.lastPathTime = 0;
   }
 
   start(options = {}) {
@@ -902,6 +910,10 @@ export class GuardBehavior {
     }
     if (Number.isFinite(options.minHealth)) {
       this.minHealth = Math.max(0, options.minHealth);
+    }
+
+    if (Number.isFinite(options.pathCooldownMs)) {
+      this.pathCooldownMs = Math.max(300, options.pathCooldownMs);
     }
 
     this.active = true;
@@ -930,6 +942,12 @@ export class GuardBehavior {
   tick() {
     if (!this.active || !this.bot?.entity) return;
     if (typeof this.bot.health === 'number' && this.bot.health <= this.minHealth) {
+      if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+      if (this.bot?.setControlState) {
+        this.bot.setControlState('sprint', false);
+        this.bot.setControlState('jump', false);
+        this.bot.setControlState('sneak', false);
+      }
       this.autoStop('low_health');
       return;
     }
@@ -944,6 +962,14 @@ export class GuardBehavior {
     this.lastTarget = target.username || target.name || target.type || 'unknown';
     const dist = this.bot.entity.position.distanceTo(target.position);
     if (dist > this.attackRange && this.bot?.pathfinder) {
+      if (this.bot.getControlState?.('sprint')) {
+        this.bot.setControlState('sprint', false);
+      }
+      const now = Date.now();
+      if (now - this.lastPathTime < this.pathCooldownMs) {
+        return;
+      }
+      this.lastPathTime = now;
       const goal = new this.goals.GoalFollow(target, 1);
       this.bot.pathfinder.setGoal(goal, true);
       return;
@@ -965,6 +991,11 @@ export class GuardBehavior {
       this.interval = null;
     }
     if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+    if (this.bot?.setControlState) {
+      this.bot.setControlState('sprint', false);
+      this.bot.setControlState('jump', false);
+      this.bot.setControlState('sneak', false);
+    }
     if (this.log && reason === 'low_health') {
       this.log('warning', '生命值过低，自动停止守护', '🛡️');
     }

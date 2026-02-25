@@ -87,7 +87,7 @@ export class BotInstance {
     this.behaviorSettings = {
       attack: {
         whitelist: [],
-        minHealth: 6,
+        minHealth: 12,
         ...(config.behaviorSettings?.attack || {})
       },
       patrol: {
@@ -101,14 +101,15 @@ export class BotInstance {
         ...(config.behaviorSettings?.antiAfk || {})
       },
       autoEat: {
-        minHealth: 6,
-        minFood: 14,
+        minHealth: 12,
+        minFood: 18,
         ...(config.behaviorSettings?.autoEat || {})
       },
       guard: {
-        radius: 12,
-        attackRange: 4,
-        minHealth: 6,
+        radius: 8,
+        attackRange: 3,
+        minHealth: 12,
+        pathCooldownMs: 800,
         ...(config.behaviorSettings?.guard || {})
       },
       fishing: {
@@ -1855,9 +1856,11 @@ export class BotInstance {
       const radius = Number(settings.guard.radius);
       const attackRange = Number(settings.guard.attackRange);
       const minHealth = Number(settings.guard.minHealth);
+      const pathCooldownMs = Number(settings.guard.pathCooldownMs);
       if (!Number.isNaN(radius)) next.guard.radius = Math.max(2, radius);
       if (!Number.isNaN(attackRange)) next.guard.attackRange = Math.max(2, attackRange);
       if (!Number.isNaN(minHealth)) next.guard.minHealth = Math.max(0, minHealth);
+      if (!Number.isNaN(pathCooldownMs)) next.guard.pathCooldownMs = Math.max(300, pathCooldownMs);
     }
 
     if (settings.fishing) {

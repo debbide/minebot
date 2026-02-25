@@ -456,7 +456,7 @@ export class ConfigManager {
       behaviorSettings: serverConfig.behaviorSettings || {
         attack: {
           whitelist: [],
-          minHealth: 6
+          minHealth: 12
         },
         patrol: {
           waypoints: []
@@ -466,13 +466,14 @@ export class ConfigManager {
           jitterSeconds: 15
         },
         autoEat: {
-          minHealth: 6,
-          minFood: 14
+          minHealth: 12,
+          minFood: 18
         },
         guard: {
-          radius: 12,
-          attackRange: 4,
-          minHealth: 6
+          radius: 8,
+          attackRange: 3,
+          minHealth: 12,
+          pathCooldownMs: 800
         },
         fishing: {
           intervalSeconds: 2,
