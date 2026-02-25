@@ -38,6 +38,13 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
     const [proxyNodes, setProxyNodes] = useState<ProxyNode[]>([]);
     const [selectedNode, setSelectedNode] = useState<ProxyNode | null>(null);
     const [testLoading, setTestLoading] = useState<Record<string, boolean>>({});
+    const [aiConfig, setAiConfig] = useState({
+        enabled: true,
+        apiKey: "",
+        baseURL: "",
+        model: "gpt-3.5-turbo",
+        systemPrompt: ""
+    });
 
     const loadConfig = useCallback(async () => {
         try {
@@ -46,6 +53,16 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
             setTgConfig(tg);
             const nodes = await api.getProxyNodes();
             setProxyNodes(nodes);
+            const fullConfig = await api.getFullConfig();
+            if (fullConfig?.ai) {
+                setAiConfig({
+                    enabled: fullConfig.ai.enabled !== false,
+                    apiKey: fullConfig.ai.apiKey || "",
+                    baseURL: fullConfig.ai.baseURL || "",
+                    model: fullConfig.ai.model || "gpt-3.5-turbo",
+                    systemPrompt: fullConfig.ai.systemPrompt || ""
+                });
+            }
         } catch (error) {
             console.error("Failed to load settings:", error);
             toast({
@@ -187,6 +204,35 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
         }
     };
 
+    const handleSaveAi = async () => {
+        try {
+            setSaving(true);
+            await api.saveSettings({
+                ai: {
+                    enabled: !!aiConfig.enabled,
+                    apiKey: aiConfig.apiKey || "",
+                    baseURL: aiConfig.baseURL || "",
+                    model: aiConfig.model || "gpt-3.5-turbo",
+                    systemPrompt: aiConfig.systemPrompt || ""
+                }
+            });
+            toast({
+                title: "保存成功",
+                description: "AI 配置已更新",
+            });
+            onOpenChange(false);
+        } catch (error) {
+            console.error("Failed to save AI settings:", error);
+            toast({
+                title: "保存失败",
+                description: "无法保存 AI 配置",
+                variant: "destructive",
+            });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleSyncSubscription = async () => {
         const url = prompt("请输入订阅链接 URL:");
         if (!url) return;
@@ -233,8 +279,9 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                     </DialogHeader>
 
                     <Tabs defaultValue="telegram" className="w-full">
-                        <TabsList className="grid w-full grid-cols-3">
+                        <TabsList className="grid w-full grid-cols-4">
                             <TabsTrigger value="telegram">Telegram 通知</TabsTrigger>
+                            <TabsTrigger value="ai">AI</TabsTrigger>
                             <TabsTrigger value="proxy">代理管理</TabsTrigger>
                             <TabsTrigger value="security">账号安全</TabsTrigger>
                         </TabsList>
@@ -294,6 +341,67 @@ export function GlobalSettingsDialog({ open, onOpenChange }: GlobalSettingsDialo
                                     保存配置
                                 </Button>
                             </div>
+                        </TabsContent>
+
+                        <TabsContent value="ai" className="space-y-4 py-4">
+                            <div className="flex items-center justify-between space-x-2 border-b pb-4">
+                                <Label htmlFor="ai-enabled" className="flex flex-col space-y-1">
+                                    <span>启用 AI</span>
+                                    <span className="font-normal text-xs text-muted-foreground">
+                                        启用后可使用 AI 问答与自动响应
+                                    </span>
+                                </Label>
+                                <Switch
+                                    id="ai-enabled"
+                                    checked={aiConfig.enabled}
+                                    onCheckedChange={(checked) => setAiConfig(prev => ({ ...prev, enabled: checked }))}
+                                />
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="ai-model">模型</Label>
+                                    <Input
+                                        id="ai-model"
+                                        value={aiConfig.model}
+                                        onChange={(e) => setAiConfig(prev => ({ ...prev, model: e.target.value }))}
+                                        placeholder="gpt-4o-mini"
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="ai-baseurl">Base URL</Label>
+                                    <Input
+                                        id="ai-baseurl"
+                                        value={aiConfig.baseURL}
+                                        onChange={(e) => setAiConfig(prev => ({ ...prev, baseURL: e.target.value }))}
+                                        placeholder="https://api.openai.com/v1"
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="ai-key">API Key</Label>
+                                    <Input
+                                        id="ai-key"
+                                        type="password"
+                                        value={aiConfig.apiKey}
+                                        onChange={(e) => setAiConfig(prev => ({ ...prev, apiKey: e.target.value }))}
+                                        placeholder="sk-..."
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="ai-system">System Prompt</Label>
+                                    <Input
+                                        id="ai-system"
+                                        value={aiConfig.systemPrompt}
+                                        onChange={(e) => setAiConfig(prev => ({ ...prev, systemPrompt: e.target.value }))}
+                                        placeholder="You are a helpful Minecraft bot."
+                                    />
+                                </div>
+                            </div>
+
+                            <Button onClick={handleSaveAi} disabled={saving || loading} className="w-full">
+                                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                保存 AI 配置
+                            </Button>
                         </TabsContent>
 
                         <TabsContent value="proxy" className="space-y-4 py-4 max-h-[550px] overflow-y-auto pr-1">
