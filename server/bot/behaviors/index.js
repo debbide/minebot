@@ -495,6 +495,7 @@ export class MiningBehavior {
         const block = this.findOre();
         if (block) {
           await this.mineBlock(block);
+          await new Promise(r => setTimeout(r, 400));
         } else {
           // 没找到矿，等待后重试
           await new Promise(r => setTimeout(r, 5000));
@@ -1566,11 +1567,23 @@ export class WorkflowBehavior {
 
     switch (step) {
       case 'mining':
-        this.controller.startMining?.();
+        {
+          const result = this.controller.startMining?.();
+          if (result && result.success === false) {
+            this.completeStep('failed');
+            return;
+          }
+        }
         this.stepTimer = setTimeout(() => this.completeStep('timeout'), this.miningMaxSeconds * 1000);
         break;
       case 'patrol':
-        this.controller.startPatrol?.();
+        {
+          const result = this.controller.startPatrol?.();
+          if (result && result.success === false) {
+            this.completeStep('failed');
+            return;
+          }
+        }
         this.stepTimer = setTimeout(() => this.completeStep('timeout'), this.patrolSeconds * 1000);
         break;
       case 'rest':
