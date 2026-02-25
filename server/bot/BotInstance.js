@@ -80,7 +80,8 @@ export class BotInstance {
       autoEat: false,
       guard: false,
       fishing: false,
-      rateLimit: false
+      rateLimit: false,
+      humanize: false
     };
     this.modes = { ...defaultModes, ...(config.modes || {}) };
 
@@ -121,6 +122,15 @@ export class BotInstance {
         globalCooldownSeconds: 1,
         maxPerMinute: 20,
         ...(config.behaviorSettings?.rateLimit || {})
+      },
+      humanize: {
+        intervalSeconds: 18,
+        lookRange: 6,
+        actionChance: 0.6,
+        stepChance: 0.3,
+        sneakChance: 0.2,
+        swingChance: 0.2,
+        ...(config.behaviorSettings?.humanize || {})
       }
     };
 
@@ -849,6 +859,16 @@ export class BotInstance {
         }
       } catch (e) {
         this.log('warning', `限速恢复失败: ${e.message}`, '⚠️');
+      }
+
+      try {
+        if (this.modes.humanize) {
+          const options = this.behaviorSettings.humanize || {};
+          this.behaviors.humanize.start(options);
+          this.log('info', '拟人已恢复', '🧍');
+        }
+      } catch (e) {
+        this.log('warning', `拟人恢复失败: ${e.message}`, '⚠️');
       }
 
       try {
@@ -1743,6 +1763,10 @@ export class BotInstance {
         this.behaviors.fishing.stop();
         this.modes.fishing = false;
         break;
+      case 'humanize':
+        this.behaviors.humanize.stop();
+        this.modes.humanize = false;
+        break;
       default:
         return;
     }
@@ -1977,6 +2001,8 @@ export class BotInstance {
     this.modes.guard = false;
     this.modes.fishing = false;
     this.modes.rateLimit = false;
+    this.modes.humanize = false;
+    this.modes.humanize = false;
     this.bot.chat('已停止所有行为');
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
   }
@@ -2183,6 +2209,16 @@ export class BotInstance {
         } else {
           result = this.behaviors.rateLimit.stop();
           this.modes.rateLimit = false;
+        }
+        break;
+      case 'humanize':
+        if (enabled) {
+          const humanizeOptions = { ...(this.behaviorSettings.humanize || {}), ...(options || {}) };
+          result = this.behaviors.humanize.start(humanizeOptions);
+          this.modes.humanize = result.success;
+        } else {
+          result = this.behaviors.humanize.stop();
+          this.modes.humanize = false;
         }
         break;
       default:

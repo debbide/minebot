@@ -834,6 +834,7 @@ app.post('/api/bots/:id/stop-all', (req, res) => {
       bot.modes.guard = false;
       bot.modes.fishing = false;
       bot.modes.rateLimit = false;
+      bot.modes.humanize = false;
     }
     res.json({ success: true, status: bot.getStatus() });
   } catch (error) {

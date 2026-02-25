@@ -227,7 +227,8 @@ export class ConfigManager {
         autoEat: false,
         guard: false,
         fishing: false,
-        rateLimit: false
+        rateLimit: false,
+        humanize: false
       },
       proxyNodes: [] // 全局代理节点库
     };
@@ -405,7 +406,8 @@ export class ConfigManager {
         autoEat: false,
         guard: false,
         fishing: false,
-        rateLimit: false
+        rateLimit: false,
+        humanize: false
       },
       // 独立的自动喊话配置
       autoChat: serverConfig.autoChat || {
@@ -482,6 +484,14 @@ export class ConfigManager {
         rateLimit: {
           globalCooldownSeconds: 1,
           maxPerMinute: 20
+        },
+        humanize: {
+          intervalSeconds: 18,
+          lookRange: 6,
+          actionChance: 0.6,
+          stepChance: 0.3,
+          sneakChance: 0.2,
+          swingChance: 0.2
         }
       }
     };

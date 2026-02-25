@@ -1205,6 +1205,142 @@ export class RateLimitBehavior {
 }
 
 /**
+ * 拟人化行为 - 轻量随机动作与视角
+ */
+export class HumanizeBehavior {
+  constructor(bot, logFn = null) {
+    this.bot = bot;
+    this.log = logFn;
+    this.active = false;
+    this.intervalSeconds = 18;
+    this.lookRange = 6;
+    this.actionChance = 0.6;
+    this.stepChance = 0.3;
+    this.sneakChance = 0.2;
+    this.swingChance = 0.2;
+    this.timeout = null;
+    this.lastAction = null;
+  }
+
+  start(options = {}) {
+    if (this.active) return { success: false, message: '拟人已在运行' };
+
+    if (Number.isFinite(options.intervalSeconds)) {
+      this.intervalSeconds = Math.max(5, options.intervalSeconds);
+    }
+    if (Number.isFinite(options.lookRange)) {
+      this.lookRange = Math.max(2, options.lookRange);
+    }
+    if (Number.isFinite(options.actionChance)) {
+      this.actionChance = Math.min(1, Math.max(0, options.actionChance));
+    }
+    if (Number.isFinite(options.stepChance)) {
+      this.stepChance = Math.min(1, Math.max(0, options.stepChance));
+    }
+    if (Number.isFinite(options.sneakChance)) {
+      this.sneakChance = Math.min(1, Math.max(0, options.sneakChance));
+    }
+    if (Number.isFinite(options.swingChance)) {
+      this.swingChance = Math.min(1, Math.max(0, options.swingChance));
+    }
+
+    this.active = true;
+    this.scheduleNext();
+    return { success: true, message: '拟人已开启' };
+  }
+
+  scheduleNext() {
+    if (!this.active) return;
+    const base = this.intervalSeconds * 1000;
+    const jitter = Math.max(500, base * 0.35);
+    const delay = Math.max(800, base + (Math.random() * 2 - 1) * jitter);
+    this.timeout = setTimeout(() => {
+      this.tick();
+      this.scheduleNext();
+    }, delay);
+  }
+
+  tick() {
+    if (!this.active || !this.bot?.entity) return;
+    if (Math.random() > this.actionChance) return;
+
+    if (Math.random() < this.stepChance && !this.bot?.pathfinder?.isMoving()) {
+      this.doStep();
+      return;
+    }
+
+    if (Math.random() < this.sneakChance) {
+      this.doSneak();
+      return;
+    }
+
+    if (Math.random() < this.swingChance) {
+      this.bot.swingArm();
+      this.lastAction = 'swing';
+      return;
+    }
+
+    this.doLook();
+  }
+
+  doLook() {
+    const pos = this.bot.entity.position;
+    const target = pos.offset(
+      (Math.random() - 0.5) * this.lookRange * 2,
+      Math.random() * 2,
+      (Math.random() - 0.5) * this.lookRange * 2
+    );
+    this.bot.lookAt(target);
+    this.lastAction = 'look';
+  }
+
+  doSneak() {
+    this.lastAction = 'sneak';
+    this.bot.setControlState('sneak', true);
+    setTimeout(() => {
+      if (this.bot) this.bot.setControlState('sneak', false);
+    }, 200 + Math.random() * 200);
+  }
+
+  doStep() {
+    this.lastAction = 'step';
+    this.bot.setControlState('sprint', false);
+    const move = Math.random() > 0.5 ? 'forward' : 'back';
+    const strafe = Math.random() > 0.5 ? 'left' : 'right';
+    if (Math.random() > 0.5) {
+      this.bot.setControlState(move, true);
+    } else {
+      this.bot.setControlState(strafe, true);
+    }
+    setTimeout(() => {
+      if (this.bot) {
+        this.bot.setControlState(move, false);
+        this.bot.setControlState(strafe, false);
+      }
+    }, 180 + Math.random() * 220);
+  }
+
+  stop() {
+    this.active = false;
+    if (this.timeout) {
+      clearTimeout(this.timeout);
+      this.timeout = null;
+    }
+    return { success: true, message: '拟人已关闭' };
+  }
+
+  getStatus() {
+    return {
+      active: this.active,
+      intervalSeconds: this.intervalSeconds,
+      lookRange: this.lookRange,
+      actionChance: this.actionChance,
+      lastAction: this.lastAction
+    };
+  }
+}
+
+/**
  * 动作行为 - 模拟玩家动作
  */
 export class ActionBehavior {
@@ -1348,6 +1484,7 @@ export class BehaviorManager {
     this.guard = new GuardBehavior(bot, goals, logFn, onAutoStop);
     this.fishing = new FishingBehavior(bot, logFn, onAutoStop);
     this.rateLimit = new RateLimitBehavior(bot, logFn);
+    this.humanize = new HumanizeBehavior(bot, logFn);
   }
 
   stopAll() {
@@ -1362,6 +1499,7 @@ export class BehaviorManager {
     this.guard.stop();
     this.fishing.stop();
     this.rateLimit.stop();
+    this.humanize.stop();
     return { success: true, message: '已停止所有行为' };
   }
 
@@ -1377,7 +1515,8 @@ export class BehaviorManager {
       autoEat: this.autoEat.getStatus(),
       guard: this.guard.getStatus(),
       fishing: this.fishing.getStatus(),
-      rateLimit: this.rateLimit.getStatus()
+      rateLimit: this.rateLimit.getStatus(),
+      humanize: this.humanize.getStatus()
     };
   }
 }

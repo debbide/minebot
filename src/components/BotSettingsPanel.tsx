@@ -129,6 +129,16 @@ interface BehaviorStatus {
         maxPerMinute?: number;
         blockedCount?: number;
     };
+    humanize?: {
+        active: boolean;
+        intervalSeconds?: number;
+        lookRange?: number;
+        actionChance?: number;
+        stepChance?: number;
+        sneakChance?: number;
+        swingChance?: number;
+        lastAction?: string | null;
+    };
 }
 
 export function BotSettingsPanel({
@@ -182,6 +192,12 @@ export function BotSettingsPanel({
     const [fishingTimeout, setFishingTimeout] = useState<string>("25");
     const [rateLimitCooldown, setRateLimitCooldown] = useState<string>("1");
     const [rateLimitMaxPerMinute, setRateLimitMaxPerMinute] = useState<string>("20");
+    const [humanizeInterval, setHumanizeInterval] = useState<string>("18");
+    const [humanizeLookRange, setHumanizeLookRange] = useState<string>("6");
+    const [humanizeActionChance, setHumanizeActionChance] = useState<string>("0.6");
+    const [humanizeStepChance, setHumanizeStepChance] = useState<string>("0.3");
+    const [humanizeSneakChance, setHumanizeSneakChance] = useState<string>("0.2");
+    const [humanizeSwingChance, setHumanizeSwingChance] = useState<string>("0.2");
     const [commandAllowAll, setCommandAllowAll] = useState<boolean>(false);
     const [commandCooldownSeconds, setCommandCooldownSeconds] = useState<string>("3");
     const [commandWhitelistText, setCommandWhitelistText] = useState<string>("");
@@ -331,6 +347,36 @@ export function BotSettingsPanel({
                     settings.rateLimit?.maxPerMinute !== undefined
                         ? String(settings.rateLimit.maxPerMinute)
                         : "20"
+                );
+                setHumanizeInterval(
+                    settings.humanize?.intervalSeconds !== undefined
+                        ? String(settings.humanize.intervalSeconds)
+                        : "18"
+                );
+                setHumanizeLookRange(
+                    settings.humanize?.lookRange !== undefined
+                        ? String(settings.humanize.lookRange)
+                        : "6"
+                );
+                setHumanizeActionChance(
+                    settings.humanize?.actionChance !== undefined
+                        ? String(settings.humanize.actionChance)
+                        : "0.6"
+                );
+                setHumanizeStepChance(
+                    settings.humanize?.stepChance !== undefined
+                        ? String(settings.humanize.stepChance)
+                        : "0.3"
+                );
+                setHumanizeSneakChance(
+                    settings.humanize?.sneakChance !== undefined
+                        ? String(settings.humanize.sneakChance)
+                        : "0.2"
+                );
+                setHumanizeSwingChance(
+                    settings.humanize?.swingChance !== undefined
+                        ? String(settings.humanize.swingChance)
+                        : "0.2"
                 );
                 const cmdSettings = result.config.commandSettings || {};
                 setCommandAllowAll(!!cmdSettings.allowAll);
@@ -644,6 +690,12 @@ export function BotSettingsPanel({
             const fishingTimeoutValue = Number(fishingTimeout);
             const rateLimitCooldownValue = Number(rateLimitCooldown);
             const rateLimitMaxPerMinuteValue = Number(rateLimitMaxPerMinute);
+            const humanizeIntervalValue = Number(humanizeInterval);
+            const humanizeLookRangeValue = Number(humanizeLookRange);
+            const humanizeActionChanceValue = Number(humanizeActionChance);
+            const humanizeStepChanceValue = Number(humanizeStepChance);
+            const humanizeSneakChanceValue = Number(humanizeSneakChance);
+            const humanizeSwingChanceValue = Number(humanizeSwingChance);
 
             await api.setBehaviorSettings(botId, {
                 attack: {
@@ -673,6 +725,14 @@ export function BotSettingsPanel({
                 rateLimit: {
                     globalCooldownSeconds: Number.isNaN(rateLimitCooldownValue) ? 1 : rateLimitCooldownValue,
                     maxPerMinute: Number.isNaN(rateLimitMaxPerMinuteValue) ? 20 : rateLimitMaxPerMinuteValue
+                },
+                humanize: {
+                    intervalSeconds: Number.isNaN(humanizeIntervalValue) ? 18 : humanizeIntervalValue,
+                    lookRange: Number.isNaN(humanizeLookRangeValue) ? 6 : humanizeLookRangeValue,
+                    actionChance: Number.isNaN(humanizeActionChanceValue) ? 0.6 : humanizeActionChanceValue,
+                    stepChance: Number.isNaN(humanizeStepChanceValue) ? 0.3 : humanizeStepChanceValue,
+                    sneakChance: Number.isNaN(humanizeSneakChanceValue) ? 0.2 : humanizeSneakChanceValue,
+                    swingChance: Number.isNaN(humanizeSwingChanceValue) ? 0.2 : humanizeSwingChanceValue
                 }
             });
 
@@ -962,6 +1022,7 @@ security:
                             <div>守护: {behaviorStatus.guard?.active ? `半径 ${formatValue(behaviorStatus.guard.radius)} | 攻击距 ${formatValue(behaviorStatus.guard.attackRange)} | 血线 ${formatValue(behaviorStatus.guard.minHealth)} | 目标 ${formatValue(behaviorStatus.guard.lastTarget)}` : "未开启"}</div>
                             <div>钓鱼: {behaviorStatus.fishing?.active ? `间隔 ${formatValue(behaviorStatus.fishing.intervalSeconds)}s | 超时 ${formatValue(behaviorStatus.fishing.timeoutSeconds)}s | 状态 ${formatValue(behaviorStatus.fishing.lastResult)}` : "未开启"}</div>
                             <div>限速: {behaviorStatus.rateLimit?.active ? `冷却 ${formatValue(behaviorStatus.rateLimit.globalCooldownSeconds)}s | 每分钟 ${formatValue(behaviorStatus.rateLimit.maxPerMinute)} | 拦截 ${formatValue(behaviorStatus.rateLimit.blockedCount)}` : "未开启"}</div>
+                            <div>拟人: {behaviorStatus.humanize?.active ? `间隔 ${formatValue(behaviorStatus.humanize.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.humanize.lookRange)} | 概率 ${formatValue(behaviorStatus.humanize.actionChance)} | 动作 ${formatValue(behaviorStatus.humanize.lastAction)}` : "未开启"}</div>
                         </div>
                     )}
                 </div>
@@ -1110,6 +1171,74 @@ security:
                         value={rateLimitMaxPerMinute}
                         onChange={(e) => setRateLimitMaxPerMinute(e.target.value)}
                         placeholder="20"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>拟人间隔 (秒)</Label>
+                    <Input
+                        type="number"
+                        min="5"
+                        value={humanizeInterval}
+                        onChange={(e) => setHumanizeInterval(e.target.value)}
+                        placeholder="18"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>拟人视距</Label>
+                    <Input
+                        type="number"
+                        min="2"
+                        value={humanizeLookRange}
+                        onChange={(e) => setHumanizeLookRange(e.target.value)}
+                        placeholder="6"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>拟人动作概率 (0-1)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={humanizeActionChance}
+                        onChange={(e) => setHumanizeActionChance(e.target.value)}
+                        placeholder="0.6"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>拟人走动概率 (0-1)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={humanizeStepChance}
+                        onChange={(e) => setHumanizeStepChance(e.target.value)}
+                        placeholder="0.3"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>拟人蹲下概率 (0-1)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={humanizeSneakChance}
+                        onChange={(e) => setHumanizeSneakChance(e.target.value)}
+                        placeholder="0.2"
+                    />
+                </div>
+                <div className="space-y-2">
+                    <Label>拟人挥手概率 (0-1)</Label>
+                    <Input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={humanizeSwingChance}
+                        onChange={(e) => setHumanizeSwingChance(e.target.value)}
+                        placeholder="0.2"
                     />
                 </div>
                 <Button

@@ -18,7 +18,8 @@ import {
   Apple,
   Fish,
   Activity,
-  Timer
+  Timer,
+  UserRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +59,7 @@ interface BotControlPanelProps {
     guard?: boolean;
     fishing?: boolean;
     rateLimit?: boolean;
+    humanize?: boolean;
   };
   players?: string[];
   restartTimer?: {
@@ -157,6 +159,13 @@ interface BehaviorStatus {
     globalCooldownSeconds?: number;
     maxPerMinute?: number;
     blockedCount?: number;
+  };
+  humanize?: {
+    active: boolean;
+    intervalSeconds?: number;
+    lookRange?: number;
+    actionChance?: number;
+    lastAction?: string | null;
   };
 }
 
@@ -408,6 +417,7 @@ export function BotControlPanel({
             {modes.guard && <Badge variant="secondary">守护</Badge>}
             {modes.fishing && <Badge variant="secondary">钓鱼</Badge>}
             {modes.rateLimit && <Badge variant="secondary">限速</Badge>}
+            {modes.humanize && <Badge variant="secondary">拟人</Badge>}
             {restartTimer?.enabled && (
               <Badge variant="outline">
                 定时重启: {restartTimer.intervalMinutes}分钟
@@ -506,7 +516,7 @@ export function BotControlPanel({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-6 gap-2">
                 <Button
                   size="sm"
                   variant={modes.guard ? "destructive" : "outline"}
@@ -552,6 +562,15 @@ export function BotControlPanel({
                 >
                   {loading === "rateLimit" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Timer className="h-4 w-4" />}
                 </Button>
+                <Button
+                  size="sm"
+                  variant={modes.humanize ? "destructive" : "outline"}
+                  onClick={() => handleBehavior("humanize", !modes.humanize)}
+                  disabled={loading !== null}
+                  title="拟人"
+                >
+                  {loading === "humanize" ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserRound className="h-4 w-4" />}
+                </Button>
               </div>
 
               <div className="rounded-md border p-2 text-xs space-y-2">
@@ -585,6 +604,7 @@ export function BotControlPanel({
                     <div>守护: {formatState(modes.guard, behaviorStatus.guard?.active)}{behaviorStatus.guard?.active ? ` | 半径 ${formatValue(behaviorStatus.guard.radius)} | 攻击距 ${formatValue(behaviorStatus.guard.attackRange)} | 血线 ${formatValue(behaviorStatus.guard.minHealth)} | 目标 ${formatValue(behaviorStatus.guard.lastTarget)}` : ""}</div>
                     <div>钓鱼: {formatState(modes.fishing, behaviorStatus.fishing?.active)}{behaviorStatus.fishing?.active ? ` | 间隔 ${formatValue(behaviorStatus.fishing.intervalSeconds)}s | 超时 ${formatValue(behaviorStatus.fishing.timeoutSeconds)}s | 状态 ${formatValue(behaviorStatus.fishing.lastResult)}` : ""}</div>
                     <div>限速: {formatState(modes.rateLimit, behaviorStatus.rateLimit?.active)}{behaviorStatus.rateLimit?.active ? ` | 冷却 ${formatValue(behaviorStatus.rateLimit.globalCooldownSeconds)}s | 每分钟 ${formatValue(behaviorStatus.rateLimit.maxPerMinute)} | 拦截 ${formatValue(behaviorStatus.rateLimit.blockedCount)}` : ""}</div>
+                    <div>拟人: {formatState(modes.humanize, behaviorStatus.humanize?.active)}{behaviorStatus.humanize?.active ? ` | 间隔 ${formatValue(behaviorStatus.humanize.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.humanize.lookRange)} | 概率 ${formatValue(behaviorStatus.humanize.actionChance)}` : ""}</div>
                   </div>
                 )}
               </div>
