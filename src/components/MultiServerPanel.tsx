@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useWebSocketContext } from "@/contexts/WebSocketContext";
 import {
   Server,
@@ -34,6 +34,7 @@ import {
 import { api, BotStatus } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { formatUptime, formatSize } from "@/lib/utils";
+import { ServerDetailDialog } from "./ServerDetailDialog";
 import {
   DndContext,
   closestCenter,
@@ -54,10 +55,6 @@ import { CSS } from "@dnd-kit/utilities";
 
 // 使用从 api.ts 导入的 BotStatus 作为 ServerConfig 的别名，保持代码可读性
 type ServerConfig = BotStatus;
-
-const ServerDetailDialog = lazy(() =>
-  import("./ServerDetailDialog").then((module) => ({ default: module.ServerDetailDialog }))
-);
 
 // 可排序服务器卡片组件
 function SortableServerCard({
@@ -639,14 +636,12 @@ export function MultiServerPanel() {
       </Card>
 
       {/* 服务器详情弹窗 */}
-      <Suspense fallback={null}>
-        <ServerDetailDialog
-          server={selectedServer}
-          open={detailOpen}
-          onOpenChange={setDetailOpen}
-          onUpdate={fetchServers}
-        />
-      </Suspense>
+      <ServerDetailDialog
+        server={selectedServer}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onUpdate={fetchServers}
+      />
     </>
   );
 }
