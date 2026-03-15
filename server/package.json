@@ -10,7 +10,8 @@
     "pm2": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop minebot",
     "pm2:restart": "pm2 restart minebot",
-    "pm2:logs": "pm2 logs minebot"
+    "pm2:logs": "pm2 logs minebot",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "axios": "^1.6.0",

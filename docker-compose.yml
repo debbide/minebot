@@ -16,7 +16,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-3.5-turbo}
-      - BYPASS_SERVICE_URL=http://bypass-service:5000
+      - BYPASS_SERVICE_URL=${BYPASS_SERVICE_URL:-}
     volumes:
       # Persist configuration data
       - minebot-data:/app/server/data
@@ -38,6 +38,8 @@ services:
       start_period: 30s
 
   bypass-service:
+    profiles:
+      - bypass
     build:
       context: ./bypass-service
       dockerfile: Dockerfile

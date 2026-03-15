@@ -50,6 +50,18 @@ cd minebot
 docker compose up -d --build
 ```
 
+默认启动不会启用 `bypass-service`。此时 `BYPASS_SERVICE_URL` 为空，相关 bypass 功能保持禁用状态，不影响面板正常使用。
+
+### 可选：启用 bypass-service
+
+仅当你本地存在 `./bypass-service` 目录并准备好其依赖时，才启用 bypass profile：
+
+```bash
+BYPASS_SERVICE_URL=http://bypass-service:5000 docker compose --profile bypass up -d --build
+```
+
+如果不满足上述前置条件，请使用标准启动命令，不要添加 `--profile bypass`。
+
 ## 配置说明
 
 所有配置都可以在 Web 面板的 **设置页面** 中修改：

@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { Suspense, lazy } from "react";
 import { Header } from "@/components/Header";
-import { MultiServerPanel } from "@/components/MultiServerPanel";
 import { StatsOverview } from "@/components/StatsOverview";
 import { useWebSocket } from "@/hooks/useBot";
-import { Server } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+
+const MultiServerPanel = lazy(() =>
+  import("@/components/MultiServerPanel").then((module) => ({ default: module.MultiServerPanel }))
+);
 
 const Index = () => {
   const { status, connected } = useWebSocket();
@@ -21,8 +21,9 @@ const Index = () => {
 
 
         <div className="space-y-4">
-          <MultiServerPanel />
-
+          <Suspense fallback={<div className="text-sm text-muted-foreground">加载服务器面板中...</div>}>
+            <MultiServerPanel />
+          </Suspense>
         </div>
       </main>
 
