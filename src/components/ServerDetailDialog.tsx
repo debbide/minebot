@@ -86,7 +86,8 @@ export function ServerDetailDialog({
   // 优化日志显示（只显示当前服务器的日志）
   const displayLogs = useMemo(() => {
     if (!server) return [];
-    return logs.filter(log => log.serverId === server.id).slice(-100);
+    const serverLogs = logs.filter(log => log.serverId === server.id);
+    return serverLogs.length > 0 ? serverLogs.slice(-100) : logs.slice(-100);
   }, [logs, server]);
 
   // 清空日志
@@ -440,7 +441,7 @@ export function ServerDetailDialog({
               {/* 日志面板 */}
               <TabsContent value="logs" className="mt-0 h-full data-[state=active]:flex flex-col animate-in slide-in-from-bottom-2 duration-300">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-medium">实时日志 ({logs.length})</span>
+                  <span className="text-sm font-medium">实时日志 ({displayLogs.length})</span>
                   <Button variant="ghost" size="sm" onClick={clearLogs} className="h-8 text-muted-foreground hover:text-destructive">
                     <Trash className="h-4 w-4 mr-2" />
                     清空
@@ -448,7 +449,7 @@ export function ServerDetailDialog({
                 </div>
                 <div className="flex-1 rounded-xl border border-border/50 bg-black/40 overflow-hidden relative">
                   <div className="absolute inset-0 overflow-auto p-4 font-mono text-xs space-y-1.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                    {logs.length === 0 ? (
+                    {displayLogs.length === 0 ? (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground/50 gap-2">
                         <Terminal className="h-8 w-8 opacity-20" />
                         <p>暂无日志记录</p>
