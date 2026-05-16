@@ -139,6 +139,13 @@ interface BehaviorStatus {
     radius?: number;
     attackRange?: number;
     minHealth?: number;
+    patrolRadius?: number;
+    keepFightingAtLowHealth?: boolean;
+    attacks?: number;
+    kills?: number;
+    stuckSwitchCount?: number;
+    ignoredTargetsCount?: number;
+    currentTargetDistance?: number | null;
     lastTarget?: string | null;
   };
   rateLimit?: {
@@ -285,6 +292,11 @@ export function BotControlPanel({
     const enabledText = enabled === undefined ? "-" : (enabled ? "开" : "关");
     const activeText = active ? "开" : "关";
     return `开关${enabledText} | 运行${activeText}`;
+  };
+
+  const formatDistance = (value?: number | null) => {
+    if (value === null || value === undefined) return "无";
+    return value.toFixed(1);
   };
 
   const handleStopAll = async () => {
@@ -674,7 +686,7 @@ export function BotControlPanel({
                     <div>动作: {formatState(undefined, behaviorStatus.action?.looping)}{behaviorStatus.action?.looping ? ` | 循环中 | 动作数 ${formatValue(behaviorStatus.action.actionsCount)}` : ""}</div>
                     <div>防踢: {formatState(modes.antiAfk, behaviorStatus.antiAfk?.active)}{behaviorStatus.antiAfk?.active ? ` | 间隔 ${formatValue(behaviorStatus.antiAfk.intervalSeconds)}s | 抖动 ${formatValue(behaviorStatus.antiAfk.jitterSeconds)}s | 动作 ${formatValue(behaviorStatus.antiAfk.lastAction)}` : ""}</div>
                     <div>自动吃: {formatState(modes.autoEat, behaviorStatus.autoEat?.active)}{behaviorStatus.autoEat?.active ? ` | 血线 ${formatValue(behaviorStatus.autoEat.minHealth)} | 饥饿 ${formatValue(behaviorStatus.autoEat.minFood)} | 食物 ${formatValue(behaviorStatus.autoEat.lastFood)}` : ""}</div>
-                    <div>守护: {formatState(modes.guard, behaviorStatus.guard?.active)}{behaviorStatus.guard?.active ? ` | 半径 ${formatValue(behaviorStatus.guard.radius)} | 攻击距 ${formatValue(behaviorStatus.guard.attackRange)} | 血线 ${formatValue(behaviorStatus.guard.minHealth)} | 目标 ${formatValue(behaviorStatus.guard.lastTarget)}` : ""}</div>
+                    <div>守护: {formatState(modes.guard, behaviorStatus.guard?.active)}{behaviorStatus.guard?.active ? ` | 目标 ${formatValue(behaviorStatus.guard.lastTarget)} | 距离 ${formatDistance(behaviorStatus.guard.currentTargetDistance)} | 搜怪 ${formatValue(behaviorStatus.guard.radius)} | 巡逻 ${formatValue(behaviorStatus.guard.patrolRadius)} | 攻击距 ${formatValue(behaviorStatus.guard.attackRange)} | 出手 ${formatValue(behaviorStatus.guard.attacks, "0")} | 击杀 ${formatValue(behaviorStatus.guard.kills, "0")} | 换目标 ${formatValue(behaviorStatus.guard.stuckSwitchCount, "0")} | 忽略中 ${formatValue(behaviorStatus.guard.ignoredTargetsCount, "0")}` : ""}</div>
                     <div>限速: {formatState(modes.rateLimit, behaviorStatus.rateLimit?.active)}{behaviorStatus.rateLimit?.active ? ` | 冷却 ${formatValue(behaviorStatus.rateLimit.globalCooldownSeconds)}s | 每分钟 ${formatValue(behaviorStatus.rateLimit.maxPerMinute)} | 拦截 ${formatValue(behaviorStatus.rateLimit.blockedCount)}` : ""}</div>
                     <div>拟人: {formatState(modes.humanize, behaviorStatus.humanize?.active)}{behaviorStatus.humanize?.active ? ` | 间隔 ${formatValue(behaviorStatus.humanize.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.humanize.lookRange)} | 概率 ${formatValue(behaviorStatus.humanize.actionChance)}` : ""}</div>
                     <div>安全挂机: {formatState(modes.safeIdle, behaviorStatus.safeIdle?.active)}{behaviorStatus.safeIdle?.active ? ` | 间隔 ${formatValue(behaviorStatus.safeIdle.intervalSeconds)}s | 视距 ${formatValue(behaviorStatus.safeIdle.lookRange)} | 超时 ${formatValue(behaviorStatus.safeIdle.timeoutSeconds)}s | 恢复 ${formatValue(behaviorStatus.safeIdle.resumeDelaySeconds)}s | 动作 ${formatValue(behaviorStatus.safeIdle.lastAction)}` : ""}</div>

@@ -803,6 +803,14 @@ export class GuardBehavior {
     this.lastAvoidLogAt = 0;
     this.keepFightingAtLowHealth = true;
     this.preferredTargetId = null;
+    this.currentTargetId = null;
+    this.currentTargetStartedAt = 0;
+    this.currentTargetLastDistance = Infinity;
+    this.currentTargetLastProgressAt = 0;
+    this.currentTargetDistance = null;
+    this.ignoredTargets = new Map();
+    this.stuckSwitchCount = 0;
+    this.lastStuckLogAt = 0;
     this.onEntityHurtBound = null;
     this.onEntityDeadBound = null;
   }
@@ -833,6 +841,13 @@ export class GuardBehavior {
       this.patrolGoalTimeoutMs = Math.max(5000, options.patrolGoalTimeoutMs);
     }
     this.keepFightingAtLowHealth = options.keepFightingAtLowHealth !== false;
+
+    this.currentTargetId = null;
+    this.currentTargetStartedAt = 0;
+    this.currentTargetLastDistance = Infinity;
+    this.currentTargetLastProgressAt = 0;
+    this.currentTargetDistance = null;
+    this.ignoredTargets.clear();
 
     this.active = true;
     this.bindHurtTargeting();
@@ -906,8 +921,76 @@ export class GuardBehavior {
     }
   }
 
+  cleanupIgnoredTargets(now = Date.now()) {
+    for (const [entityId, ignoredUntil] of this.ignoredTargets.entries()) {
+      if (ignoredUntil <= now) this.ignoredTargets.delete(entityId);
+    }
+  }
+
+  isTargetIgnored(entity, now = Date.now()) {
+    const entityId = this.getEntityId(entity);
+    if (entityId === null) return false;
+    const ignoredUntil = this.ignoredTargets.get(entityId);
+    if (!ignoredUntil) return false;
+    if (ignoredUntil <= now) {
+      this.ignoredTargets.delete(entityId);
+      return false;
+    }
+    return true;
+  }
+
+  resetTargetProgress(target, dist, now = Date.now()) {
+    this.currentTargetId = this.getEntityId(target);
+    this.currentTargetStartedAt = now;
+    this.currentTargetLastDistance = dist;
+    this.currentTargetLastProgressAt = now;
+    this.currentTargetDistance = dist;
+  }
+
+  trackTargetProgress(target, dist, now = Date.now()) {
+    const targetId = this.getEntityId(target);
+    if (targetId === null) return false;
+    if (this.currentTargetId !== targetId) {
+      this.resetTargetProgress(target, dist, now);
+      return false;
+    }
+
+    this.currentTargetDistance = dist;
+    if (dist < this.currentTargetLastDistance - 0.8) {
+      this.currentTargetLastDistance = dist;
+      this.currentTargetLastProgressAt = now;
+      return false;
+    }
+
+    const chasingTooLong = now - this.currentTargetStartedAt > 12000;
+    const noProgress = now - this.currentTargetLastProgressAt > 6000;
+    return chasingTooLong && noProgress && dist > this.attackRange + 0.8;
+  }
+
+  ignoreStuckTarget(target, dist, now = Date.now()) {
+    const targetId = this.getEntityId(target);
+    if (targetId === null) return;
+    const targetName = this.getEntityName(target);
+    this.ignoredTargets.set(targetId, now + 20000);
+    this.stuckSwitchCount += 1;
+    this.preferredTargetId = null;
+    this.currentTargetId = null;
+    this.currentTargetStartedAt = 0;
+    this.currentTargetLastDistance = Infinity;
+    this.currentTargetLastProgressAt = 0;
+    this.currentTargetDistance = null;
+    if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+    this.clearCombatControls();
+    if (this.log && now - this.lastStuckLogAt > 2500) {
+      this.lastStuckLogAt = now;
+      this.log('warning', `追击 ${targetName} 卡住，距离 ${dist.toFixed(1)} 格，临时换目标`, '🔁');
+    }
+  }
+
   findTarget() {
     if (!this.bot?.entity) return null;
+    const now = Date.now();
+    this.cleanupIgnoredTargets(now);
     const origin = this.bot.entity.position;
     let preferred = null;
     let nearest = null;
@@ -915,6 +998,7 @@ export class GuardBehavior {
 
     for (const entity of Object.values(this.bot.entities)) {
       if (!this.isHostileEntity(entity)) continue;
+      if (this.isTargetIgnored(entity, now)) continue;
       const dist = origin.distanceTo(entity.position);
       if (dist > this.radius) continue;
       if (this.preferredTargetId !== null && this.getEntityId(entity) === this.preferredTargetId) {
@@ -944,6 +1028,11 @@ export class GuardBehavior {
     if (!target) {
       this.lastTarget = null;
       this.preferredTargetId = null;
+      this.currentTargetId = null;
+      this.currentTargetStartedAt = 0;
+      this.currentTargetLastDistance = Infinity;
+      this.currentTargetLastProgressAt = 0;
+      this.currentTargetDistance = null;
       this.patrolForTargets();
       return;
     }
@@ -951,6 +1040,11 @@ export class GuardBehavior {
     this.lastTarget = this.getEntityName(target);
     this.logTargetFound(this.lastTarget);
     const dist = this.bot.entity.position.distanceTo(target.position);
+    const now = Date.now();
+    if (this.trackTargetProgress(target, dist, now)) {
+      this.ignoreStuckTarget(target, dist, now);
+      return;
+    }
     const strategy = this.getTargetStrategy(target, dist);
     const lowHealth = typeof this.bot.health === 'number' && this.bot.health <= this.minHealth;
     if (strategy === 'avoid') {
@@ -968,7 +1062,6 @@ export class GuardBehavior {
     }
     if (dist > this.attackRange && this.bot?.pathfinder) {
       this.clearCombatControls();
-      const now = Date.now();
       if (now - this.lastPathTime < this.pathCooldownMs) {
         return;
       }
@@ -1116,6 +1209,11 @@ export class GuardBehavior {
     this.active = false;
     this.lastTarget = null;
     this.preferredTargetId = null;
+    this.currentTargetId = null;
+    this.currentTargetStartedAt = 0;
+    this.currentTargetLastDistance = Infinity;
+    this.currentTargetLastProgressAt = 0;
+    this.currentTargetDistance = null;
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
@@ -1136,6 +1234,11 @@ export class GuardBehavior {
     this.active = false;
     this.lastTarget = null;
     this.preferredTargetId = null;
+    this.currentTargetId = null;
+    this.currentTargetStartedAt = 0;
+    this.currentTargetLastDistance = Infinity;
+    this.currentTargetLastProgressAt = 0;
+    this.currentTargetDistance = null;
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
@@ -1157,6 +1260,9 @@ export class GuardBehavior {
       keepFightingAtLowHealth: this.keepFightingAtLowHealth,
       attacks: this.combatStats.attacks,
       kills: this.combatStats.kills,
+      stuckSwitchCount: this.stuckSwitchCount,
+      ignoredTargetsCount: this.ignoredTargets.size,
+      currentTargetDistance: this.currentTargetDistance,
       lastTarget: this.lastTarget
     };
   }
