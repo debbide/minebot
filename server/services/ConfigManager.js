@@ -475,10 +475,13 @@ export class ConfigManager {
           minFood: 18
         },
         guard: {
-          radius: 8,
+          radius: 24,
           attackRange: 3,
           minHealth: 12,
-          pathCooldownMs: 800
+          pathCooldownMs: 800,
+          patrolRadius: 48,
+          patrolIntervalMs: 7000,
+          patrolGoalTimeoutMs: 12000
         },
         rateLimit: {
           globalCooldownSeconds: 1,

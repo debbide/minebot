@@ -145,10 +145,13 @@ export class BotInstance {
         ...(config.behaviorSettings?.autoEat || {})
       },
       guard: {
-        radius: 8,
+        radius: 24,
         attackRange: 3,
         minHealth: 12,
         pathCooldownMs: 800,
+        patrolRadius: 48,
+        patrolIntervalMs: 7000,
+        patrolGoalTimeoutMs: 12000,
         ...(config.behaviorSettings?.guard || {})
       },
       rateLimit: {

@@ -779,23 +779,32 @@ export class GuardBehavior {
     this.log = logFn;
     this.onAutoStop = onAutoStop;
     this.active = false;
-    this.radius = 8;
+    this.radius = 24;
     this.attackRange = 3;
     this.minHealth = 12;
     this.pathCooldownMs = 800;
+    this.patrolRadius = 48;
+    this.patrolIntervalMs = 7000;
+    this.patrolGoalTimeoutMs = 12000;
     this.interval = null;
     this.lastTarget = null;
     this.lastPathTime = 0;
+    this.lastPatrolAt = 0;
+    this.patrolGoalStartedAt = 0;
+    this.combatStats = { attacks: 0, kills: 0 };
+    this.recentAttacks = new Map();
     this.lastLoggedTarget = null;
     this.lastTargetLogAt = 0;
     this.lastAttackLogAt = 0;
     this.lastApproachLogAt = 0;
+    this.lastPatrolLogAt = 0;
     this.lastLowHealthLogAt = 0;
     this.lastRetreatAt = 0;
     this.lastAvoidLogAt = 0;
-    this.keepFightingAtLowHealth = false;
+    this.keepFightingAtLowHealth = true;
     this.preferredTargetId = null;
     this.onEntityHurtBound = null;
+    this.onEntityDeadBound = null;
   }
 
   start(options = {}) {
@@ -814,12 +823,22 @@ export class GuardBehavior {
     if (Number.isFinite(options.pathCooldownMs)) {
       this.pathCooldownMs = Math.max(300, options.pathCooldownMs);
     }
-    this.keepFightingAtLowHealth = options.keepFightingAtLowHealth === true;
+    if (Number.isFinite(options.patrolRadius)) {
+      this.patrolRadius = Math.max(12, options.patrolRadius);
+    }
+    if (Number.isFinite(options.patrolIntervalMs)) {
+      this.patrolIntervalMs = Math.max(2500, options.patrolIntervalMs);
+    }
+    if (Number.isFinite(options.patrolGoalTimeoutMs)) {
+      this.patrolGoalTimeoutMs = Math.max(5000, options.patrolGoalTimeoutMs);
+    }
+    this.keepFightingAtLowHealth = options.keepFightingAtLowHealth !== false;
 
     this.active = true;
     this.bindHurtTargeting();
+    this.bindKillLogging();
     this.interval = setInterval(() => this.tick(), 350);
-    return { success: true, message: '守护已开启' };
+    return { success: true, message: '主动出击已开启' };
   }
 
   getEntityName(entity) {
@@ -863,6 +882,30 @@ export class GuardBehavior {
     this.onEntityHurtBound = null;
   }
 
+  bindKillLogging() {
+    if (!this.bot?.on || this.onEntityDeadBound) return;
+    this.onEntityDeadBound = (entity) => this.handleEntityDead(entity);
+    this.bot.on('entityDead', this.onEntityDeadBound);
+  }
+
+  unbindKillLogging() {
+    if (!this.bot?.removeListener || !this.onEntityDeadBound) return;
+    this.bot.removeListener('entityDead', this.onEntityDeadBound);
+    this.onEntityDeadBound = null;
+  }
+
+  handleEntityDead(entity) {
+    const entityId = this.getEntityId(entity);
+    if (entityId === null || !this.recentAttacks.has(entityId)) return;
+    const record = this.recentAttacks.get(entityId);
+    this.recentAttacks.delete(entityId);
+    if (Date.now() - record.lastAttackAt > 15000) return;
+    this.combatStats.kills += 1;
+    if (this.log) {
+      this.log('success', `已击杀 ${record.name}，今日战果 ${this.combatStats.kills} 个`, '🏆');
+    }
+  }
+
   findTarget() {
     if (!this.bot?.entity) return null;
     const origin = this.bot.entity.position;
@@ -901,7 +944,7 @@ export class GuardBehavior {
     if (!target) {
       this.lastTarget = null;
       this.preferredTargetId = null;
-      if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+      this.patrolForTargets();
       return;
     }
 
@@ -940,12 +983,28 @@ export class GuardBehavior {
       this.bot.lookAt(target.position.offset(0, target.height * 0.85, 0));
       if (strategy === 'attack' && dist <= this.attackRange + 0.8) {
         this.bot.attack(target);
-        this.logAttack(this.lastTarget);
+        this.logAttack(this.lastTarget, target);
       }
       if (strategy === 'defend') this.retreatFromTarget(target, 650);
     } catch (e) {
       // ignore
     }
+  }
+
+  patrolForTargets() {
+    if (!this.bot?.pathfinder || !this.goals?.GoalNear || !this.bot?.entity) return;
+    const now = Date.now();
+    if (this.bot.pathfinder.isMoving?.() && now - this.patrolGoalStartedAt < this.patrolGoalTimeoutMs) return;
+    if (now - this.lastPatrolAt < this.patrolIntervalMs) return;
+    this.lastPatrolAt = now;
+    this.patrolGoalStartedAt = now;
+
+    const origin = this.bot.entity.position;
+    const angle = Math.random() * Math.PI * 2;
+    const distance = this.patrolRadius * (0.55 + Math.random() * 0.45);
+    const target = origin.offset(Math.cos(angle) * distance, 0, Math.sin(angle) * distance);
+    this.bot.pathfinder.setGoal(new this.goals.GoalNear(target.x, target.y, target.z, 2));
+    this.logPatrol(target, distance);
   }
 
   logTargetFound(targetName) {
@@ -954,7 +1013,7 @@ export class GuardBehavior {
     if (targetName === this.lastLoggedTarget && now - this.lastTargetLogAt < 10000) return;
     this.lastLoggedTarget = targetName;
     this.lastTargetLogAt = now;
-    this.log('info', `守护发现敌对生物: ${targetName}`, '🛡️');
+    this.log('warning', `发现目标 ${targetName}，主动出击`, '⚔️');
   }
 
   logApproach(targetName, dist) {
@@ -962,7 +1021,15 @@ export class GuardBehavior {
     const now = Date.now();
     if (now - this.lastApproachLogAt < 2500) return;
     this.lastApproachLogAt = now;
-    this.log('info', `守护靠近敌对生物: ${targetName}，距离 ${dist.toFixed(1)} 格`, '🛡️');
+    this.log('info', `追击 ${targetName}，距离 ${dist.toFixed(1)} 格`, '🏃');
+  }
+
+  logPatrol(target, distance) {
+    if (!this.log) return;
+    const now = Date.now();
+    if (now - this.lastPatrolLogAt < 10000) return;
+    this.lastPatrolLogAt = now;
+    this.log('info', `未发现目标，向 ${Math.round(distance)} 格外巡逻搜索 X:${Math.floor(target.x)} Z:${Math.floor(target.z)}`, '🧭');
   }
 
   logLowHealthDefense(targetName) {
@@ -1012,12 +1079,17 @@ export class GuardBehavior {
     timer.unref?.();
   }
 
-  logAttack(targetName) {
+  logAttack(targetName, target = null) {
+    const entityId = this.getEntityId(target);
+    if (entityId !== null) {
+      this.recentAttacks.set(entityId, { name: targetName, lastAttackAt: Date.now() });
+    }
+    this.combatStats.attacks += 1;
     if (!this.log) return;
     const now = Date.now();
-    if (now - this.lastAttackLogAt < 5000) return;
+    if (now - this.lastAttackLogAt < 3500) return;
     this.lastAttackLogAt = now;
-    this.log('info', `守护反击敌对生物: ${targetName}`, '⚔️');
+    this.log('info', `正在攻击 ${targetName}，累计出手 ${this.combatStats.attacks} 次`, '⚔️');
   }
 
   autoStop(reason = 'unknown') {
@@ -1029,6 +1101,7 @@ export class GuardBehavior {
       this.interval = null;
     }
     this.unbindHurtTargeting();
+    this.unbindKillLogging();
     if (this.bot?.pathfinder) this.bot.pathfinder.stop();
     this.clearCombatControls();
     if (this.log && reason === 'low_health') {
@@ -1048,6 +1121,7 @@ export class GuardBehavior {
       this.interval = null;
     }
     this.unbindHurtTargeting();
+    this.unbindKillLogging();
     if (this.bot?.pathfinder) this.bot.pathfinder.stop();
     this.clearCombatControls();
     return { success: true, message: '守护已关闭' };
@@ -1059,7 +1133,10 @@ export class GuardBehavior {
       radius: this.radius,
       attackRange: this.attackRange,
       minHealth: this.minHealth,
+      patrolRadius: this.patrolRadius,
       keepFightingAtLowHealth: this.keepFightingAtLowHealth,
+      attacks: this.combatStats.attacks,
+      kills: this.combatStats.kills,
       lastTarget: this.lastTarget
     };
   }
