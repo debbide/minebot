@@ -844,15 +844,6 @@ export class GuardBehavior {
   }
 
   getTargetStrategy(entity, dist) {
-    const name = this.getEntityName(entity).toLowerCase();
-    const highRisk = new Set(['enderman', 'creeper', 'witch']);
-    const ranged = new Set(['skeleton', 'stray', 'bogged', 'pillager', 'blaze', 'ghast']);
-    if (highRisk.has(name)) {
-      return dist <= this.attackRange + 0.5 ? 'defend' : 'avoid';
-    }
-    if (ranged.has(name)) {
-      return dist <= this.attackRange + 0.5 ? 'defend' : 'avoid';
-    }
     return 'attack';
   }
 
@@ -932,23 +923,6 @@ export class GuardBehavior {
       this.autoStop('low_health');
       return;
     }
-    if (lowHealth) {
-      this.logLowHealthDefense(this.lastTarget);
-      if (this.bot?.pathfinder) this.bot.pathfinder.stop();
-      this.clearCombatControls();
-      try {
-        this.bot.lookAt(target.position.offset(0, target.height * 0.85, 0));
-        if (strategy === 'attack' && dist <= this.attackRange + 0.8) {
-          this.bot.attack(target);
-          this.logAttack(this.lastTarget);
-        }
-      } catch (e) {
-        // ignore
-      }
-      if (dist <= this.attackRange + 3) this.retreatFromTarget(target);
-      return;
-    }
-
     if (dist > this.attackRange && this.bot?.pathfinder) {
       this.clearCombatControls();
       const now = Date.now();
@@ -956,8 +930,7 @@ export class GuardBehavior {
         return;
       }
       this.lastPathTime = now;
-      const followDistance = lowHealth ? 2 : 1;
-      const goal = new this.goals.GoalFollow(target, followDistance);
+      const goal = new this.goals.GoalFollow(target, 1);
       this.bot.pathfinder.setGoal(goal, true);
       this.logApproach(this.lastTarget, dist);
       return;
@@ -970,7 +943,6 @@ export class GuardBehavior {
         this.logAttack(this.lastTarget);
       }
       if (strategy === 'defend') this.retreatFromTarget(target, 650);
-      if (lowHealth) this.retreatFromTarget(target);
     } catch (e) {
       // ignore
     }
@@ -1613,8 +1585,7 @@ export class HumanizeBehavior {
   }
 
   isSurvivalPriorityActive() {
-    const health = typeof this.bot?.health === 'number' ? this.bot.health : 20;
-    return this.isBotInWater() || health <= 14 || this.hasNearbyHostile(10) || !!this.bot?.__autoEating;
+    return this.isBotInWater() || !!this.bot?.__autoEating;
   }
 
   bindHurtReaction() {
@@ -1909,17 +1880,7 @@ export class SafeIdleBehavior {
 
   isSurvivalPriorityActive() {
     if (!this.bot?.entity) return false;
-    const health = typeof this.bot.health === 'number' ? this.bot.health : 20;
-    if (health <= 14 || this.bot.__autoEating) return true;
-    if (this.bot.entity.isInWater) return true;
-    const origin = this.bot.entity.position;
-    return Object.values(this.bot.entities || {}).some(entity => (
-      entity &&
-      entity !== this.bot.entity &&
-      entity.type === 'hostile' &&
-      entity.position &&
-      origin.distanceTo(entity.position) <= 8
-    ));
+    return this.bot.entity.isInWater || this.bot.__autoEating;
   }
 
   checkTimeout() {

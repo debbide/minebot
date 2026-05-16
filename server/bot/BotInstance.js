@@ -1222,8 +1222,6 @@ export class BotInstance {
           if (now - this.lastDeathHandledAt < 5000) return;
           this.lastDeathHandledAt = now;
 
-          this.logDeathDiagnostics();
-          this.log('warning', '机器人死亡，正在重生...', '💀');
           // 停止所有行为
           if (this.behaviors) {
             try {
@@ -1241,7 +1239,6 @@ export class BotInstance {
             if (this.bot !== activeBot) return;
             try {
               activeBot.respawn();
-              this.log('info', `重生请求已发送 (尝试 ${attempt})`, '🔄');
             } catch (e) {
               this.log('error', `重生失败 (尝试 ${attempt}): ${e.message}`, '❌');
               if (attempt < 3) {
@@ -1262,12 +1259,9 @@ export class BotInstance {
             this.respawnRequestTimer = null;
           }
 
-          this.log('info', '已重生', '✨');
           // 更新出生点
           if (activeBot.entity) {
             this.spawnPosition = activeBot.entity.position.clone();
-            const pos = activeBot.entity.position;
-            this.log('info', `重生坐标: X=${pos.x.toFixed(1)} Y=${pos.y.toFixed(1)} Z=${pos.z.toFixed(1)}`, '📍');
           }
           if (this.modes.invincible) {
             setTimeout(() => {
