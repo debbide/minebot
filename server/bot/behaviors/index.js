@@ -1375,27 +1375,10 @@ export class HumanizeBehavior {
     this.greetingChance = 0.65;
     this.greetingGlobalCooldownSeconds = 45;
     this.greetingPlayerCooldownSeconds = 180;
-    this.greetingMessages = [
-      'hi',
-      'hello',
-      '来了',
-      '有人来了',
-      '你也在这啊',
-      '我看看',
-      '路过一下',
-      '在忙啥呢',
-      '这边挺热闹',
-      '我刚到',
-      '别打我啊',
-      '一起看看',
-      '这地方不错',
-      '我站会儿',
-      '需要帮忙吗',
-      '你好呀'
-    ];
-    this.approachGreetingMessages = ['你也来了啊', '你在这啊', '我看看你在干嘛', '这边有人啊', '哈喽', '刚过来看看'];
-    this.leaveGreetingMessages = ['走了啊', '回头见', '我继续逛逛', '那我先走了', '一会儿见'];
-    this.hurtGreetingMessages = ['别打我啊', '别别别', '干嘛打我', '我没惹你吧', '停一下停一下'];
+    this.greetingMessages = ['hi', 'hello', 'hey', 'yo', 'sup', 'morning', 'evening', 'anyone here?', 'nice place', 'cool base', 'looks busy here', 'just spawned in', 'I am checking around', 'need help?', 'all good?', 'what is up', '来了', '有人来了', '有人吗', '你也在这啊', '我看看', '路过一下', '在忙啥呢', '这边挺热闹', '我刚到', '一起看看', '这地方不错', '我站会儿', '需要帮忙吗', '你好呀', '早啊', '晚上好', '刚上线', '人不少啊', '我路过看看', '这边不错', '你们在忙啥', '看起来挺热闹', '我来转转', '别紧张'];
+    this.approachGreetingMessages = ['你也来了啊', '你在这啊', '我看看你在干嘛', '这边有人啊', '哈喽', '刚过来看看', '我过来看看', '你在这干嘛', '这边有东西吗', '我跟一下', '别紧张我路过', '我看一眼', '这边安全吗', '我也来看看', 'just checking around', 'what are you doing here?', 'mind if I look?', 'I am just passing by', 'checking this spot', 'anything interesting?', 'I will follow a bit', 'looks interesting here'];
+    this.leaveGreetingMessages = ['走了啊', '回头见', '我继续逛逛', '那我先走了', '一会儿见', '我去别处看看', '我继续巡逻', '待会儿回来', '先撤了', '这边看完了', '下次见', 'see ya', 'catch you later', 'I will be back', 'gonna check elsewhere', 'moving on', 'later', 'back in a bit'];
+    this.hurtGreetingMessages = ['别打啊', '别别别', '打我干嘛', '我没惹你吧', '停一下停一下', '我路过的', '误会误会', '别急啊', '冷静点', '我只是看看', 'hey stop', 'why hit me?', 'chill', 'I am friendly', 'easy', 'not fighting you', 'calm down', 'my bad'];
     this.timeout = null;
     this.reactionInterval = null;
     this.greetingTimers = new Set();
@@ -1413,6 +1396,7 @@ export class HumanizeBehavior {
     this.playerGreetingTimes = new Map();
     this.playerLeaveGreetingTimes = new Map();
     this.nearbyPlayerStates = new Map();
+    this.recentChatMessages = [];
     this.lastPathAt = 0;
     this.pathGoalActive = false;
     this.onEntityHurtBound = null;
@@ -1750,7 +1734,12 @@ export class HumanizeBehavior {
   pickMessage(messages) {
     const cleanMessages = this.normalizeChatMessages(messages);
     if (cleanMessages.length === 0) return null;
-    return cleanMessages[Math.floor(Math.random() * cleanMessages.length)];
+    const candidates = cleanMessages.filter(message => !this.recentChatMessages.includes(message));
+    const pool = candidates.length > 0 ? candidates : cleanMessages;
+    const message = pool[Math.floor(Math.random() * pool.length)];
+    this.recentChatMessages.push(message);
+    if (this.recentChatMessages.length > 8) this.recentChatMessages.shift();
+    return message;
   }
 
   normalizeChatMessages(messages) {
