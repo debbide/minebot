@@ -780,7 +780,7 @@ export class GuardBehavior {
     this.onAutoStop = onAutoStop;
     this.active = false;
     this.radius = 24;
-    this.attackRange = 3;
+    this.attackRange = 4.5;
     this.minHealth = 12;
     this.pathCooldownMs = 800;
     this.patrolRadius = 48;
@@ -973,7 +973,7 @@ export class GuardBehavior {
         return;
       }
       this.lastPathTime = now;
-      const goal = new this.goals.GoalFollow(target, 1);
+      const goal = new this.goals.GoalFollow(target, 0.8);
       this.bot.pathfinder.setGoal(goal, true);
       this.logApproach(this.lastTarget, dist);
       return;
@@ -981,9 +981,13 @@ export class GuardBehavior {
 
     try {
       this.bot.lookAt(target.position.offset(0, target.height * 0.85, 0));
-      if (strategy === 'attack' && dist <= this.attackRange + 0.8) {
-        this.bot.attack(target);
-        this.logAttack(this.lastTarget, target);
+      if (dist <= this.attackRange + 1.2) {
+        if (this.bot?.pathfinder) this.bot.pathfinder.stop();
+        this.pressIntoTarget(target, dist);
+        if (strategy === 'attack') {
+          this.bot.attack(target);
+          this.logAttack(this.lastTarget, target);
+        }
       }
       if (strategy === 'defend') this.retreatFromTarget(target, 650);
     } catch (e) {
@@ -1057,6 +1061,22 @@ export class GuardBehavior {
     this.bot.setControlState('back', false);
     this.bot.setControlState('left', false);
     this.bot.setControlState('right', false);
+  }
+
+  pressIntoTarget(target, dist) {
+    if (!this.bot?.setControlState || !target?.position) return;
+    this.bot.setControlState('back', false);
+    this.bot.setControlState('sneak', false);
+    this.bot.setControlState('sprint', true);
+    this.bot.setControlState('forward', true);
+    if (dist > this.attackRange) this.bot.setControlState('jump', true);
+    const timer = setTimeout(() => {
+      if (!this.bot?.setControlState) return;
+      this.bot.setControlState('forward', false);
+      this.bot.setControlState('sprint', false);
+      this.bot.setControlState('jump', false);
+    }, 450);
+    timer.unref?.();
   }
 
   retreatFromTarget(target, durationMs = 450) {
