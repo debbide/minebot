@@ -525,7 +525,7 @@ export class ConfigManager {
           restSeconds: 40
         },
         pathSafety: {
-          avoidWater: true,
+          avoidWater: false,
           avoidLava: true,
           avoidEdges: true,
           maxDropDown: 2,

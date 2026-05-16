@@ -206,7 +206,7 @@ export class BotInstance {
         miningMaxSeconds: undefined
       },
       pathSafety: {
-        avoidWater: true,
+        avoidWater: false,
         avoidLava: true,
         avoidEdges: true,
         maxDropDown: 2,
@@ -1150,7 +1150,6 @@ export class BotInstance {
           this.usernameRetryCount = 0;
           this.updateActivity();
           this.startActivityMonitor();
-          this.startWaterRescueMonitor();
 
           if (this.modes.autoChat) {
             this.startAutoChat();

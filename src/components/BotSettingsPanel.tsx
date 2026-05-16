@@ -210,7 +210,7 @@ export function BotSettingsPanel({
     const [workflowStepsText, setWorkflowStepsText] = useState<string>("patrol, rest");
     const [workflowPatrolSeconds, setWorkflowPatrolSeconds] = useState<string>("120");
     const [workflowRestSeconds, setWorkflowRestSeconds] = useState<string>("40");
-    const [pathAvoidWater, setPathAvoidWater] = useState<boolean>(true);
+    const [pathAvoidWater, setPathAvoidWater] = useState<boolean>(false);
     const [pathAvoidLava, setPathAvoidLava] = useState<boolean>(true);
     const [pathAvoidEdges, setPathAvoidEdges] = useState<boolean>(true);
     const [pathMaxDropDown, setPathMaxDropDown] = useState<string>("2");
@@ -437,7 +437,7 @@ export function BotSettingsPanel({
                         ? String(settings.workflow.restSeconds)
                         : "40"
                 );
-                setPathAvoidWater(settings.pathSafety?.avoidWater !== false);
+                setPathAvoidWater(settings.pathSafety?.avoidWater === true);
                 setPathAvoidLava(settings.pathSafety?.avoidLava !== false);
                 setPathAvoidEdges(settings.pathSafety?.avoidEdges !== false);
                 setPathMaxDropDown(
@@ -1406,45 +1406,7 @@ export function BotSettingsPanel({
                         <Label>允许跑酷跳跃</Label>
                         <Switch checked={pathAllowParkour} onCheckedChange={setPathAllowParkour} />
                     </div>
-                    <div className="border-t pt-3 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <div className="space-y-1">
-                                <Label>水中自动发送救援命令</Label>
-                                <p className="text-xs text-muted-foreground">需要服务器支持该命令；默认关闭，避免误触发。</p>
-                            </div>
-                            <Switch checked={waterSpawnRescueEnabled} onCheckedChange={setWaterSpawnRescueEnabled} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>救援命令</Label>
-                            <Input
-                                value={waterSpawnRescueCommand}
-                                onChange={(e) => setWaterSpawnRescueCommand(e.target.value)}
-                                placeholder="/spawn"
-                            />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                                <Label>触发延迟 (秒)</Label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    value={waterSpawnRescueDelaySeconds}
-                                    onChange={(e) => setWaterSpawnRescueDelaySeconds(e.target.value)}
-                                    placeholder="8"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>冷却时间 (秒)</Label>
-                                <Input
-                                    type="number"
-                                    min="5"
-                                    value={waterSpawnRescueCooldownSeconds}
-                                    onChange={(e) => setWaterSpawnRescueCooldownSeconds(e.target.value)}
-                                    placeholder="60"
-                                />
-                            </div>
-                        </div>
-                    </div>
+                    <p className="text-xs text-muted-foreground">主动出击模式不会进行水中自救，避免打断巡逻和追击。</p>
                 </div>
                 <Button
                     onClick={handleSaveBehaviorSettings}
