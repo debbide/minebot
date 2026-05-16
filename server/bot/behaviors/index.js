@@ -1019,11 +1019,6 @@ export class GuardBehavior {
       if (this.bot?.pathfinder) this.bot.pathfinder.stop();
       return;
     }
-    if (this.isBotInWater()) {
-      this.lastTarget = null;
-      this.clearCombatControls();
-      return;
-    }
     const target = this.findTarget();
     if (!target) {
       this.lastTarget = null;
@@ -1788,7 +1783,7 @@ export class HumanizeBehavior {
   }
 
   isSurvivalPriorityActive() {
-    return this.isBotInWater() || !!this.bot?.__autoEating;
+    return !!this.bot?.__autoEating;
   }
 
   bindHurtReaction() {
@@ -2083,7 +2078,7 @@ export class SafeIdleBehavior {
 
   isSurvivalPriorityActive() {
     if (!this.bot?.entity) return false;
-    return this.bot.entity.isInWater || this.bot.__autoEating;
+    return !!this.bot.__autoEating;
   }
 
   checkTimeout() {
