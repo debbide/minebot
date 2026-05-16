@@ -86,8 +86,7 @@ export function ServerDetailDialog({
   // 优化日志显示（只显示当前服务器的日志）
   const displayLogs = useMemo(() => {
     if (!server) return [];
-    const serverLogs = logs.filter(log => log.serverId === server.id);
-    return serverLogs.length > 0 ? serverLogs.slice(-100) : logs.slice(-100);
+    return logs.filter(log => log.serverId === server.id).slice(-100);
   }, [logs, server]);
 
   // 清空日志
