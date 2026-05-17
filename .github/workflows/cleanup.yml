@@ -1,28 +1,117 @@
-name: Cleanup Old Runs
+name: Cleanup Artifacts
 
 on:
   workflow_dispatch:
     inputs:
-      retain_days:
-        description: 'Days to retain'
+      keep_days:
+        description: 'Delete artifacts older than this many days'
         required: true
-        default: '1'
-      keep_minimum_runs:
-        description: 'Minimum runs to keep'
+        default: '7'
+      delete_workflow_runs:
+        description: 'Also delete Actions run records'
         required: true
-        default: '5'
+        type: boolean
+        default: true
+      keep_workflow_runs_days:
+        description: 'Delete workflow runs older than this many days'
+        required: true
+        default: '30'
+      dry_run:
+        description: 'Preview only, do not delete'
+        required: true
+        type: boolean
+        default: false
+  schedule:
+    - cron: '17 3 * * 0'
+
+permissions:
+  actions: write
+  contents: read
 
 jobs:
-  del_runs:
+  cleanup:
     runs-on: ubuntu-latest
-    permissions:
-      actions: write
-      contents: read
     steps:
-      - name: Delete workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
+      - name: Delete old artifacts and workflow runs
+        uses: actions/github-script@v7
         with:
-          token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          retain_days: ${{ inputs.retain_days }}
-          keep_minimum_runs: ${{ inputs.keep_minimum_runs }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const isScheduledRun = context.eventName === 'schedule';
+
+            const inputs = context.payload.inputs || {};
+            const keepDays = Number(inputs.keep_days || 7);
+            const deleteWorkflowRuns = isScheduledRun
+              ? true
+              : inputs.delete_workflow_runs !== 'false';
+            const keepWorkflowRunsDays = Number(inputs.keep_workflow_runs_days || 30);
+            const dryRun = isScheduledRun
+              ? false
+              : inputs.dry_run !== 'false';
+
+            const now = Date.now();
+            const artifactCutoff = now - keepDays * 24 * 60 * 60 * 1000;
+            const workflowRunCutoff = now - keepWorkflowRunsDays * 24 * 60 * 60 * 1000;
+
+            core.info(`dry_run=${dryRun}`);
+            core.info(`keep_days=${keepDays}`);
+            core.info(`delete_workflow_runs=${deleteWorkflowRuns}`);
+            core.info(`keep_workflow_runs_days=${keepWorkflowRunsDays}`);
+
+            const artifacts = await github.paginate(
+              github.rest.actions.listArtifactsForRepo,
+              { owner, repo, per_page: 100 }
+            );
+
+            let artifactsDeleted = 0;
+            for (const artifact of artifacts) {
+              const createdAt = new Date(artifact.created_at).getTime();
+              const shouldDelete = artifact.expired || createdAt < artifactCutoff;
+
+              if (!shouldDelete) {
+                continue;
+              }
+
+              core.info(`${dryRun ? '[dry-run] Would delete' : 'Deleting'} artifact: ${artifact.name} (${artifact.id})`);
+              if (!dryRun) {
+                await github.rest.actions.deleteArtifact({
+                  owner,
+                  repo,
+                  artifact_id: artifact.id,
+                });
+              }
+              artifactsDeleted += 1;
+            }
+
+            let workflowRunsDeleted = 0;
+            if (deleteWorkflowRuns) {
+              const runs = await github.paginate(
+                github.rest.actions.listWorkflowRunsForRepo,
+                { owner, repo, per_page: 100, status: 'completed' }
+              );
+
+              for (const run of runs) {
+                if (run.id === context.runId) {
+                  continue;
+                }
+
+                const createdAt = new Date(run.created_at).getTime();
+                if (createdAt >= workflowRunCutoff) {
+                  continue;
+                }
+
+                core.info(`${dryRun ? '[dry-run] Would delete' : 'Deleting'} workflow run: ${run.name} #${run.run_number} (${run.id})`);
+                if (!dryRun) {
+                  await github.rest.actions.deleteWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id,
+                  });
+                }
+                workflowRunsDeleted += 1;
+              }
+            }
+
+            core.info(`Artifacts matched: ${artifactsDeleted}`);
+            core.info(`Workflow runs matched: ${workflowRunsDeleted}`);
