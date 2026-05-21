@@ -46,18 +46,31 @@ const normalizeImportedProxyLink = (value) => {
         return trimmed;
     }
 };
-const nodeUsesReality = (node) => String(node.security || '').trim().toLowerCase() === 'reality' || !!node.pbk;
-const nodeUsesTls = (node) => nodeUsesReality(node)
-    || node.tls === true
-    || ['tls', 'reality'].includes(String(node.security || '').trim().toLowerCase());
+const nodeUsesReality = (node = {}) => {
+    const type = String(node?.type || '').trim().toLowerCase();
+    const security = String(node?.security || '').trim().toLowerCase();
+    return type === 'vless' && (
+        security === 'reality'
+        || !!node?.pbk
+        || !!node?.tls?.reality?.public_key
+        || !!node?.tls?.reality?.enabled
+    );
+};
+const nodeUsesTls = (node = {}) => {
+    if (nodeUsesReality(node)) return true;
+
+    const type = String(node?.type || '').trim().toLowerCase();
+    const security = String(node?.security || '').trim().toLowerCase();
+    if (type !== 'vmess' && security === 'none') return false;
+    if (node?.tls === true) return true;
+    if (type === 'vmess') return security === 'tls';
+    return security === 'tls' || security === 'reality';
+};
 const normalizeHysteria2Obfs = (value) => {
     const raw = String(value || '').trim().toLowerCase();
     if (!raw || raw === 'none' || raw === 'false' || raw === '0') return '';
     return raw;
 };
-const NATIVE_TRANSPORT_OUTBOUND_TYPES = new Set(['vmess', 'vless', 'trojan']);
-const NATIVE_TLS_OUTBOUND_TYPES = new Set(['vmess', 'vless', 'trojan', 'tuic', 'hysteria2']);
-const V2RAY_PLUGIN_NAMES = new Set(['v2ray-plugin', 'xray-plugin']);
 const parsePluginString = (value) => {
     const raw = String(value || '').trim();
     if (!raw) return {};
@@ -66,53 +79,6 @@ const parsePluginString = (value) => {
         plugin: plugin || undefined,
         plugin_opts: rest.length ? rest.join(';') : undefined
     };
-};
-const parsePluginOptions = (value) => String(value || '').split(';').reduce((options, item) => {
-    const trimmed = item.trim();
-    if (!trimmed) return options;
-    const separatorIndex = trimmed.indexOf('=');
-    if (separatorIndex === -1) {
-        options[trimmed.toLowerCase()] = true;
-        return options;
-    }
-    options[trimmed.slice(0, separatorIndex).trim().toLowerCase()] = trimmed.slice(separatorIndex + 1).trim();
-    return options;
-}, {});
-const isV2rayPlugin = (value) => V2RAY_PLUGIN_NAMES.has(String(value || '').trim().toLowerCase());
-const normalizeWsPath = (value) => {
-    const raw = String(value || '').trim() || '/';
-    const queryIndex = raw.indexOf('?');
-    if (queryIndex === -1) return { path: raw, earlyData: undefined };
-
-    const basePath = raw.slice(0, queryIndex) || '/';
-    const query = new URLSearchParams(raw.slice(queryIndex + 1));
-    const earlyData = toInt(query.get('ed'));
-    query.delete('ed');
-    const queryString = query.toString();
-    return {
-        path: queryString ? `${basePath}?${queryString}` : basePath,
-        earlyData
-    };
-};
-const appendPluginOption = (parts, keys, option, key = option.split('=')[0]) => {
-    const normalizedKey = key.trim().toLowerCase();
-    if (keys.has(normalizedKey)) return;
-    parts.push(option);
-    keys.add(normalizedKey);
-};
-const buildShadowsocksWsPluginOptions = (node, serverHost, existingOpts = '') => {
-    const parts = String(existingOpts || '').split(';').map(item => item.trim()).filter(Boolean);
-    const keys = new Set(parts.map(item => item.split('=')[0].trim().toLowerCase()));
-    const { path: cleanPath } = normalizeWsPath(node.wsPath || parsePluginOptions(existingOpts).path || '/');
-    const hostHeader = node.wsHost || normalizeHost(node.sni) || serverHost;
-
-    appendPluginOption(parts, keys, 'mode=websocket', 'mode');
-    if (hostHeader) appendPluginOption(parts, keys, `host=${hostHeader}`, 'host');
-    appendPluginOption(parts, keys, `path=${cleanPath}`, 'path');
-    if (node.tls === true || String(node.security || '').trim().toLowerCase() === 'tls' || node.sni) {
-        appendPluginOption(parts, keys, 'tls', 'tls');
-    }
-    return parts.join(';');
 };
 const trimBase64Padding = (value) => value.replace(/=+$/, '');
 const looksLikeBase64Payload = (value) => {
@@ -213,13 +179,8 @@ export class ProxyService {
                 outbound.packet_encoding = node.packet_encoding || 'packetaddr';
             } else if (node.type === 'shadowsocks') {
                 outbound.method = node.method || 'aes-256-gcm';
-                if (node.transport === 'ws' && (!node.plugin || isV2rayPlugin(node.plugin))) {
-                    outbound.plugin = node.plugin || 'v2ray-plugin';
-                    outbound.plugin_opts = buildShadowsocksWsPluginOptions(node, serverHost, node.plugin_opts);
-                } else {
-                    applyIfPresent(outbound, 'plugin', node.plugin);
-                    applyIfPresent(outbound, 'plugin_opts', node.plugin_opts);
-                }
+                applyIfPresent(outbound, 'plugin', node.plugin);
+                applyIfPresent(outbound, 'plugin_opts', node.plugin_opts);
             } else if (node.type === 'vless') {
                 outbound.packet_encoding = node.packet_encoding || 'xudp';
             }
@@ -227,11 +188,10 @@ export class ProxyService {
             applyIfPresent(outbound, 'network', node.network);
             applyIfPresent(outbound, 'ip', node.ip);
 
-            const supportsNativeTls = NATIVE_TLS_OUTBOUND_TYPES.has(node.type);
-            const isTls = supportsNativeTls && nodeUsesTls(node);
+            const isTls = nodeUsesTls(node);
             const tlsExplicitlyDisabled = node.type !== 'vmess' && String(node.security || '').trim().toLowerCase() === 'none';
 
-            if (isTls || (supportsNativeTls && node.sni && !tlsExplicitlyDisabled)) {
+            if (isTls || (node.sni && !tlsExplicitlyDisabled)) {
                 outbound.tls = {
                     enabled: true,
                     server_name: normalizeHost(node.sni) || node.wsHost || serverHost,
@@ -261,19 +221,27 @@ export class ProxyService {
                 }
             }
 
-            if (node.transport === 'ws' && NATIVE_TRANSPORT_OUTBOUND_TYPES.has(node.type)) {
-                const normalizedWsPath = normalizeWsPath(node.wsPath);
-                let maxEarlyData = node.max_early_data ?? normalizedWsPath.earlyData;
+            if (node.transport === 'ws') {
+                let cleanPath = node.wsPath || '/';
+                let maxEarlyData = node.max_early_data;
+
+                if (cleanPath.includes('ed=')) {
+                    const match = cleanPath.match(/[?&]ed=(\d+)/);
+                    if (match && match[1]) {
+                        if (maxEarlyData === undefined) maxEarlyData = parseInt(match[1], 10);
+                        cleanPath = cleanPath.replace(/[?&]ed=\d+/, '').replace(/\?$/, '').replace(/&$/, '');
+                        if (!cleanPath) cleanPath = '/';
+                    }
+                }
 
                 outbound.transport = {
                     type: 'ws',
-                    path: normalizedWsPath.path,
+                    path: cleanPath,
                     headers: {}
                 };
 
-                const explicitHostHeader = node.wsHost || node.headers?.Host || node.headers?.host;
-                const hostHeader = explicitHostHeader || normalizeHost(node.sni) || serverHost;
-                if (hostHeader && (explicitHostHeader || !isIpLiteralHost(hostHeader))) {
+                const hostHeader = node.wsHost || normalizeHost(node.sni) || serverHost;
+                if (hostHeader && !isIpLiteralHost(hostHeader)) {
                     outbound.transport.headers.Host = hostHeader;
                     if (outbound.tls && !outbound.tls.server_name) outbound.tls.server_name = hostHeader;
                 }
@@ -285,7 +253,7 @@ export class ProxyService {
                 if (node.headers && typeof node.headers === 'object') {
                     outbound.transport.headers = { ...outbound.transport.headers, ...node.headers };
                 }
-            } else if (node.transport === 'grpc' && NATIVE_TRANSPORT_OUTBOUND_TYPES.has(node.type)) {
+            } else if (node.transport === 'grpc') {
                 outbound.transport = {
                     type: 'grpc',
                     service_name: node.serviceName || ''
