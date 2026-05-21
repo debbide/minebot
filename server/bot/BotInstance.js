@@ -1123,6 +1123,7 @@ export class BotInstance {
     this.nextUsername = null;
     const version = this.config.version || false;
 
+    let botOptions = null;
     let connectViaProxy = null;
     if (this.config.proxyNodeId) {
       const localPort = proxyService.getLocalPort(this.config.proxyNodeId);
@@ -1131,8 +1132,10 @@ export class BotInstance {
         connectViaProxy = async (client) => {
           try {
             const destination = await this.resolveMinecraftDestination(host, port);
-            client.options.host = destination.host;
-            client.options.port = destination.port;
+            if (botOptions) {
+              botOptions.host = destination.host;
+              botOptions.port = destination.port;
+            }
             const { socket } = await SocksClient.createConnection({
               command: 'connect',
               proxy: {
@@ -1160,7 +1163,7 @@ export class BotInstance {
 
     return new Promise((resolve, reject) => {
       try {
-        const botOptions = {
+        botOptions = {
           host,
           port,
           username,
