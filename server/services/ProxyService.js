@@ -14,6 +14,8 @@ const SUBSCRIPTION_USER_AGENTS = [
     'v2rayN/7.20.0',
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36'
 ];
+const DEFAULT_SPEEDTEST_URL = 'https://www.google.com/generate_204';
+const SPEEDTEST_TIMEOUT_MS = 10000;
 
 const applyIfPresent = (target, key, value) => {
     if (value !== undefined && value !== null && value !== '') target[key] = value;
@@ -876,24 +878,25 @@ export class ProxyService {
         const localPort = this.getLocalPort(nodeId);
         if (!localPort) throw new Error('Node not active in bridge');
 
+        const agent = new SocksProxyAgent(`socks5h://127.0.0.1:${localPort}`, {
+            keepAlive: true,
+            timeout: SPEEDTEST_TIMEOUT_MS
+        });
         const startTime = Date.now();
         try {
-            // Use socks5h to ensure DNS resolution also goes through the proxy
-            const agent = new SocksProxyAgent(`socks5h://127.0.0.1:${localPort}`);
-            // Use a small, reliable resource to test
-            // proxy: false is critical to prevent axios from using global env proxies
-            await axios.get('http://cp.cloudflare.com/generate_204', {
+            const response = await axios.get(DEFAULT_SPEEDTEST_URL, {
                 httpAgent: agent,
                 httpsAgent: agent,
-                timeout: 15000,
-                proxy: false
+                timeout: SPEEDTEST_TIMEOUT_MS,
+                proxy: false,
+                validateStatus: () => true
             });
-            return Date.now() - startTime;
+            const latency = Date.now() - startTime;
+            console.log(`[ProxyService] Test succeeded for ${nodeId} on port ${localPort}: HTTP ${response.status || 0}, ${latency}ms`);
+            return latency;
         } catch (e) {
-            // Detailed error for debugging failed tests
             const reason = e.response ? `HTTP ${e.response.status}` : e.message;
             console.error(`[ProxyService] Test failed for ${nodeId} on port ${localPort}:`, reason);
-            // Throw the reason so the API can catch it or return it
             throw new Error(reason);
         }
     }
