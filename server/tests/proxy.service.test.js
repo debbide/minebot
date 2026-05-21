@@ -18,16 +18,17 @@ test('proxy config emits native websocket transport for vless nodes', () => {
   assert.equal(outbound.transport.early_data_header_name, 'Sec-WebSocket-Protocol');
 });
 
-test('proxy config matches client websocket behavior for IP literal Host fallback', () => {
+test('proxy config preserves imported websocket Host header for IP literal hosts', () => {
   const service = new ProxyService();
-  const node = service.parseProxyLink('vless://0478303c-d7d2-4156-afba-1ab7e14c47fd@185.231.136.23:27588?encryption=none&security=none&type=ws&host=185.231.136.23&path=%2F97d73c57#edge');
+  const node = service.parseProxyLink('vless://97d73c57-7ac5-4840-b016-aa7c29a277e8@185.231.136.23:27588?encryption=none&security=none&type=ws&host=185.231.136.23&path=%2F97d73c57#edge');
   service.setNodes([node]);
 
   const outbound = service.generateConfig().outbounds[0];
 
+  assert.equal(node.headers.Host, '185.231.136.23');
   assert.equal(outbound.transport.type, 'ws');
   assert.equal(outbound.transport.path, '/97d73c57');
-  assert.equal(outbound.transport.headers.Host, undefined);
+  assert.equal(outbound.transport.headers.Host, '185.231.136.23');
 });
 
 test('proxy config matches client behavior for shadowsocks websocket query fields', () => {

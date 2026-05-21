@@ -80,6 +80,15 @@ const parsePluginString = (value) => {
         plugin_opts: rest.length ? rest.join(';') : undefined
     };
 };
+const normalizeWsHeaders = (node, wsHost) => {
+    if (!wsHost) return;
+    if (!node.headers || typeof node.headers !== 'object' || Array.isArray(node.headers)) {
+        node.headers = {};
+    }
+    delete node.headers.Host;
+    delete node.headers.host;
+    node.headers.Host = wsHost;
+};
 const trimBase64Padding = (value) => value.replace(/=+$/, '');
 const looksLikeBase64Payload = (value) => {
     const normalized = String(value || '').trim().replace(/\s+/g, '');
@@ -250,7 +259,7 @@ export class ProxyService {
                     outbound.transport.max_early_data = parseInt(maxEarlyData, 10);
                     outbound.transport.early_data_header_name = node.early_data_header_name || 'Sec-WebSocket-Protocol';
                 }
-                if (node.headers && typeof node.headers === 'object') {
+                if (node.headers && typeof node.headers === 'object' && !Array.isArray(node.headers)) {
                     outbound.transport.headers = { ...outbound.transport.headers, ...node.headers };
                 }
             } else if (node.transport === 'grpc') {
@@ -550,6 +559,7 @@ export class ProxyService {
             if (params.get('type') === 'grpc' && !params.get('serviceName') && params.get('path')) config.serviceName = params.get('path');
             if (params.get('path')) config.wsPath = params.get('path');
             config.wsHost = params.get('host') || params.get('wsHost') || '';
+            normalizeWsHeaders(config, config.wsHost);
             config.transport = params.get('type') || params.get('transport') || params.get('net') || 'tcp';
 
             if (params.get('serviceName')) config.serviceName = params.get('serviceName');
@@ -721,7 +731,8 @@ export class ProxyService {
             packet_encoding: node.packet_encoding,
             serviceName: node.transport?.service_name || node.serviceName || node.service_name,
             wsPath: node.transport?.path || node.path,
-            wsHost: node.transport?.headers?.Host || node.wsHost || node.host,
+            wsHost: node.transport?.headers?.Host || node.transport?.headers?.host || node.wsHost || node.host,
+            headers: node.transport?.headers || node.headers,
             max_early_data: node.transport?.max_early_data,
             early_data_header_name: node.transport?.early_data_header_name,
             fp: node.tls?.utls?.fingerprint || node.fp,
@@ -745,6 +756,7 @@ export class ProxyService {
         normalized.server = normalizeHost(normalized.server);
         normalized.sni = normalizeHost(normalized.sni);
         normalized.ip = normalizeHost(normalized.ip);
+        if (normalized.transport === 'ws') normalizeWsHeaders(normalized, normalized.wsHost);
 
         if (normalized.type === 'vless' && nodeUsesReality({ ...node, ...normalized })) {
             normalized.tls = true;
