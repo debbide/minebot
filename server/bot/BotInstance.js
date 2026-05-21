@@ -5,7 +5,12 @@ import { BehaviorManager } from './behaviors/index.js';
 import axios from 'axios';
 import SftpClient from 'ssh2-sftp-client';
 import { SocksProxyAgent } from 'socks-proxy-agent';
+import socks from 'socks';
+import dns from 'dns/promises';
+import net from 'net';
 import { proxyService } from '../services/ProxyService.js';
+
+const { SocksClient } = socks;
 
 // 协议数据缓存，内存紧张时清空
 const mcDataCache = new Map();
@@ -1063,6 +1068,21 @@ export class BotInstance {
     if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
   }
 
+  async resolveMinecraftDestination(host, port) {
+    const destinationPort = port || 25565;
+    if (destinationPort === 25565 && net.isIP(host) === 0 && host !== 'localhost') {
+      try {
+        const addresses = await dns.resolveSrv(`_minecraft._tcp.${host}`);
+        if (addresses?.length) {
+          return { host: addresses[0].name, port: addresses[0].port };
+        }
+      } catch {
+        // 保持 minecraft-protocol 原有行为：SRV 解析失败时直连原 host:port。
+      }
+    }
+    return { host, port: destinationPort };
+  }
+
   /**
    * 清理内存缓存 - 内存紧张时调用
    */
@@ -1103,13 +1123,35 @@ export class BotInstance {
     this.nextUsername = null;
     const version = this.config.version || false;
 
-    // Handle Proxy
-    let agent = null;
+    let connectViaProxy = null;
     if (this.config.proxyNodeId) {
       const localPort = proxyService.getLocalPort(this.config.proxyNodeId);
       if (localPort) {
         this.log('info', `使用代理节点: ${this.config.proxyNodeId} (桥接端口: ${localPort})`, '🌐');
-        agent = new SocksProxyAgent(`socks5://127.0.0.1:${localPort}`);
+        connectViaProxy = async (client) => {
+          try {
+            const destination = await this.resolveMinecraftDestination(host, port);
+            client.options.host = destination.host;
+            client.options.port = destination.port;
+            const { socket } = await SocksClient.createConnection({
+              command: 'connect',
+              proxy: {
+                host: '127.0.0.1',
+                port: localPort,
+                type: 5
+              },
+              destination,
+              timeout: 15000,
+              set_tcp_nodelay: true
+            });
+            client.setSocket(socket);
+            client.emit('connect');
+          } catch (error) {
+            client.emit('error', error);
+          }
+        };
+      } else {
+        this.log('warning', `代理节点未启动或不存在，已回退直连: ${this.config.proxyNodeId}`, '⚠');
       }
     }
 
@@ -1126,7 +1168,7 @@ export class BotInstance {
           auth: 'offline',
           connectTimeout: 15000,
           checkTimeoutInterval: 30000,
-          agent: agent || undefined
+          connect: connectViaProxy || undefined
         };
 
         this.bot = mineflayer.createBot(botOptions);

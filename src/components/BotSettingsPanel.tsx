@@ -642,7 +642,7 @@ export function BotSettingsPanel({
             setProxyNodeId(nodeId);
             toast({
                 title: "服务器代理已更新",
-                description: nodeId ? `已连接到代理节点` : "已切换为直连模式"
+                description: nodeId ? "代理配置已保存，重启机器人后生效" : "已切换为直连模式，重启机器人后生效"
             });
             onUpdate?.();
         } catch (error) {
