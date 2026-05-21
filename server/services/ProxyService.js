@@ -271,8 +271,9 @@ export class ProxyService {
                     headers: {}
                 };
 
-                const hostHeader = node.wsHost || normalizeHost(node.sni) || serverHost;
-                if (hostHeader && !isIpLiteralHost(hostHeader)) {
+                const explicitHostHeader = node.wsHost || node.headers?.Host || node.headers?.host;
+                const hostHeader = explicitHostHeader || normalizeHost(node.sni) || serverHost;
+                if (hostHeader && (explicitHostHeader || !isIpLiteralHost(hostHeader))) {
                     outbound.transport.headers.Host = hostHeader;
                     if (outbound.tls && !outbound.tls.server_name) outbound.tls.server_name = hostHeader;
                 }
