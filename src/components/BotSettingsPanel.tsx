@@ -37,6 +37,7 @@ interface BotSettingsPanelProps {
         apiKey?: string;
         cookie?: string;
         csrfToken?: string;
+        ignoreTlsError?: boolean;
         serverId: string;
         autoRestart?: {
             enabled: boolean;
@@ -171,6 +172,7 @@ export function BotSettingsPanel({
     const [panelApiKey, setPanelApiKey] = useState(pterodactyl?.apiKey || "");
     const [panelCookie, setPanelCookie] = useState(pterodactyl?.cookie || "");
     const [panelCsrfToken, setPanelCsrfToken] = useState(pterodactyl?.csrfToken || "");
+    const [panelIgnoreTlsError, setPanelIgnoreTlsError] = useState(pterodactyl?.ignoreTlsError || false);
     const [panelServerId, setPanelServerId] = useState(pterodactyl?.serverId || "");
     const [autoRestartEnabled, setAutoRestartEnabled] = useState(pterodactyl?.autoRestart?.enabled || false);
     const [maxRetries, setMaxRetries] = useState(pterodactyl?.autoRestart?.maxRetries || 3);
@@ -262,6 +264,7 @@ export function BotSettingsPanel({
         setPanelApiKey(pterodactyl?.apiKey || "");
         setPanelCookie(pterodactyl?.cookie || "");
         setPanelCsrfToken(pterodactyl?.csrfToken || "");
+        setPanelIgnoreTlsError(pterodactyl?.ignoreTlsError || false);
         setPanelServerId(pterodactyl?.serverId || "");
         setAutoRestartEnabled(pterodactyl?.autoRestart?.enabled || false);
         setMaxRetries(pterodactyl?.autoRestart?.maxRetries || 3);
@@ -547,6 +550,7 @@ export function BotSettingsPanel({
                 apiKey: panelApiKey,
                 cookie: panelCookie,
                 csrfToken: panelCsrfToken,
+                ignoreTlsError: panelIgnoreTlsError,
                 serverId: panelServerId,
                 autoRestart: {
                     enabled: autoRestartEnabled,
@@ -1559,6 +1563,17 @@ export function BotSettingsPanel({
                         </div>
                     </>
                 )}
+
+                <div className="flex items-center justify-between pt-2">
+                    <div className="space-y-0.5">
+                        <Label>忽略 HTTPS 证书错误</Label>
+                        <p className="text-xs text-muted-foreground">适用于自签名证书或证书链不完整的面板</p>
+                    </div>
+                    <Switch
+                        checked={panelIgnoreTlsError}
+                        onCheckedChange={setPanelIgnoreTlsError}
+                    />
+                </div>
 
                 <div className="space-y-2">
                     <Label>服务器 ID (UUID/Identifier)</Label>

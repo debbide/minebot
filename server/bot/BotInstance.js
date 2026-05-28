@@ -3,6 +3,7 @@ import pkg from 'mineflayer-pathfinder';
 const { pathfinder, Movements, goals } = pkg;
 import { BehaviorManager } from './behaviors/index.js';
 import axios from 'axios';
+import https from 'https';
 import SftpClient from 'ssh2-sftp-client';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import socks from 'socks';
@@ -653,11 +654,16 @@ export class BotInstance {
   }
 
   getPanelHttpOptions(extraConfig = {}) {
+    const panel = this.status.pterodactyl;
     const options = {
       ...extraConfig,
       headers: { ...this.getPanelAuthHeaders(), ...(extraConfig.headers || {}) },
       timeout: extraConfig.timeout || 15000
     };
+
+    if (panel?.ignoreTlsError) {
+      options.httpsAgent = new https.Agent({ rejectUnauthorized: false });
+    }
 
     if (this.config.proxyNodeId) {
       const localPort = proxyService.getLocalPort(this.config.proxyNodeId);
@@ -1909,6 +1915,7 @@ export class BotInstance {
     const cookie = config.cookie || '';
     const csrfToken = config.csrfToken || '';
     const authType = config.authType || 'api';
+    const ignoreTlsError = config.ignoreTlsError === true || config.ignoreTlsError === 'true';
     const serverId = config.serverId || '';
 
     const oldPterodactyl = this.status.pterodactyl;
@@ -1918,7 +1925,7 @@ export class BotInstance {
       this.config.pterodactyl = null;
       this.log('info', '翼龙面板配置已清除', '🔑');
     } else {
-      this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, serverId };
+      this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, ignoreTlsError, serverId };
       if (config.autoRestart) {
         // Ensure types are correct
         this.status.pterodactyl.autoRestart = {

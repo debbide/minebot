@@ -1,4 +1,5 @@
 import axios from 'axios';
+import https from 'https';
 import net from 'net';
 import SftpClient from 'ssh2-sftp-client';
 import { SocksProxyAgent } from 'socks-proxy-agent';
@@ -151,11 +152,16 @@ export class PanelInstance {
    * 获取完整的 HTTP 请求配置 (包含代理和 Headers)
    */
   getHttpOptions(extraConfig = {}) {
+    const panel = this.status.pterodactyl;
     const options = {
       ...extraConfig,
       headers: { ...this.getAuthHeaders(), ...(extraConfig.headers || {}) },
       timeout: extraConfig.timeout || 15000
     };
+
+    if (panel?.ignoreTlsError) {
+      options.httpsAgent = new https.Agent({ rejectUnauthorized: false });
+    }
 
     if (this.config.proxyNodeId) {
       const localPort = proxyService.getLocalPort(this.config.proxyNodeId);
@@ -625,6 +631,7 @@ export class PanelInstance {
     const cookie = config.cookie || '';
     const csrfToken = config.csrfToken || '';
     const authType = config.authType || 'api';
+    const ignoreTlsError = config.ignoreTlsError === true || config.ignoreTlsError === 'true';
     const serverId = config.serverId || '';
 
     const oldPterodactyl = this.status.pterodactyl;
@@ -634,7 +641,7 @@ export class PanelInstance {
       this.config.pterodactyl = null;
       this.log('info', '翼龙面板配置已清除', '🔑');
     } else {
-      this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, serverId };
+      this.status.pterodactyl = { url, apiKey, cookie, csrfToken, authType, ignoreTlsError, serverId };
       if (config.autoRestart) {
         // Ensure types are correct
         this.status.pterodactyl.autoRestart = {

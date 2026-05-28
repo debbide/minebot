@@ -59,6 +59,7 @@ export interface BotStatus {
     authType?: 'api' | 'cookie';
     cookie?: string;
     csrfToken?: string;
+    ignoreTlsError?: boolean;
     autoRestart?: {
       enabled: boolean;
       maxRetries: number;
@@ -481,7 +482,7 @@ class ApiService {
   }
 
   // Pterodactyl panel config
-  async setPterodactyl(id: string, config: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } }): Promise<{ success: boolean; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; autoRestart?: { enabled: boolean; maxRetries: number } } }> {
+  async setPterodactyl(id: string, config: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; ignoreTlsError?: boolean; autoRestart?: { enabled: boolean; maxRetries: number } }): Promise<{ success: boolean; pterodactyl: { url: string; apiKey: string; serverId: string; authType?: 'api' | 'cookie'; cookie?: string; csrfToken?: string; ignoreTlsError?: boolean; autoRestart?: { enabled: boolean; maxRetries: number } } }> {
     return this.request(`/api/bots/${id}/pterodactyl`, {
       method: 'POST',
       body: JSON.stringify(config),

@@ -429,7 +429,8 @@ export class ConfigManager {
       pterodactyl: serverConfig.pterodactyl || {
         url: '',
         apiKey: '',
-        serverId: ''
+        serverId: '',
+        ignoreTlsError: false
       },
       // 独立的 SFTP 配置
       sftp: serverConfig.sftp || {
