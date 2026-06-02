@@ -1177,7 +1177,23 @@ export class BotInstance {
           auth: 'offline',
           connectTimeout: 15000,
           checkTimeoutInterval: 30000,
-          connect: connectViaProxy || undefined
+          connect: connectViaProxy || undefined,
+          brand: 'vanilla',
+          hideErrors: true,
+          clientInformation: {
+            chatVisibility: 'FULL',
+            chatColors: true,
+            skinParts: {
+              showCape: true,
+              showJacket: true,
+              showLeftArm: true,
+              showRightArm: true,
+              showLeftPants: true,
+              showRightPants: true,
+              showHat: true
+            },
+            mainHand: 'right'
+          }
         };
 
         this.bot = mineflayer.createBot(botOptions);

@@ -4,7 +4,24 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "PowerShell(npm run build)",
+      "Skill(ui-ux-pro-max)",
+      "Skill(ui-ux-pro-max:*)",
+      "PowerShell(node --check \"server/index.js\")",
+      "PowerShell(git rm -- \"server/data/agents.json\")",
+      "PowerShell(git add -- \"NEXT_SESSION_OPTIMIZATION_PLAN.md\" \"server/bot/BotInstance.js\" \"server/bot/PanelInstance.js\" \"server/index.js\" \"server/routes/bots.js\" \"server/routes/files.js\" \"server/services/ConfigManager.js\" \"server/tests/smoke.bots.test.js\" \"src/components/BotControlPanel.tsx\" \"src/components/BotSettingsPanel.tsx\" \"src/components/FileManager.tsx\" \"src/components/MultiServerPanel.tsx\" \"src/components/ServerDetailDialog.tsx\" \"src/contexts/WebSocketContext.tsx\" \"src/lib/api.ts\")",
+      "PowerShell(npm test)",
+      "PowerShell(node -e \"import\\('./server/bot/BotInstance.js'\\).then\\(\\(\\) => console.log\\('BotInstance import ok'\\)\\)\")",
+      "PowerShell(git fetch origin main)",
+      "PowerShell(node -e \"import\\('./server/services/ProxyService.js'\\).then\\(\\(\\) => console.log\\('ProxyService import ok'\\)\\)\")",
+      "PowerShell(node -e \"import\\('./server/services/ProxyService.js'\\).then\\(\\({ proxyService }\\) => { const node = proxyService.parseProxyLink\\('vless://123e4567-e89b-12d3-a456-426614174000@example.com:443?security=reality&sni=example.com&fp=chrome&pbk=abc&sid=01&type=grpc&serviceName=svc#demo'\\); proxyService.setNodes\\([node]\\); const config = proxyService.generateConfig\\(\\); if \\(!node || config.outbounds[0].type !== 'vless' || !config.outbounds[0].tls?.reality || config.outbounds[0].transport?.type !== 'grpc'\\) throw new Error\\('proxy config smoke failed'\\); console.log\\('proxy config smoke ok'\\); }\\)\")",
+      "PowerShell(node --check \"server/services/ProxyService.js\")",
+      "PowerShell(try { \\(Get-Command sing-box -ErrorAction Stop\\).Source } catch { 'sing-box not found' })",
+      "PowerShell(node --input-type=module -e \"import { ProxyService } from './server/services/ProxyService.js'; const s = new ProxyService\\(\\); const n = s.parseProxyLink\\('vless://97d73c57-7ac5-4840-b016-aa7c29a277e8@185.231.136.23:27588?encryption=none&security=none&type=ws&host=185.231.136.23&path=%2F97d73c57#edge'\\); s.setNodes\\([n]\\); console.log\\(JSON.stringify\\(s.generateConfig\\(\\).outbounds[0], null, 2\\)\\);\")",
+      "PowerShell(Get-Process)",
+      "PowerShell(Get-Process node,sing-box,pm2 -ErrorAction SilentlyContinue)",
+      "PowerShell(docker stats --no-stream --format \"table {{.Name}}\\\\t{{.CPUPerc}}\\\\t{{.MemUsage}}\\\\t{{.NetIO}}\")"
     ]
   }
 }

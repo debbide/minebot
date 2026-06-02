@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "PowerShell(git push)",
+      "PowerShell(node --check \"server/bot/BotInstance.js\")",
+      "PowerShell(node --check \"server/bot/behaviors/index.js\")",
+      "Bash(npm run *)"
     ]
   }
 }
