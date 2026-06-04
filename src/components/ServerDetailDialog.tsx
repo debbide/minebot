@@ -53,6 +53,7 @@ export function ServerDetailDialog({
     host: "",
     port: "25565",
     username: "",
+    version: "",
   });
   const [activeTab, setActiveTab] = useState("control");
   const contentRef = useRef<HTMLDivElement>(null);
@@ -79,6 +80,7 @@ export function ServerDetailDialog({
         host: server.host || "",
         port: server.port ? String(server.port) : "",
         username: server.username || "",
+        version: server.version || "",
       });
     }
   }, [server]);
@@ -124,6 +126,7 @@ export function ServerDetailDialog({
         host: editForm.host || undefined,
         port: editForm.port ? parseInt(editForm.port) : 0,
         username: editForm.username || undefined,
+        version: editForm.version || undefined,
       });
       toast({ title: "成功", description: "服务器配置已更新" });
       setEditing(false);
@@ -380,6 +383,18 @@ export function ServerDetailDialog({
                             />
                           </div>
                         </div>
+
+                        {!isPanel && (
+                          <div className="space-y-2">
+                            <Label>游戏版本 (可选, 留空自动检测)</Label>
+                            <Input
+                              value={editForm.version}
+                              onChange={(e) => setEditForm({ ...editForm, version: e.target.value })}
+                              placeholder="如: 1.20.4, 1.19.4"
+                              className="bg-background/50 font-mono"
+                            />
+                          </div>
+                        )}
 
                         <div className="flex gap-3 justify-end pt-2">
                           <Button variant="ghost" onClick={() => setEditing(false)} disabled={loading}>

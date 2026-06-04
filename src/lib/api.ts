@@ -394,6 +394,7 @@ class ApiService {
     port?: number;
     proxyNodeId?: string;
     autoReconnect?: boolean;
+    version?: string;
   }): Promise<{ success: boolean; config: unknown }> {
     return this.request(`/api/bots/${id}`, {
       method: 'PUT',

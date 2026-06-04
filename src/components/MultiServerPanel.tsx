@@ -292,6 +292,7 @@ export function MultiServerPanel() {
     host: "",
     port: "25565",
     username: "",
+    version: "",
   });
 
   const handleRandomUsername = useCallback(() => {
@@ -405,9 +406,10 @@ export function MultiServerPanel() {
         host: newServer.type === "minecraft" ? newServer.host : "",
         port: newServer.type === "minecraft" ? (newServer.port ? parseInt(newServer.port) : 0) : 0,
         username: newServer.type === "minecraft" ? (newServer.username || undefined) : undefined,
+        version: newServer.type === "minecraft" ? (newServer.version || undefined) : undefined,
       });
       toast({ title: "成功", description: newServer.type === "panel" ? "面板服务器已添加" : "服务器已添加并开始连接", variant: "success" });
-      setNewServer({ type: "minecraft", name: "", host: "", port: "25565", username: "" });
+      setNewServer({ type: "minecraft", name: "", host: "", port: "25565", username: "", version: "" });
       setAddingServer(false);
       fetchServers();
     } catch (error) {
@@ -674,6 +676,14 @@ export function MultiServerPanel() {
                                 onChange={(e) => setNewServer({ ...newServer, port: e.target.value })}
                               />
                             </div>
+                          </div>
+                          <div className="space-y-1 mt-3">
+                            <Label>游戏版本 (可选, 留空自动检测)</Label>
+                            <Input
+                              placeholder="如: 1.20.4, 1.19.4"
+                              value={newServer.version}
+                              onChange={(e) => setNewServer({ ...newServer, version: e.target.value })}
+                            />
                           </div>
                         </>
                       )}

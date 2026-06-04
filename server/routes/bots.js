@@ -55,7 +55,7 @@ export function registerBotRoutes(app, {
   // Update server config (name, username, host, port)
   app.put('/api/bots/:id', async (req, res) => {
     try {
-      const { name, username, host, port } = req.body;
+      const { name, username, host, port, version } = req.body;
       const id = req.params.id;
 
       if (username !== undefined && username !== '') {
@@ -73,6 +73,7 @@ export function registerBotRoutes(app, {
       if (username !== undefined) updates.username = username;
       if (host !== undefined) updates.host = host;
       if (port !== undefined) updates.port = parseInt(port);
+      if (version !== undefined) updates.version = version;
       if (req.body.proxyNodeId !== undefined) updates.proxyNodeId = req.body.proxyNodeId;
       if (req.body.autoReconnect !== undefined) updates.autoReconnect = !!req.body.autoReconnect;
 
@@ -92,6 +93,7 @@ export function registerBotRoutes(app, {
         }
         if (host !== undefined) bot.config.host = host;
         if (port !== undefined) bot.config.port = parseInt(port);
+        if (version !== undefined) bot.config.version = version;
 
         if (req.body.proxyNodeId !== undefined) bot.config.proxyNodeId = req.body.proxyNodeId;
         if (req.body.autoReconnect !== undefined) {
