@@ -85,6 +85,10 @@ export function registerAuthRoutes(app, { authService, auditService }) {
   });
 
   app.post('/api/auth/logout', (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      authService.revokeToken(authHeader.substring(7));
+    }
     res.json({ success: true, message: 'Logged out successfully' });
   });
 }

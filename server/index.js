@@ -125,7 +125,7 @@ initializeProxy();
 // Apply auth middleware to all /api routes except auth and screenshots
 // MUST be defined BEFORE API routes
 app.use('/api', (req, res, next) => {
-  if (req.path === '/auth/login' || req.path === '/auth/check' || req.path.startsWith('/screenshots/') || (req.method === 'POST' && req.path === '/webhooks/trigger')) {
+  if (req.path === '/auth/login' || req.path === '/auth/check' || (req.method === 'POST' && req.path === '/webhooks/trigger')) {
     return next();
   }
   return authService.authMiddleware()(req, res, next);
@@ -152,8 +152,6 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.static(join(__dirname, '../dist')));
-// Serve screenshots
-app.use('/api/screenshots', express.static(join(process.cwd(), 'data', 'screenshots')));
 
 // WebSocket connections
 const clients = new Set();

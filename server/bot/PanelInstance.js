@@ -1,6 +1,7 @@
 import axios from 'axios';
 import https from 'https';
 import net from 'net';
+import path from 'path';
 import SftpClient from 'ssh2-sftp-client';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { proxyService } from '../services/ProxyService.js';
@@ -1099,22 +1100,13 @@ export class PanelInstance {
    * 获取 SFTP 完整路径
    */
   getSftpFullPath(relativePath) {
-    const basePath = (this.status.sftp?.basePath || '/').replace(/\/+$/, '') || '/';
-
-    // 规范化相对路径
-    let cleanPath = (relativePath || '/').replace(/\/+/g, '/');
-
-    // 如果相对路径是根目录或空，直接返回 basePath
-    if (cleanPath === '/' || cleanPath === '') {
+    const basePath = path.posix.normalize(this.status.sftp?.basePath || '/');
+    const target = path.posix.normalize(path.posix.join(basePath, relativePath || '/'));
+    // 限制在 basePath 内：越界（../ 或绝对路径逃逸）一律钳回 basePath
+    if (basePath !== '/' && target !== basePath && !target.startsWith(basePath + '/')) {
       return basePath;
     }
-
-    // 移除开头的斜杠，因为我们要拼接到 basePath
-    cleanPath = cleanPath.replace(/^\/+/, '');
-
-    // 拼接路径
-    const fullPath = basePath === '/' ? `/${cleanPath}` : `${basePath}/${cleanPath}`;
-    return fullPath.replace(/\/+/g, '/');
+    return target;
   }
 
   /**

@@ -14,6 +14,9 @@ const AUDIT_LOG_FILE = path.join(__dirname, '../data/audit.log');
 export class AuditService {
   constructor() {
     this.ensureAuditDir();
+    this.cleanup();
+    this.cleanupTimer = setInterval(() => this.cleanup(), 24 * 60 * 60 * 1000);
+    if (this.cleanupTimer.unref) this.cleanupTimer.unref();
   }
 
   ensureAuditDir() {

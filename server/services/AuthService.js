@@ -275,6 +275,27 @@ export class AuthService {
   constructor(configManager) {
     this.configManager = configManager;
     this.rateLimiter = rateLimiter;
+    this.revokedTokens = new Map(); // sha256(token) -> exp (seconds)
+  }
+
+  getPasswordFingerprint() {
+    const creds = this.getCredentials();
+    return creds.password?.hash ? creds.password.hash.slice(0, 16) : '';
+  }
+
+  revokeToken(token) {
+    if (!token) return;
+    try {
+      const decoded = jwt.decode(token);
+      const exp = decoded?.exp || Math.floor(Date.now() / 1000) + 24 * 3600;
+      const key = crypto.createHash('sha256').update(token).digest('hex');
+      this.revokedTokens.set(key, exp);
+      // 顺手清理已过期条目，避免集合无界增长
+      const now = Math.floor(Date.now() / 1000);
+      for (const [k, e] of this.revokedTokens) {
+        if (e <= now) this.revokedTokens.delete(k);
+      }
+    } catch {}
   }
 
   /**
@@ -369,7 +390,7 @@ export class AuthService {
    */
   generateToken(username) {
     return jwt.sign(
-      { username, iat: Date.now() },
+      { username, iat: Date.now(), pv: this.getPasswordFingerprint() },
       getJwtSecret(),
       { expiresIn: TOKEN_EXPIRY }
     );
@@ -380,7 +401,16 @@ export class AuthService {
    */
   verifyToken(token) {
     try {
-      return jwt.verify(token, getJwtSecret());
+      const decoded = jwt.verify(token, getJwtSecret());
+      const key = crypto.createHash('sha256').update(token).digest('hex');
+      if (this.revokedTokens.has(key)) {
+        return null;
+      }
+      // 密码变更后，旧令牌携带的密码指纹对不上，一律失效
+      if (decoded.pv !== this.getPasswordFingerprint()) {
+        return null;
+      }
+      return decoded;
     } catch (error) {
       return null;
     }

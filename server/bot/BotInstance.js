@@ -9,6 +9,7 @@ import { SocksProxyAgent } from 'socks-proxy-agent';
 import socks from 'socks';
 import dns from 'dns/promises';
 import net from 'net';
+import path from 'path';
 import { proxyService } from '../services/ProxyService.js';
 
 const { SocksClient } = socks;
@@ -3213,12 +3214,13 @@ export class BotInstance {
    * 获取 SFTP 完整路径
    */
   getSftpFullPath(relativePath) {
-    const basePath = this.status.sftp?.basePath || '/';
-    // 规范化路径
-    let fullPath = relativePath.startsWith('/') ? relativePath : `${basePath}/${relativePath}`;
-    // 移除多余的斜杠
-    fullPath = fullPath.replace(/\/+/g, '/');
-    return fullPath;
+    const basePath = path.posix.normalize(this.status.sftp?.basePath || '/');
+    const target = path.posix.normalize(path.posix.join(basePath, relativePath || '/'));
+    // 限制在 basePath 内：越界（../ 或绝对路径逃逸）一律钳回 basePath
+    if (basePath !== '/' && target !== basePath && !target.startsWith(basePath + '/')) {
+      return basePath;
+    }
+    return target;
   }
 
   // ==================== SFTP 文件操作方法 ====================

@@ -89,6 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    if (token) {
+      fetch(`${API_BASE}/api/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {});
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     setToken(null);

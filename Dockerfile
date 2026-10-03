@@ -1,7 +1,7 @@
 # Multi-stage build for MineCraft Bot Assistant
 
 # Stage 1: Build frontend
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app
 
@@ -20,18 +20,18 @@ COPY public/ ./public/
 RUN npm run build
 
 # Stage 2: Install server dependencies (production only)
-FROM node:20-alpine AS server-deps
+FROM node:22-alpine AS server-deps
 
 WORKDIR /app/server
 
-# Copy package.json only
-COPY server/package.json ./
+# Copy package files (lockfile included for reproducible installs)
+COPY server/package.json server/package-lock.json ./
 
 # Install production dependencies
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
 # Stage 3: Final Production Image (Alpine based, lightweight)
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
 
 WORKDIR /app
 
