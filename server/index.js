@@ -539,7 +539,7 @@ app.post('/api/webhooks/trigger', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server running on port ${PORT}`);
-  console.log('Admin account is initialized; see server/data/initial-admin-password.txt on first run.');
+  console.log(`Default login: admin / admin123`);
   broadcast('log', {
     type: 'info',
     icon: '🚀',

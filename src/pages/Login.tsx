@@ -99,7 +99,7 @@ export default function Login() {
 
           <div className="mt-4 pt-4 border-t border-border">
             <p className="text-xs text-muted-foreground text-center">
-              首次启动的初始密码在服务器 data/initial-admin-password.txt 中
+              默认账号: admin / admin123
             </p>
           </div>
         </div>

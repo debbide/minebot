@@ -289,7 +289,7 @@ export class AuthService {
     const config = this.configManager.getFullConfig();
     const username = process.env.ADMIN_USERNAME || config.auth?.username || 'admin';
     const envPassword = process.env.ADMIN_PASSWORD;
-    const password = envPassword || crypto.randomBytes(18).toString('base64url');
+    const password = envPassword || 'admin123';
     const { hash, salt } = hashPassword(password);
     const auth = {
       username,
@@ -301,18 +301,7 @@ export class AuthService {
     if (envPassword) {
       console.log('📋 First-time admin credentials initialized from ADMIN_USERNAME/ADMIN_PASSWORD.');
     } else {
-      try {
-        fs.mkdirSync(path.dirname(INITIAL_ADMIN_PASSWORD_FILE), { recursive: true });
-        fs.writeFileSync(INITIAL_ADMIN_PASSWORD_FILE, `${password}\n`, { mode: 0o600 });
-        try {
-          fs.chmodSync(INITIAL_ADMIN_PASSWORD_FILE, 0o600);
-        } catch {}
-        console.log(`🔐 Initial admin password written to ${INITIAL_ADMIN_PASSWORD_FILE}`);
-        console.log(`   Username: ${username}. Log in with that password, then change it immediately.`);
-      } catch (error) {
-        console.error('❌ Failed to write initial admin password file:', error.message);
-        console.log(`   Generated password: ${password}`);
-      }
+      console.log(`📋 Default admin credentials initialized: ${username} / admin123`);
     }
 
     return auth;
@@ -328,21 +317,10 @@ export class AuthService {
       return this.getDefaultCredentials();
     }
 
-    // 旧版默认口令 admin123 不再迁移保留，升级时强制改为随机初始密码。
-    const storedPassword = config.auth.password;
-    const isLegacyDefaultPassword = !process.env.ADMIN_PASSWORD && (
-      storedPassword === 'admin123' ||
-      (storedPassword && typeof storedPassword === 'object' && verifyPassword('admin123', storedPassword))
-    );
-    if (isLegacyDefaultPassword) {
-      console.warn('⚠️  Detected legacy default admin password. Resetting to a generated initial password.');
-      return this.initializeCredentials();
-    }
-
     // 兼容旧版明文密码格式 - 自动迁移到哈希格式
-    if (typeof storedPassword === 'string') {
+    if (typeof config.auth.password === 'string') {
       console.log('🔄 Migrating plaintext password to hashed format...');
-      const { hash, salt } = hashPassword(storedPassword);
+      const { hash, salt } = hashPassword(config.auth.password);
       config.auth.password = { hash, salt };
       // 保存迁移后的配置
       this.configManager.updateConfig({ auth: config.auth });

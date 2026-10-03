@@ -229,7 +229,7 @@ export class ConfigManager {
       },
       auth: {
         username: 'admin',
-        password: null
+        password: 'admin123'
       },
       autoChat: {
         enabled: false,

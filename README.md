@@ -4,7 +4,7 @@
 
 ## 功能特性
 
-- **登录认证**: JWT 认证保护，首次启动会生成初始管理员密码
+- **登录认证**: JWT 认证保护，默认账号 `admin` / `admin123`
 - **机器人控制**: 通过 Web UI 连接和控制 Minecraft 机器人
 - **AI 对话**: 集成 OpenAI API，支持智能对话
 - **指令系统**: 支持 `!help`, `!come`, `!follow`, `!stop`, `!pos`, `!ask` 等指令
@@ -40,7 +40,7 @@ volumes:
 docker compose up -d
 ```
 
-访问 http://localhost:3000，使用 `admin` 和服务器 `server/data/initial-admin-password.txt` 中的初始密码登录，并立即修改密码。
+访问 http://localhost:3000，使用 `admin` / `admin123` 登录。
 
 ### 方式二：从源码构建
 
