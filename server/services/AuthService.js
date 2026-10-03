@@ -1,11 +1,63 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 // ============================================================================
 // 安全配置
 // ============================================================================
 
-const JWT_SECRET = process.env.JWT_SECRET || 'c7b4e2a1f9c04d7fbd8a8c3a6f1b2d7e6a9c4b1f3d8e2c7a9b4f1d6e8c2a7b5f';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const JWT_SECRET_FILE = path.join(__dirname, '../data/jwt.key');
+const INITIAL_ADMIN_PASSWORD_FILE = path.join(__dirname, '../data/initial-admin-password.txt');
+let cachedJwtSecret = null;
+
+function getJwtSecret() {
+  if (process.env.JWT_SECRET) {
+    return process.env.JWT_SECRET;
+  }
+
+  if (cachedJwtSecret) {
+    return cachedJwtSecret;
+  }
+
+  try {
+    if (fs.existsSync(JWT_SECRET_FILE)) {
+      const stored = fs.readFileSync(JWT_SECRET_FILE, 'utf-8').trim();
+      if (stored) {
+        cachedJwtSecret = stored;
+        return cachedJwtSecret;
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error reading JWT secret file:', error.message);
+  }
+
+  const secret = crypto.randomBytes(32).toString('hex');
+  cachedJwtSecret = secret;
+
+  try {
+    fs.mkdirSync(path.dirname(JWT_SECRET_FILE), { recursive: true });
+    fs.writeFileSync(JWT_SECRET_FILE, secret, { mode: 0o600 });
+    try {
+      fs.chmodSync(JWT_SECRET_FILE, 0o600);
+    } catch {}
+  } catch (error) {
+    console.error('❌ Failed to persist JWT secret; tokens will not survive restart:', error.message);
+  }
+
+  return cachedJwtSecret;
+}
+
+function clearInitialAdminPasswordFile() {
+  try {
+    if (fs.existsSync(INITIAL_ADMIN_PASSWORD_FILE)) {
+      fs.unlinkSync(INITIAL_ADMIN_PASSWORD_FILE);
+    }
+  } catch {}
+}
 
 const TOKEN_EXPIRY = '24h';
 
@@ -230,22 +282,40 @@ export class AuthService {
    * @returns {{username: string, password: {hash: string, salt: string}}}
    */
   getDefaultCredentials() {
-    const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-    const adminPassword = process.env.ADMIN_PASSWORD || crypto.randomBytes(8).toString('hex');
+    return this.initializeCredentials();
+  }
 
-    const { hash, salt } = hashPassword(adminPassword);
-
-    console.log('📋 First-time setup credentials:');
-    console.log(`   Username: ${adminUsername}`);
-    if (!process.env.ADMIN_PASSWORD) {
-      console.log(`   Generated password: ${adminPassword}`);
-      console.log('   ⚠️  Make sure to save this password or set ADMIN_PASSWORD in environment');
-    }
-
-    return {
-      username: adminUsername,
+  initializeCredentials() {
+    const config = this.configManager.getFullConfig();
+    const username = process.env.ADMIN_USERNAME || config.auth?.username || 'admin';
+    const envPassword = process.env.ADMIN_PASSWORD;
+    const password = envPassword || crypto.randomBytes(18).toString('base64url');
+    const { hash, salt } = hashPassword(password);
+    const auth = {
+      username,
       password: { hash, salt }
     };
+
+    this.configManager.updateConfig({ auth });
+
+    if (envPassword) {
+      console.log('📋 First-time admin credentials initialized from ADMIN_USERNAME/ADMIN_PASSWORD.');
+    } else {
+      try {
+        fs.mkdirSync(path.dirname(INITIAL_ADMIN_PASSWORD_FILE), { recursive: true });
+        fs.writeFileSync(INITIAL_ADMIN_PASSWORD_FILE, `${password}\n`, { mode: 0o600 });
+        try {
+          fs.chmodSync(INITIAL_ADMIN_PASSWORD_FILE, 0o600);
+        } catch {}
+        console.log(`🔐 Initial admin password written to ${INITIAL_ADMIN_PASSWORD_FILE}`);
+        console.log(`   Username: ${username}. Log in with that password, then change it immediately.`);
+      } catch (error) {
+        console.error('❌ Failed to write initial admin password file:', error.message);
+        console.log(`   Generated password: ${password}`);
+      }
+    }
+
+    return auth;
   }
 
   /**
@@ -258,10 +328,21 @@ export class AuthService {
       return this.getDefaultCredentials();
     }
 
+    // 旧版默认口令 admin123 不再迁移保留，升级时强制改为随机初始密码。
+    const storedPassword = config.auth.password;
+    const isLegacyDefaultPassword = !process.env.ADMIN_PASSWORD && (
+      storedPassword === 'admin123' ||
+      (storedPassword && typeof storedPassword === 'object' && verifyPassword('admin123', storedPassword))
+    );
+    if (isLegacyDefaultPassword) {
+      console.warn('⚠️  Detected legacy default admin password. Resetting to a generated initial password.');
+      return this.initializeCredentials();
+    }
+
     // 兼容旧版明文密码格式 - 自动迁移到哈希格式
-    if (typeof config.auth.password === 'string') {
+    if (typeof storedPassword === 'string') {
       console.log('🔄 Migrating plaintext password to hashed format...');
-      const { hash, salt } = hashPassword(config.auth.password);
+      const { hash, salt } = hashPassword(storedPassword);
       config.auth.password = { hash, salt };
       // 保存迁移后的配置
       this.configManager.updateConfig({ auth: config.auth });
@@ -301,6 +382,7 @@ export class AuthService {
 
     // 成功
     this.rateLimiter.recordSuccess(username, ip);
+    clearInitialAdminPasswordFile();
     return { valid: true };
   }
 
@@ -310,7 +392,7 @@ export class AuthService {
   generateToken(username) {
     return jwt.sign(
       { username, iat: Date.now() },
-      JWT_SECRET,
+      getJwtSecret(),
       { expiresIn: TOKEN_EXPIRY }
     );
   }
@@ -320,7 +402,7 @@ export class AuthService {
    */
   verifyToken(token) {
     try {
-      return jwt.verify(token, JWT_SECRET);
+      return jwt.verify(token, getJwtSecret());
     } catch (error) {
       return null;
     }
@@ -352,6 +434,7 @@ export class AuthService {
     };
 
     this.configManager.updateConfig(config);
+    clearInitialAdminPasswordFile();
     return { success: true, message: 'Credentials updated successfully' };
   }
 

@@ -94,6 +94,16 @@ function getMasterPassword() {
     if (fs.existsSync(CONFIG_FILE)) {
       const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
       if (raw && raw.masterKey) {
+        try {
+          fs.mkdirSync(path.dirname(MASTER_KEY_FILE), { recursive: true });
+          fs.writeFileSync(MASTER_KEY_FILE, raw.masterKey, { mode: 0o600 });
+          try {
+            fs.chmodSync(MASTER_KEY_FILE, 0o600);
+          } catch {}
+          console.log('✅ Migrated legacy master key from config.json to data/master.key');
+        } catch (error) {
+          console.error('❌ Failed to migrate legacy master key:', error.message);
+        }
         return raw.masterKey;
       }
     }
@@ -134,7 +144,7 @@ export class ConfigManager {
         if (isEncryptedConfig(rawConfig)) {
           const masterPassword = getMasterPassword();
           if (!masterPassword) {
-            throw new Error('Config is encrypted but MASTER_PASSWORD is not set in environment');
+            throw new Error('Config is encrypted but no master key is available (set MASTER_PASSWORD or restore data/master.key)');
           }
 
           // 派生密钥用于解密
@@ -143,6 +153,23 @@ export class ConfigManager {
 
           // 解密配置
           const decrypted = decryptConfig(rawConfig.data, key);
+
+          // 旧版配置曾把 masterKey 写回 config.json；迁移后立即重写，去掉同文件密钥。
+          if (rawConfig.masterKey) {
+            const { key: migratedKey, salt: migratedSalt } = generateMasterKey(masterPassword);
+            const migratedEncrypted = encryptConfig(decrypted, migratedKey);
+            fs.writeFileSync(CONFIG_FILE, JSON.stringify({
+              encrypted: true,
+              version: '2.0',
+              salt: migratedSalt.toString('base64'),
+              data: migratedEncrypted
+            }, null, 2), { mode: 0o600 });
+            try {
+              fs.chmodSync(CONFIG_FILE, 0o600);
+            } catch {}
+            console.log('✅ Removed legacy masterKey from config.json');
+          }
+
           return decrypted;
         }
 
@@ -197,9 +224,12 @@ export class ConfigManager {
         botToken: '',
         chatId: ''
       },
+      webhook: {
+        secret: ''
+      },
       auth: {
         username: 'admin',
-        password: 'admin123'
+        password: null
       },
       autoChat: {
         enabled: false,
@@ -246,6 +276,10 @@ export class ConfigManager {
       telegram: {
         ...this.config.telegram,
         botToken: this.config.telegram?.botToken ? '***' : ''
+      },
+      webhook: {
+        ...(this.config.webhook || {}),
+        secret: this.config.webhook?.secret ? '***' : ''
       }
     };
   }
@@ -292,6 +326,9 @@ export class ConfigManager {
         masterPassword = crypto.randomBytes(32).toString('base64');
         try {
           fs.writeFileSync(MASTER_KEY_FILE, masterPassword, { mode: 0o600 });
+          try {
+            fs.chmodSync(MASTER_KEY_FILE, 0o600);
+          } catch {}
           console.log('✅ Generated master key and saved to data/master.key');
         } catch (error) {
           console.error('❌ Failed to persist master key:', error.message);
@@ -308,15 +345,20 @@ export class ConfigManager {
           encrypted: true,
           version: '2.0',
           salt: salt.toString('base64'),
-          data: encrypted,
-          masterKey: process.env.MASTER_PASSWORD ? undefined : masterPassword
+          data: encrypted
         };
 
-        fs.writeFileSync(CONFIG_FILE, JSON.stringify(encryptedConfig, null, 2));
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(encryptedConfig, null, 2), { mode: 0o600 });
+        try {
+          fs.chmodSync(CONFIG_FILE, 0o600);
+        } catch {}
         console.log('✅ Config saved (encrypted with AES-256-GCM)');
       } else {
         // 明文保存 (不推荐用于生产环境)
-        fs.writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2));
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(this.config, null, 2), { mode: 0o600 });
+        try {
+          fs.chmodSync(CONFIG_FILE, 0o600);
+        } catch {}
         console.warn('⚠️  Config saved in plaintext. Set MASTER_PASSWORD to enable encryption.');
       }
     } catch (error) {

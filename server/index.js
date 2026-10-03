@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 import { BotManager } from './bot/BotPool.js';
 import { AIService } from './services/AIService.js';
@@ -106,6 +107,7 @@ app.use((req, res, next) => {
 // Initialize services
 const configManager = new ConfigManager();
 const authService = new AuthService(configManager);
+authService.getCredentials();
 const aiService = new AIService(configManager);
 const systemService = new SystemService();
 const auditService = new AuditService();
@@ -123,7 +125,7 @@ initializeProxy();
 // Apply auth middleware to all /api routes except auth and screenshots
 // MUST be defined BEFORE API routes
 app.use('/api', (req, res, next) => {
-  if (req.path === '/auth/login' || req.path === '/auth/check' || req.path.startsWith('/screenshots/') || req.path.startsWith('/webhooks/')) {
+  if (req.path === '/auth/login' || req.path === '/auth/check' || req.path.startsWith('/screenshots/') || (req.method === 'POST' && req.path === '/webhooks/trigger')) {
     return next();
   }
   return authService.authMiddleware()(req, res, next);
@@ -190,6 +192,30 @@ wss.on('connection', (ws, req) => {
     clients.delete(ws);
   });
 });
+
+function getWebhookSecret() {
+  const config = configManager.getFullConfig();
+  if (config.webhook?.secret) {
+    return config.webhook.secret;
+  }
+
+  const secret = crypto.randomBytes(32).toString('hex');
+  configManager.updateConfig({
+    webhook: {
+      ...(config.webhook || {}),
+      secret
+    }
+  });
+  return secret;
+}
+
+function hasValidWebhookSecret(req) {
+  const provided = req.get('x-webhook-secret') || '';
+  const expected = getWebhookSecret();
+  const providedHash = crypto.createHash('sha256').update(String(provided)).digest();
+  const expectedHash = crypto.createHash('sha256').update(String(expected)).digest();
+  return crypto.timingSafeEqual(providedHash, expectedHash);
+}
 
 function broadcast(type, data) {
   const message = JSON.stringify({ type, data });
@@ -262,7 +288,7 @@ app.post('/api/settings', (req, res) => {
     } else if (auth) {
       updates.auth = {
         username: auth.username,
-        password: configManager.getFullConfig().auth?.password || 'admin123'
+        password: configManager.getFullConfig().auth?.password
       };
     }
     if (autoChat) updates.autoChat = autoChat;
@@ -383,6 +409,26 @@ registerFileRoutes(app, {
   botManager
 });
 
+app.get('/api/webhooks/config', (req, res) => {
+  res.json({
+    success: true,
+    secret: getWebhookSecret(),
+    header: 'X-Webhook-Secret'
+  });
+});
+
+app.post('/api/webhooks/regenerate-secret', (req, res) => {
+  const config = configManager.getFullConfig();
+  const secret = crypto.randomBytes(32).toString('hex');
+  configManager.updateConfig({
+    webhook: {
+      ...(config.webhook || {}),
+      secret
+    }
+  });
+  res.json({ success: true, secret, header: 'X-Webhook-Secret' });
+});
+
 // Serve frontend for all other routes
 
 
@@ -396,6 +442,10 @@ app.get('*', (req, res) => {
 // Webhook endpoint for auto power-on
 app.post('/api/webhooks/trigger', async (req, res) => {
   try {
+    if (!hasValidWebhookSecret(req)) {
+      return res.status(401).json({ success: false, error: 'Invalid webhook secret' });
+    }
+
     const body = req.body;
     // 将整个 body 转为小写字符串以便匹配
     const content = JSON.stringify(body).toLowerCase();
@@ -489,7 +539,7 @@ app.post('/api/webhooks/trigger', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', async () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Default login: admin / admin123`);
+  console.log('Admin account is initialized; see server/data/initial-admin-password.txt on first run.');
   broadcast('log', {
     type: 'info',
     icon: '🚀',
