@@ -357,7 +357,7 @@ export class BotPool {
     const bot = this.bots.get(id);
     if (!bot) return false;
     bot.disconnect();
-    this.broadcastStatus(id, bot.getStatus());
+    this.onStatusChange(id, bot.getStatus());
     return true;
   }
 
@@ -367,7 +367,7 @@ export class BotPool {
   disconnectAll() {
     for (const [id, bot] of this.bots) {
       bot.disconnect();
-      this.broadcastStatus(id, bot.getStatus());
+      this.onStatusChange(id, bot.getStatus());
     }
     this.broadcast('status', this.getOverallStatus());
   }
