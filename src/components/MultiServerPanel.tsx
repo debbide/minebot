@@ -330,11 +330,11 @@ export function MultiServerPanel() {
         return [...existingIds, ...addedIds];
       });
 
-      // 更新选中的服务器数据
+      // 更新选中的服务器数据（已删除的清掉选择，避免僵尸卡片）
       setSelectedServer(prev => {
         if (!prev) return prev;
         const updated = data[prev.id];
-        return updated || prev;
+        return updated || null;
       });
     } catch (error) {
       console.error("Failed to fetch servers:", error);
@@ -347,18 +347,16 @@ export function MultiServerPanel() {
 
   useEffect(() => {
     if (botUpdates.size > 0) {
+      // 只更新已在列表中的服务器；新服务器的加入以 fetchServers 为准，
+      // 避免删除后迟到的状态更新把卡片又加回来
       setServers(prev => {
         const updated = { ...prev };
         botUpdates.forEach((botData, botId) => {
-          updated[botId] = { ...(updated[botId] || {}), ...botData };
+          if (updated[botId]) {
+            updated[botId] = { ...updated[botId], ...botData };
+          }
         });
         return updated;
-      });
-
-      setOrderedIds(prevIds => {
-        const incomingIds = Array.from(botUpdates.keys());
-        const addedIds = incomingIds.filter(id => !prevIds.includes(id));
-        return [...prevIds, ...addedIds];
       });
 
       setSelectedServer(prev => {

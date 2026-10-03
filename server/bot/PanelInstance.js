@@ -24,6 +24,7 @@ export class PanelInstance {
     // 面板状态
     this.panelStatus = null;
     this.statusCheckInterval = null;
+    this.destroyed = false;
 
     this.status = {
       id: this.id,
@@ -179,6 +180,7 @@ export class PanelInstance {
    * 连接到面板（开始状态检查）
    */
   async connect() {
+    this.destroyed = false;
     // 检查是否有任何可用的配置（翼龙面板或手动IP/端口）
     const hasPanelConfig = this.isPanelConfigured();
     const pingHost = this.config.host;
@@ -236,6 +238,7 @@ export class PanelInstance {
    * 断开连接（停止状态检查）
    */
   disconnect() {
+    this.destroyed = true;
     if (this.statusCheckInterval) {
       clearInterval(this.statusCheckInterval);
       this.statusCheckInterval = null;
@@ -431,6 +434,7 @@ export class PanelInstance {
    * 获取服务器状态
    */
   async fetchServerStatus() {
+    if (this.destroyed) return;
     const panel = this.status.pterodactyl;
     if (!this.isPanelConfigured()) {
       throw new Error('面板未配置');
@@ -508,6 +512,7 @@ export class PanelInstance {
       this.status.tcpLatency = null;
     }
 
+    if (this.destroyed) return;
     if (this.onStatusChange) {
       this.onStatusChange(this.id, this.getStatus());
     }

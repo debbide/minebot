@@ -10,7 +10,7 @@ export class AIService {
   }
 
   initClient() {
-    const config = this.configManager.getConfig();
+    const config = this.configManager.getFullConfig();
     const apiKey = config.ai?.apiKey || process.env.OPENAI_API_KEY;
     const baseURL = config.ai?.baseURL || process.env.OPENAI_BASE_URL;
 
@@ -23,7 +23,7 @@ export class AIService {
   }
 
   getSystemPrompt() {
-    const config = this.configManager.getConfig();
+    const config = this.configManager.getFullConfig();
     return config.ai?.systemPrompt || `你是一个 Minecraft 服务器中的友好机器人助手。
 你的任务是帮助玩家解答问题，提供游戏指导。
 请用简洁友好的中文回答，每次回复不超过100字。
@@ -55,7 +55,7 @@ export class AIService {
       history.splice(0, 2);
     }
 
-    const config = this.configManager.getConfig();
+    const config = this.configManager.getFullConfig();
     const model = config.ai?.model || process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
 
     try {

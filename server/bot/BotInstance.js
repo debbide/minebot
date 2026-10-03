@@ -695,6 +695,11 @@ export class BotInstance {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
     }
+    if (this.pendingConnectReject) {
+      const rejectConnect = this.pendingConnectReject;
+      this.pendingConnectReject = null;
+      rejectConnect(new Error('连接在登录完成前已断开'));
+    }
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -1168,6 +1173,7 @@ export class BotInstance {
     this.log('info', `正在连接 ${host}:${port} (用户: ${username})...`, '⚡');
 
     return new Promise((resolve, reject) => {
+      this.pendingConnectReject = reject;
       try {
         botOptions = {
           host,
@@ -1212,11 +1218,13 @@ export class BotInstance {
         this.bot.on('login', () => {
           this.log('success', `登录成功 (${username})`, '✅');
           clearTimeout(this.connectionTimeout);
+          this.pendingConnectReject = null;
           this.isRepairing = false;
           this.reconnectAttempts = 0;
           this.usernameRetryCount = 0;
           this.updateActivity();
           this.startActivityMonitor();
+          this.startWaterRescueMonitor();
 
           if (this.modes.autoChat) {
             this.startAutoChat();
@@ -1274,6 +1282,7 @@ export class BotInstance {
           }
 
           if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+          this.pendingConnectReject = null;
           resolve();
         });
 
@@ -1402,7 +1411,7 @@ export class BotInstance {
           this.log('warning', '连接断开', '🔌');
           this.status.connected = false;
           this.bot = null;
-          if (this.onStatusChange) this.onStatusChange(this.id, this.getStatus());
+          if (this.onStatusChange && !this.destroyed) this.onStatusChange(this.id, this.getStatus());
           // 连接断开自动重连，除非是主动断开
           if (!this.destroyed) {
             this.attemptRepair('连接断开');
